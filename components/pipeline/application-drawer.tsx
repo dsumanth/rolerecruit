@@ -75,10 +75,10 @@ export function ApplicationDrawer({ app, schoolName, onClose }: Props) {
   return (
     <>
       <div className="fixed inset-0 bg-black/20 z-40" onClick={onClose} />
-      <div className="fixed inset-y-0 right-0 w-96 bg-surface border-l border-surface-tertiary z-50 overflow-y-auto shadow-menu">
+      <div className="fixed inset-y-0 right-0 w-96 bg-surface backdrop-blur-20 border-l border-chrome z-50 overflow-y-auto shadow-elev-3">
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold text-ink">
+            <h2 className="text-title-m text-ink">
               {candidateName}
             </h2>
             <Button variant="ghost" size="sm" onClick={onClose}>

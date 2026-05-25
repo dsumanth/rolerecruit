@@ -56,7 +56,7 @@ export function InlineExpansion({ app }: InlineExpansionProps) {
   const candidatePhone = candidate?.phone ?? app.candidate?.phone ?? "";
 
   return (
-    <div className="border-t border-surface-tertiary bg-surface-secondary/50 px-6 py-4">
+    <div className="border-t border-hairline bg-surface-canvas px-6 py-4">
       <Tabs
         items={[
           { value: "info", label: "Info" },

@@ -17,7 +17,7 @@ export function EvaluationSummary({ applicationId }: Props) {
   const submitted = evaluations.filter((e) => e.submitted);
   if (submitted.length === 0) {
     return (
-      <p className="text-xs text-ink-tertiary mt-1">
+      <p className="text-caption text-ink-secondary mt-1">
         {evaluations.length} evaluator{evaluations.length !== 1 ? "s" : ""} invited
       </p>
     );
@@ -38,11 +38,11 @@ export function EvaluationSummary({ applicationId }: Props) {
 
   return (
     <div className="flex items-center gap-2 mt-1.5">
-      <span className="text-xs text-ink-secondary tabular-nums">
+      <span className="text-body-s text-ink-secondary tabular-nums">
         Avg: {avg.toFixed(1)}
       </span>
-      <span className="text-xs text-ink-secondary">·</span>
-      <span className="text-xs text-ink-secondary tabular-nums">
+      <span className="text-body-s text-ink-secondary">·</span>
+      <span className="text-body-s text-ink-secondary tabular-nums">
         {recommendations}/{submitted.length} hire
       </span>
     </div>

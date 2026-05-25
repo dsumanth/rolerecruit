@@ -4,7 +4,20 @@ import { useState, useMemo, useRef, useCallback } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
 import { InlineExpansion } from "@/components/pipeline/inline-expansion";
+
+type BadgeVariant = "neutral" | "info" | "success" | "warning" | "danger";
+
+const STAGE_VARIANT: Record<string, BadgeVariant> = {
+  sourced: "neutral",
+  screened: "neutral",
+  demo_scheduled: "info",
+  demo_completed: "info",
+  offer_sent: "warning",
+  hired: "success",
+  rejected: "danger",
+};
 
 interface Application {
   _id: string;
@@ -48,10 +61,10 @@ const STAGE_LABELS: Record<string, string> = {
   rejected: "Rejected",
 };
 
-function matchScoreVariant(score: number) {
-  if (score >= 85) return "success" as const;
-  if (score >= 60) return "warning" as const;
-  return "default" as const;
+function matchScoreVariant(score: number): BadgeVariant {
+  if (score >= 85) return "success";
+  if (score >= 60) return "warning";
+  return "neutral";
 }
 
 export function ApplicationTable({
@@ -100,17 +113,17 @@ export function ApplicationTable({
   };
 
   return (
-    <div className="rounded-apple bg-surface shadow-elevation-low overflow-hidden">
-      <div className="grid grid-cols-[1fr_80px_140px_1fr_80px_120px] gap-4 px-5 py-2.5 border-b border-surface-tertiary bg-surface-secondary/50 text-xs font-medium text-ink-secondary uppercase tracking-wider">
+    <Card padding="none" elevation={1} className="overflow-hidden">
+      <div className="grid grid-cols-[1fr_80px_140px_1fr_80px_120px] gap-4 px-5 py-2.5 border-b border-hairline bg-surface-canvas text-micro font-medium text-ink-secondary uppercase tracking-wider">
         <button
           onClick={() => onSortChange("name")}
-          className={cn("text-left hover:text-ink transition-colors", sortBy === "name" && "text-accent")}
+          className={cn("text-left hover:text-ink transition-colors duration-fast", sortBy === "name" && "text-accent")}
         >
           Candidate
         </button>
         <button
           onClick={() => onSortChange("score")}
-          className={cn("text-center hover:text-ink transition-colors", sortBy === "score" && "text-accent")}
+          className={cn("text-center hover:text-ink transition-colors duration-fast", sortBy === "score" && "text-accent")}
         >
           {showScoreAs === "global" ? "Global Score" : "Match Score"}
         </button>
@@ -157,8 +170,8 @@ export function ApplicationTable({
                     }
                   }}
                   className={cn(
-                    "w-full grid grid-cols-[1fr_80px_140px_1fr_80px_120px] gap-4 px-5 py-3 text-sm text-left border-b border-surface-tertiary transition-colors duration-normal hover:bg-surface-secondary/50",
-                    isExpanded && "bg-accent/5 border-l-2 border-l-accent",
+                    "w-full grid grid-cols-[1fr_80px_140px_1fr_80px_120px] gap-4 px-5 py-3 text-body-s text-left border-b border-hairline transition-colors duration-fast hover:bg-accent-soft",
+                    isExpanded && "bg-accent-soft border-l-2 border-l-accent",
                   )}
                 >
                   <div>
@@ -190,7 +203,7 @@ export function ApplicationTable({
                     )}
                   </div>
                   <div>
-                    <Badge variant="neutral">
+                    <Badge dot variant={STAGE_VARIANT[app.stage] ?? "neutral"}>
                       {STAGE_LABELS[app.stage] ?? app.stage}
                     </Badge>
                   </div>
@@ -215,11 +228,11 @@ export function ApplicationTable({
       </div>
 
       {sorted.length === 0 && (
-        <div className="py-12 text-center text-sm text-ink-secondary">
+        <div className="py-12 text-center text-body-s text-ink-secondary">
           No applications match your filters
         </div>
       )}
-    </div>
+    </Card>
   );
 }
 
