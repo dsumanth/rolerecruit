@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { Button, Card, Input } from "@/components/ui";
 
 interface Props {
   schoolId: Id<"schools">;
@@ -53,99 +54,101 @@ export function CalendarConfigForm({ schoolId }: Props) {
   };
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h2 className="text-lg font-semibold text-ink mb-1">Google Calendar</h2>
+    <div className="space-y-6">
+      <Card padding="md" elevation={1}>
+        <h2 className="text-body-s font-semibold text-ink mb-1">Google Calendar</h2>
+        <p className="text-body-s text-ink-secondary mb-4">
+          Sync availability and create calendar events for interviews.
+        </p>
         {connectionStatus?.connected ? (
-          <div className="flex items-center justify-between p-4 rounded-apple bg-surface border border-surface-tertiary">
+          <div className="flex items-center justify-between rounded-sm bg-surface-canvas px-4 py-3">
             <div>
-              <p className="text-sm font-medium text-ink">Connected</p>
-              <p className="text-xs text-ink-secondary">{connectionStatus.email}</p>
+              <p className="text-body-s font-medium text-ink">Connected</p>
+              <p className="text-caption text-ink-secondary">{connectionStatus.email}</p>
             </div>
-            <button
-              onClick={() => disconnectCalendar({ schoolId })}
-              className="px-3 py-1.5 rounded-apple bg-surface-secondary text-ink text-xs font-medium hover:bg-surface-tertiary transition-colors"
-            >
+            <Button variant="secondary" size="sm" onClick={() => disconnectCalendar({ schoolId })}>
               Disconnect
-            </button>
+            </Button>
           </div>
         ) : (
-          <button
-            onClick={handleConnect}
-            className="w-full py-3 rounded-apple bg-accent text-white text-sm font-medium hover:bg-accent-hover transition-colors"
-          >
+          <Button variant="primary" onClick={handleConnect}>
             Connect Google Calendar
-          </button>
+          </Button>
         )}
-      </div>
+      </Card>
 
-      <div>
-        <h2 className="text-lg font-semibold text-ink mb-4">Scheduling Preferences</h2>
-        <div className="space-y-4">
-          <div>
-            <label className="text-xs font-medium text-ink-secondary block mb-1">
-              Advance Booking Window (days)
-            </label>
-            <input
+      <Card padding="md" elevation={1}>
+        <h2 className="text-body-s font-semibold text-ink mb-1">Scheduling Preferences</h2>
+        <p className="text-body-s text-ink-secondary mb-2">
+          Control how far ahead candidates can book and which slots are offered.
+        </p>
+
+        <div>
+          <div className="grid grid-cols-[1fr_240px] gap-6 py-4 border-b border-hairline items-center">
+            <div>
+              <div className="text-body-s font-medium text-ink">Advance booking window</div>
+              <div className="text-caption text-ink-secondary mt-0.5">Maximum days ahead a candidate can book.</div>
+            </div>
+            <Input
               type="number"
               min={1}
               max={90}
               value={advanceDays}
               onChange={(e) => setAdvanceDays(Number(e.target.value))}
-              className="w-24 px-3 py-2 rounded-apple bg-surface border border-surface-tertiary text-sm text-ink"
             />
           </div>
 
-          <div className="flex gap-4">
+          <div className="grid grid-cols-[1fr_240px] gap-6 py-4 border-b border-hairline items-center">
             <div>
-              <label className="text-xs font-medium text-ink-secondary block mb-1">Working Hours Start</label>
-              <input
-                type="time"
-                value={workingHoursStart}
-                onChange={(e) => setWorkingHoursStart(e.target.value)}
-                className="px-3 py-2 rounded-apple bg-surface border border-surface-tertiary text-sm text-ink"
-              />
+              <div className="text-body-s font-medium text-ink">Working hours start</div>
+              <div className="text-caption text-ink-secondary mt-0.5">Earliest time of day to offer slots.</div>
             </div>
-            <div>
-              <label className="text-xs font-medium text-ink-secondary block mb-1">Working Hours End</label>
-              <input
-                type="time"
-                value={workingHoursEnd}
-                onChange={(e) => setWorkingHoursEnd(e.target.value)}
-                className="px-3 py-2 rounded-apple bg-surface border border-surface-tertiary text-sm text-ink"
-              />
-            </div>
+            <Input
+              type="time"
+              value={workingHoursStart}
+              onChange={(e) => setWorkingHoursStart(e.target.value)}
+            />
           </div>
 
-          <div>
-            <label className="text-xs font-medium text-ink-secondary block mb-2">Slot Duration</label>
+          <div className="grid grid-cols-[1fr_240px] gap-6 py-4 border-b border-hairline items-center">
+            <div>
+              <div className="text-body-s font-medium text-ink">Working hours end</div>
+              <div className="text-caption text-ink-secondary mt-0.5">Latest time of day to offer slots.</div>
+            </div>
+            <Input
+              type="time"
+              value={workingHoursEnd}
+              onChange={(e) => setWorkingHoursEnd(e.target.value)}
+            />
+          </div>
+
+          <div className="grid grid-cols-[1fr_240px] gap-6 py-4 items-center">
+            <div>
+              <div className="text-body-s font-medium text-ink">Slot duration</div>
+              <div className="text-caption text-ink-secondary mt-0.5">Length of each interview slot.</div>
+            </div>
             <div className="flex gap-2">
               {[30, 45, 60].map((d) => (
-                <button
+                <Button
                   key={d}
                   type="button"
+                  variant={slotDuration === d ? "primary" : "secondary"}
+                  size="sm"
                   onClick={() => setSlotDuration(d)}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                    slotDuration === d
-                      ? "bg-accent text-white"
-                      : "bg-surface-secondary text-ink hover:bg-surface-tertiary"
-                  }`}
                 >
                   {d} min
-                </button>
+                </Button>
               ))}
             </div>
           </div>
         </div>
 
-        <button
-          onClick={handleSaveSlotConfig}
-          disabled={saving}
-          className="mt-6 w-full py-2.5 rounded-apple bg-accent text-white text-sm font-medium hover:bg-accent-hover disabled:opacity-50 transition-colors"
-        >
-          {saving ? "Saving..." : "Save Settings"}
-        </button>
-      </div>
+        <div className="mt-4">
+          <Button variant="primary" onClick={handleSaveSlotConfig} disabled={saving} loading={saving}>
+            Save Settings
+          </Button>
+        </div>
+      </Card>
     </div>
   );
 }
