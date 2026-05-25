@@ -1,9 +1,26 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { PageHeader, Badge, Button, Card } from "@/components/ui";
+
+type RunStatus = "running" | "completed" | "failed" | string;
+
+function jobBadge(status: string) {
+  if (status === "active") return <Badge dot variant="success">Active</Badge>;
+  if (status === "draft") return <Badge dot variant="neutral">Draft</Badge>;
+  return <Badge dot variant="neutral">Closed</Badge>;
+}
+
+function runBadge(status: RunStatus) {
+  if (status === "running") return <Badge variant="info">Running</Badge>;
+  if (status === "completed") return <Badge variant="success">Completed</Badge>;
+  if (status === "failed") return <Badge variant="danger">Failed</Badge>;
+  return <Badge variant="neutral">{status}</Badge>;
+}
 
 export default function SourcingPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -33,95 +50,135 @@ export default function SourcingPage({ params }: { params: { id: string } }) {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-ink">
+      <PageHeader
+        back={{ href: "/dashboard/jobs", label: "Jobs" }}
+        title={job?.title ?? "Sourcing"}
+        subtitle={job ? [job.subject, job.level, job.board].filter(Boolean).join(" · ") : undefined}
+        status={job ? jobBadge(job.status) : undefined}
+        actions={
+          <Button
+            variant="primary"
+            size="md"
+            iconLeft="Sparkles"
+            loading={running}
+            onClick={handleRunSourcing}
+          >
             Source Candidates
-          </h1>
-          <p className="text-sm text-ink-secondary mt-1">
-            {job?.title ?? "Loading..."}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={handleRunSourcing}
-          disabled={running}
-          className="py-2.5 px-5 rounded-apple bg-[#0071e3] text-white text-sm font-medium hover:bg-[#0077ed] active:bg-[#004999] disabled:opacity-50 transition-colors"
-        >
-          {running ? "Sourcing..." : "Source Candidates"}
-        </button>
-      </div>
+          </Button>
+        }
+      />
 
-      {sourcingRuns && sourcingRuns.length > 0 && (
-        <div className="mb-6 space-y-2">
-          <h2 className="text-sm font-semibold text-ink mb-3">Sourcing History</h2>
-          {sourcingRuns.map((run) => (
-            <div key={run._id} className="flex items-center gap-3 text-sm">
-              <span className={`text-xs px-2 py-0.5 rounded-full ${
-                run.status === "completed"
-                  ? "bg-[#e8f5e9] text-[#34c759]"
-                  : run.status === "running"
-                  ? "bg-accent/10 text-accent"
-                  : run.status === "failed"
-                  ? "bg-[#fff2f0] text-[#ff3b30]"
-                  : "bg-surface-secondary text-ink-secondary"
-              }`}>
-                {run.status}
-              </span>
-              <span className="text-xs text-ink-tertiary">
-                {new Date(run.startedAt).toLocaleDateString("en-IN", {
-                  day: "numeric",
-                  month: "short",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </span>
-              {run.candidatesFound != null && (
-                <span className="text-xs text-ink-secondary">{run.candidatesFound} found</span>
-              )}
-              {run.candidatesScored != null && (
-                <span className="text-xs text-ink-secondary">{run.candidatesScored} scored</span>
-              )}
-              {run.error && (
-                <span className="text-xs text-[#ff3b30] truncate">{run.error}</span>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+      <JobTabs jobId={params.id} active="sourcing" />
 
-      {error && (
-        <div className="px-4 py-3 rounded-apple bg-[#fff2f0] text-sm text-[#ff3b30] mb-6">{error}</div>
-      )}
-
-      <div className="rounded-apple bg-surface border border-surface-tertiary p-8 text-center">
-        {sourcingRuns && sourcingRuns.length > 0 ? (
-          <>
-            <p className="text-ink text-sm font-medium mb-2">
-              {totalPipeline} candidate{totalPipeline !== 1 ? "s" : ""} in pipeline
-            </p>
-            <p className="text-ink-secondary text-sm mb-4">
-              Sourced candidates are added directly to your pipeline.
-            </p>
-            <button
-              type="button"
-              onClick={() => router.push(`/dashboard/jobs/${params.id}/pipeline`)}
-              className="py-2.5 px-5 rounded-apple bg-[#0071e3] text-white text-sm font-medium hover:bg-[#0077ed] transition-colors"
-            >
-              View Pipeline
-            </button>
-          </>
-        ) : (
-          <>
-            <p className="text-ink-secondary text-sm mb-4">
-              Click &quot;Source Candidates&quot; to find matching teachers from Naukri, Indeed, and LinkedIn.
-            </p>
-            <p className="text-ink-tertiary text-xs">
-              During beta, this uses mock data. Real Apify integration is configured in convex/sourcing_actions.ts.
-            </p>
-          </>
+      <div className="mt-7 space-y-5">
+        {error && (
+          <Card padding="md" elevation={1}>
+            <p className="text-body-s text-danger">{error}</p>
+          </Card>
         )}
+
+        {sourcingRuns && sourcingRuns.length > 0 && (
+          <div>
+            <div className="text-micro text-ink-secondary uppercase tracking-wider mb-3">
+              Sourcing history
+            </div>
+            <div className="space-y-2">
+              {sourcingRuns.map((run) => (
+                <Card key={run._id} padding="md" elevation={1} interactive>
+                  <div className="flex flex-wrap items-center gap-3">
+                    {runBadge(run.status)}
+                    <span className="text-caption text-ink-secondary">
+                      {new Date(run.startedAt).toLocaleDateString("en-IN", {
+                        day: "numeric",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                    {run.candidatesFound != null && (
+                      <span className="text-caption text-ink-secondary">
+                        {run.candidatesFound} found
+                      </span>
+                    )}
+                    {run.candidatesScored != null && (
+                      <span className="text-caption text-ink-secondary">
+                        {run.candidatesScored} scored
+                      </span>
+                    )}
+                    {run.error && (
+                      <span className="text-caption text-danger truncate">{run.error}</span>
+                    )}
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <Card padding="lg" elevation={1}>
+          <div className="text-center">
+            {sourcingRuns && sourcingRuns.length > 0 ? (
+              <>
+                <p className="text-body text-ink font-medium mb-2">
+                  {totalPipeline} candidate{totalPipeline !== 1 ? "s" : ""} in pipeline
+                </p>
+                <p className="text-body-s text-ink-secondary mb-4">
+                  Sourced candidates are added directly to your pipeline.
+                </p>
+                <Button
+                  variant="primary"
+                  size="md"
+                  onClick={() => router.push(`/dashboard/jobs/${params.id}/pipeline`)}
+                >
+                  View Pipeline
+                </Button>
+              </>
+            ) : (
+              <>
+                <p className="text-body-s text-ink-secondary mb-2">
+                  Click &quot;Source Candidates&quot; to find matching teachers from Naukri, Indeed, and LinkedIn.
+                </p>
+                <p className="text-caption text-ink-tertiary">
+                  During beta, this uses mock data. Real Apify integration is configured in convex/sourcing_actions.ts.
+                </p>
+              </>
+            )}
+          </div>
+        </Card>
       </div>
+    </div>
+  );
+}
+
+function JobTabs({ jobId, active }: { jobId: string; active: "overview" | "pipeline" | "sourcing" | "criteria" }) {
+  const tabs: Array<{ value: typeof active; label: string; href: string }> = [
+    { value: "overview", label: "Overview", href: `/dashboard/jobs/${jobId}` },
+    { value: "pipeline", label: "Pipeline", href: `/dashboard/jobs/${jobId}/pipeline` },
+    { value: "sourcing", label: "Sourcing", href: `/dashboard/jobs/${jobId}/sourcing` },
+    { value: "criteria", label: "Criteria", href: `/dashboard/jobs/${jobId}/criteria` },
+  ];
+  return (
+    <div role="tablist" className="flex gap-1 border-b border-hairline">
+      {tabs.map((t) => {
+        const a = t.value === active;
+        return (
+          <Link
+            key={t.value}
+            href={t.href}
+            role="tab"
+            aria-selected={a}
+            className={`relative px-3.5 py-2 text-body-s ${a ? "text-ink font-semibold" : "text-ink-secondary hover:text-ink"} transition-colors duration-fast`}
+          >
+            {t.label}
+            {a && (
+              <span
+                aria-hidden
+                className="absolute left-3.5 right-3.5 -bottom-px h-[2px] rounded-full bg-accent-grad"
+              />
+            )}
+          </Link>
+        );
+      })}
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { cn } from "@/lib/utils";
+import { Card, Badge, Button } from "@/components/ui";
 
 interface Candidate {
   _id: string;
@@ -27,6 +27,14 @@ interface Props {
   reasoning?: string;
 }
 
+type BadgeVariant = "neutral" | "info" | "success" | "warning" | "danger";
+
+function scoreVariant(score: number): BadgeVariant {
+  if (score >= 80) return "success";
+  if (score >= 50) return "warning";
+  return "neutral";
+}
+
 export function CandidateReviewCard({
   candidate,
   jobId,
@@ -36,96 +44,74 @@ export function CandidateReviewCard({
   reasoning,
 }: Props) {
   return (
-    <div className="rounded-apple bg-surface border border-surface-tertiary p-5">
+    <Card padding="md" elevation={1} interactive>
       <div className="flex items-start justify-between mb-3">
         <div>
-          <h3 className="text-sm font-semibold text-ink">
+          <h3 className="text-body-s font-semibold text-ink">
             {candidate.name}
           </h3>
           {candidate.location && (
-            <p className="text-xs text-ink-tertiary mt-0.5">{candidate.location}</p>
+            <p className="text-caption text-ink-secondary mt-0.5">{candidate.location}</p>
           )}
         </div>
         {score != null && (
-          <span
-            className={cn(
-              "text-xs px-2 py-1 rounded-full font-medium tabular-nums",
-              score >= 80
-                ? "bg-green-50 text-success"
-                : score >= 50
-                  ? "bg-amber-50 text-warning"
-                  : "bg-surface-secondary text-ink-secondary"
-            )}
-          >
-            {score}%
-          </span>
+          <Badge variant={scoreVariant(score)}>{score}%</Badge>
         )}
       </div>
 
       {reasoning && (
-        <p className="text-xs text-ink-secondary mb-3 italic">{reasoning}</p>
+        <p className="text-caption text-ink-secondary mb-3 italic">{reasoning}</p>
       )}
 
       <div className="space-y-2 mb-4">
         {candidate.yearsExperience != null && (
           <div className="flex items-center gap-2">
-            <span className="text-xs text-ink-tertiary w-20 shrink-0">Experience</span>
-            <span className="text-xs text-ink">{candidate.yearsExperience} years</span>
+            <span className="text-caption text-ink-secondary w-20 shrink-0">Experience</span>
+            <span className="text-caption text-ink">{candidate.yearsExperience} years</span>
           </div>
         )}
         {candidate.currentSchool && (
           <div className="flex items-center gap-2">
-            <span className="text-xs text-ink-tertiary w-20 shrink-0">Current</span>
-            <span className="text-xs text-ink">{candidate.currentSchool}</span>
+            <span className="text-caption text-ink-secondary w-20 shrink-0">Current</span>
+            <span className="text-caption text-ink">{candidate.currentSchool}</span>
           </div>
         )}
         {candidate.qualifications.length > 0 && (
           <div className="flex items-start gap-2">
-            <span className="text-xs text-ink-tertiary w-20 shrink-0">Quals</span>
+            <span className="text-caption text-ink-secondary w-20 shrink-0">Quals</span>
             <div className="flex flex-wrap gap-1">
               {candidate.qualifications.map((q) => (
-                <span
-                  key={q}
-                  className="text-xs px-1.5 py-0.5 rounded bg-surface-secondary text-ink"
-                >
-                  {q}
-                </span>
+                <Badge key={q} variant="neutral">{q}</Badge>
               ))}
             </div>
           </div>
         )}
         {candidate.certifications.length > 0 && (
           <div className="flex items-start gap-2">
-            <span className="text-xs text-ink-tertiary w-20 shrink-0">Certs</span>
+            <span className="text-caption text-ink-secondary w-20 shrink-0">Certs</span>
             <div className="flex flex-wrap gap-1">
               {candidate.certifications.map((c) => (
-                <span key={c} className="text-xs px-1.5 py-0.5 rounded bg-green-50 text-success">
-                  {c}
-                </span>
+                <Badge key={c} variant="success">{c}</Badge>
               ))}
             </div>
           </div>
         )}
         {candidate.subjects.length > 0 && (
           <div className="flex items-start gap-2">
-            <span className="text-xs text-ink-tertiary w-20 shrink-0">Subjects</span>
+            <span className="text-caption text-ink-secondary w-20 shrink-0">Subjects</span>
             <div className="flex flex-wrap gap-1">
               {candidate.subjects.map((s) => (
-                <span key={s} className="text-xs px-1.5 py-0.5 rounded bg-surface-secondary text-ink">
-                  {s}
-                </span>
+                <Badge key={s} variant="neutral">{s}</Badge>
               ))}
             </div>
           </div>
         )}
         {candidate.boardExperience.length > 0 && (
           <div className="flex items-start gap-2">
-            <span className="text-xs text-ink-tertiary w-20 shrink-0">Boards</span>
+            <span className="text-caption text-ink-secondary w-20 shrink-0">Boards</span>
             <div className="flex flex-wrap gap-1">
               {candidate.boardExperience.map((b) => (
-                <span key={b} className="text-xs px-1.5 py-0.5 rounded bg-surface-secondary text-ink">
-                  {b}
-                </span>
+                <Badge key={b} variant="neutral">{b}</Badge>
               ))}
             </div>
           </div>
@@ -133,21 +119,22 @@ export function CandidateReviewCard({
       </div>
 
       <div className="flex gap-2">
-        <button
-          type="button"
+        <Button
+          variant="primary"
+          size="sm"
+          className="flex-1"
           onClick={() => onAddToPipeline(candidate._id)}
-          className="flex-1 py-2 rounded-apple bg-accent text-white text-xs font-medium hover:bg-accent-hover transition-colors"
         >
           Add to Pipeline
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={() => onDismiss(candidate._id)}
-          className="py-2 px-4 rounded-apple bg-surface-secondary text-ink-secondary text-xs font-medium hover:bg-surface-tertiary transition-colors"
         >
           Dismiss
-        </button>
+        </Button>
       </div>
-    </div>
+    </Card>
   );
 }
