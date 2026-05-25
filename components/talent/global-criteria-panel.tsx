@@ -3,9 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Badge, Button, Card } from "@/components/ui";
 
 interface GlobalCriteriaPanelProps {
   schoolId: string;
@@ -103,9 +101,9 @@ export function GlobalCriteriaPanel({ schoolId, onClose }: GlobalCriteriaPanelPr
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/20" onClick={onClose} />
 
-      <div className="relative bg-surface rounded-apple shadow-elevation-high max-w-lg w-full mx-4 p-6 space-y-5">
+      <Card surface="floating" elevation={4} padding="lg" className="relative max-w-lg w-full mx-4 space-y-5">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-ink">Global Scoring Criteria</h3>
+          <h3 className="text-title-m text-ink">Global Scoring Criteria</h3>
           <button
             onClick={onClose}
             className="text-ink-tertiary hover:text-ink transition-colors"
@@ -118,23 +116,23 @@ export function GlobalCriteriaPanel({ schoolId, onClose }: GlobalCriteriaPanelPr
 
         {mode === "view" && existing ? (
           <div className="space-y-4">
-            <p className="text-sm text-ink-secondary">
+            <p className="text-body-s text-ink-secondary">
               Scoring criteria used to evaluate all candidates in the talent bank.
             </p>
             <div className="space-y-2">
               {existing.scoringRules.dimensions.map((dim: any) => (
-                <div key={dim.name} className="flex items-center justify-between px-3 py-2 rounded-apple bg-surface-secondary">
-                  <span className="text-sm text-ink">{dim.name}</span>
+                <div key={dim.name} className="flex items-center justify-between px-3 py-2 rounded-sm bg-surface-canvas">
+                  <span className="text-body-s text-ink">{dim.name}</span>
                   <Badge variant="neutral">
                     {Math.round(dim.weight * 100)}%
                   </Badge>
                 </div>
               ))}
             </div>
-            <div className="flex items-center gap-4 text-xs text-ink-secondary">
+            <div className="flex items-center gap-4 text-caption text-ink-secondary">
               <span>Min Score: <span className="text-ink font-medium">{existing.scoringRules.minimumScore}</span></span>
               <span>Auto-Reject: <span className="text-ink font-medium">{existing.scoringRules.autoRejectScore}</span></span>
-              <Badge variant={existing.scoringRules.generatedBy === "agent" ? "info" : "default"}>
+              <Badge variant={existing.scoringRules.generatedBy === "agent" ? "info" : "neutral"}>
                 v{existing.scoringRules.version}
               </Badge>
             </div>
@@ -157,13 +155,13 @@ export function GlobalCriteriaPanel({ schoolId, onClose }: GlobalCriteriaPanelPr
           </div>
         ) : (
           <div className="space-y-4">
-            <p className="text-sm text-ink-secondary">
+            <p className="text-body-s text-ink-secondary">
               Define scoring dimensions and weights to evaluate every candidate in your talent bank.
             </p>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-ink-secondary">Dimensions</span>
+                <span className="text-caption font-medium text-ink-secondary">Dimensions</span>
                 <Button size="sm" variant="secondary" onClick={handleSuggest} loading={loading}>
                   Suggest with AI
                 </Button>
@@ -175,7 +173,7 @@ export function GlobalCriteriaPanel({ schoolId, onClose }: GlobalCriteriaPanelPr
                     value={dim.name}
                     onChange={(e) => updateDimension(i, "name", e.target.value)}
                     placeholder="Dimension name"
-                    className="flex-1 text-sm px-3 py-1.5 rounded-apple bg-surface border border-surface-tertiary text-ink placeholder:text-ink-tertiary focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
+                    className="flex-1 text-body-s px-3 py-1.5 rounded-sm bg-surface border border-hairline-strong text-ink placeholder:text-ink-tertiary focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
                   />
                   <input
                     type="number"
@@ -183,9 +181,9 @@ export function GlobalCriteriaPanel({ schoolId, onClose }: GlobalCriteriaPanelPr
                     onChange={(e) => updateDimension(i, "weight", Number(e.target.value) / 100)}
                     min={0}
                     max={100}
-                    className="w-16 text-sm px-2 py-1.5 rounded-apple bg-surface border border-surface-tertiary text-ink text-center focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
+                    className="w-16 text-body-s px-2 py-1.5 rounded-sm bg-surface border border-hairline-strong text-ink text-center focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
                   />
-                  <span className="text-xs text-ink-secondary">%</span>
+                  <span className="text-caption text-ink-secondary">%</span>
                   <button
                     onClick={() => removeDimension(i)}
                     className="text-ink-tertiary hover:text-danger transition-colors"
@@ -204,25 +202,25 @@ export function GlobalCriteriaPanel({ schoolId, onClose }: GlobalCriteriaPanelPr
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-ink-secondary block mb-1">Minimum Score</label>
+                <label className="text-caption text-ink-secondary block mb-1">Minimum Score</label>
                 <input
                   type="number"
                   value={minimumScore}
                   onChange={(e) => setMinimumScore(Number(e.target.value))}
                   min={0}
                   max={100}
-                  className="w-full text-sm px-3 py-1.5 rounded-apple bg-surface border border-surface-tertiary text-ink focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
+                  className="w-full text-body-s px-3 py-1.5 rounded-sm bg-surface border border-hairline-strong text-ink focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
                 />
               </div>
               <div>
-                <label className="text-xs text-ink-secondary block mb-1">Auto-Reject Score</label>
+                <label className="text-caption text-ink-secondary block mb-1">Auto-Reject Score</label>
                 <input
                   type="number"
                   value={autoRejectScore}
                   onChange={(e) => setAutoRejectScore(Number(e.target.value))}
                   min={0}
                   max={100}
-                  className="w-full text-sm px-3 py-1.5 rounded-apple bg-surface border border-surface-tertiary text-ink focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
+                  className="w-full text-body-s px-3 py-1.5 rounded-sm bg-surface border border-hairline-strong text-ink focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
                 />
               </div>
             </div>
@@ -244,7 +242,7 @@ export function GlobalCriteriaPanel({ schoolId, onClose }: GlobalCriteriaPanelPr
             </div>
           </div>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

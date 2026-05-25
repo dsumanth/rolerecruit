@@ -81,8 +81,8 @@ describe("TalentControls", () => {
     const onSortChange = vi.fn();
     render(<TalentControls {...defaultProps} onSortChange={onSortChange} />);
 
-    const select = screen.getByRole("combobox");
-    fireEvent.change(select, { target: { value: "score" } });
+    fireEvent.click(screen.getByText("Newest"));
+    fireEvent.click(screen.getByText("Highest Score"));
     expect(onSortChange).toHaveBeenCalledWith("score");
   });
 });

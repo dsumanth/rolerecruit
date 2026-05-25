@@ -3,6 +3,13 @@
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Select } from "@/components/ui";
+
+const SORT_OPTIONS = [
+  { value: "newest", label: "Newest" },
+  { value: "score", label: "Highest Score" },
+  { value: "name", label: "Name A-Z" },
+];
 
 const PIPELINE_STAGES = [
   "sourced",
@@ -88,15 +95,11 @@ export function TalentControls({
           />
         </div>
 
-        <select
+        <Select
           value={sortBy}
-          onChange={(e) => onSortChange(e.target.value as "newest" | "score" | "name")}
-          className="text-xs px-3 py-1.5 rounded-apple bg-surface border border-surface-tertiary text-ink-secondary focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent appearance-none"
-        >
-          <option value="newest">Newest</option>
-          <option value="score">Highest Score</option>
-          <option value="name">Name A-Z</option>
-        </select>
+          onChange={(v) => onSortChange(v as "newest" | "score" | "name")}
+          options={SORT_OPTIONS}
+        />
       </div>
 
       {pools.length > 0 && (

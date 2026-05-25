@@ -3,10 +3,8 @@
 import { useState } from "react";
 import { useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Button } from "@/components/ui/button";
+import { Badge, Button, Card } from "@/components/ui";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
 
 interface Pool {
   _id: string;
@@ -86,9 +84,9 @@ export function PoolSelector({ schoolId, pools }: PoolSelectorProps) {
   };
 
   return (
-    <div className="rounded-apple bg-surface border border-surface-tertiary p-5 space-y-4">
+    <Card padding="md" className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-ink">Manage Pools</h3>
+        <h3 className="text-body-s font-semibold text-ink">Manage Pools</h3>
         <Button variant="secondary" size="sm" onClick={handleSuggest} loading={suggesting}>
           Suggest Pools
         </Button>
@@ -96,12 +94,12 @@ export function PoolSelector({ schoolId, pools }: PoolSelectorProps) {
 
       {suggestions.length > 0 && (
         <div className="space-y-2">
-          <p className="text-xs text-ink-secondary">AI Suggestions</p>
+          <p className="text-caption text-ink-secondary">AI Suggestions</p>
           {suggestions.map((s) => (
-            <div key={s.name} className="flex items-center justify-between px-3 py-2 rounded-apple bg-surface-secondary">
+            <div key={s.name} className="flex items-center justify-between px-3 py-2 rounded-sm bg-surface-canvas">
               <div>
-                <span className="text-sm text-ink">{s.name}</span>
-                <span className="text-xs text-ink-secondary ml-2">
+                <span className="text-body-s text-ink">{s.name}</span>
+                <span className="text-caption text-ink-secondary ml-2">
                   {s.tags.join(", ")}
                 </span>
               </div>
@@ -127,7 +125,7 @@ export function PoolSelector({ schoolId, pools }: PoolSelectorProps) {
           {pools.map((pool) => (
             <div
               key={pool._id}
-              className="flex items-center justify-between px-3 py-2 rounded-apple hover:bg-surface-secondary/50 transition-colors"
+              className="flex items-center justify-between px-3 py-2 rounded-sm hover:bg-surface-canvas transition-colors"
             >
               {editingId === pool._id ? (
                 <div className="flex items-center gap-2 flex-1">
@@ -135,13 +133,13 @@ export function PoolSelector({ schoolId, pools }: PoolSelectorProps) {
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
                     placeholder="Pool name"
-                    className="text-sm h-8 flex-1"
+                    className="text-body-s h-8 flex-1"
                   />
                   <Input
                     value={editTags}
                     onChange={(e) => setEditTags(e.target.value)}
                     placeholder="Tags (comma-separated)"
-                    className="text-sm h-8 flex-1"
+                    className="text-body-s h-8 flex-1"
                   />
                   <Button size="sm" onClick={() => handleUpdate(pool._id)}>Save</Button>
                   <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>Cancel</Button>
@@ -149,11 +147,11 @@ export function PoolSelector({ schoolId, pools }: PoolSelectorProps) {
               ) : (
                 <>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-ink">{pool.name}</span>
-                    <Badge variant={pool.createdBy === "ai" ? "info" : "default"}>
+                    <span className="text-body-s text-ink">{pool.name}</span>
+                    <Badge variant={pool.createdBy === "ai" ? "info" : "neutral"}>
                       {pool.createdBy === "ai" ? "AI" : "Admin"}
                     </Badge>
-                    <span className="text-xs text-ink-tertiary">
+                    <span className="text-caption text-ink-tertiary">
                       {pool.candidateCount} candidate{pool.candidateCount !== 1 ? "s" : ""}
                     </span>
                   </div>
@@ -180,18 +178,18 @@ export function PoolSelector({ schoolId, pools }: PoolSelectorProps) {
         </div>
       )}
 
-      <div className="flex items-center gap-2 pt-2 border-t border-surface-tertiary">
+      <div className="flex items-center gap-2 pt-2 border-t border-hairline">
         <Input
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
           placeholder="New pool name (e.g., TGT English)"
-          className="text-sm flex-1"
+          className="text-body-s flex-1"
         />
         <Input
           value={newTags}
           onChange={(e) => setNewTags(e.target.value)}
           placeholder="Tags (comma-separated)"
-          className="text-sm flex-1"
+          className="text-body-s flex-1"
         />
         <Button size="sm" onClick={handleCreate} disabled={!newName.trim() || !schoolId}>
           Create Pool
@@ -199,10 +197,10 @@ export function PoolSelector({ schoolId, pools }: PoolSelectorProps) {
       </div>
 
       {pools.length === 0 && suggestions.length === 0 && (
-        <p className="text-xs text-ink-secondary text-center py-4">
+        <p className="text-caption text-ink-secondary text-center py-4">
           No pools yet. Create one or let AI suggest some based on your candidates.
         </p>
       )}
-    </div>
+    </Card>
   );
 }
