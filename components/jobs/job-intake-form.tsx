@@ -4,9 +4,22 @@ import { useState } from "react";
 import { useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useRouter } from "next/navigation";
+import { Button, Card, Input, Select } from "@/components/ui";
 
-const BOARDS = ["CBSE", "ICSE", "IB", "IGCSE", "State"];
-const LEVELS = ["PRT", "TGT", "PGT", "Other"];
+const BOARD_OPTIONS = [
+  { value: "CBSE", label: "CBSE" },
+  { value: "ICSE", label: "ICSE" },
+  { value: "IB", label: "IB" },
+  { value: "IGCSE", label: "IGCSE" },
+  { value: "State", label: "State" },
+];
+
+const LEVEL_OPTIONS = [
+  { value: "PRT", label: "PRT" },
+  { value: "TGT", label: "TGT" },
+  { value: "PGT", label: "PGT" },
+  { value: "Other", label: "Other" },
+];
 
 export function JobIntakeForm({ schoolId }: { schoolId: string }) {
   const router = useRouter();
@@ -108,113 +121,117 @@ export function JobIntakeForm({ schoolId }: { schoolId: string }) {
   };
 
   return (
-    <form onSubmit={handleSaveDraft} className="space-y-8">
-      <div>
-        <label className="block text-sm font-medium text-ink mb-1.5">
-          Describe the role
-        </label>
-        <p className="text-[13px] text-ink-secondary mb-3">
-          Write naturally. Our AI will extract subjects, qualifications, and requirements.
-        </p>
-        <textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows={5}
-          className="w-full px-4 py-3 rounded-apple bg-surface border border-surface-tertiary text-sm text-ink placeholder:text-ink-tertiary focus:outline-none focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent resize-none"
-          placeholder="We need a Physics teacher for Classes 11 and 12. Must have B.Ed and at least 3 years of CBSE teaching experience. CTET qualified preferred."
-          required
-        />
+    <Card padding="lg" elevation={1}>
+      <form onSubmit={handleSaveDraft} className="space-y-7">
+        <div>
+          <label className="block text-body-s font-medium text-ink mb-1.5">
+            Describe the role
+          </label>
+          <p className="text-caption text-ink-secondary mb-3">
+            Write naturally. Our AI will extract subjects, qualifications, and requirements.
+          </p>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={5}
+            className="w-full rounded-sm bg-surface border border-hairline-strong px-3 py-2 text-body-s text-ink placeholder:text-ink-tertiary outline-none transition-all duration-fast focus:border-accent focus:ring-2 focus:ring-accent-soft min-h-[120px] resize-none"
+            placeholder="We need a Physics teacher for Classes 11 and 12. Must have B.Ed and at least 3 years of CBSE teaching experience. CTET qualified preferred."
+            required
+          />
 
-        {!parsed && (
-          <button
-            type="button"
-            onClick={handleParseWithAI}
-            disabled={parsing || !description.trim()}
-            className="mt-3 py-2 px-4 rounded-apple bg-surface-secondary text-ink text-sm font-medium hover:bg-surface-tertiary disabled:opacity-50 transition-colors"
-          >
-            {parsing ? "Parsing with AI..." : "Parse with AI"}
-          </button>
-        )}
+          {!parsed && (
+            <div className="mt-3">
+              <Button
+                type="button"
+                variant="secondary"
+                size="md"
+                onClick={handleParseWithAI}
+                disabled={!description.trim()}
+                loading={parsing}
+              >
+                {parsing ? "Parsing with AI" : "Parse with AI"}
+              </Button>
+            </div>
+          )}
 
-        {parsed && (
-          <div className="mt-3 px-4 py-2 rounded-apple bg-green-50 text-sm text-success">
-            AI has parsed your description. Review the fields below and edit if needed.
+          {parsed && (
+            <div className="mt-3 rounded-md bg-[color-mix(in_srgb,var(--success)_8%,transparent)] border border-[color-mix(in_srgb,var(--success)_25%,transparent)] px-4 py-3 text-body-s text-[color-mix(in_srgb,var(--success)_75%,var(--ink-1))]">
+              AI has parsed your description. Review the fields below and edit if needed.
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-5">
+          <div>
+            <label className="block text-body-s font-medium text-ink mb-1.5">Job title</label>
+            <Input
+              size="md"
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Physics PGT Teacher"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-body-s font-medium text-ink mb-1.5">Subject</label>
+            <Input
+              size="md"
+              type="text"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              placeholder="Physics"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-body-s font-medium text-ink mb-1.5">Level</label>
+            <Select
+              value={level}
+              onChange={setLevel}
+              options={LEVEL_OPTIONS}
+              className="w-full"
+            />
+          </div>
+          <div>
+            <label className="block text-body-s font-medium text-ink mb-1.5">Board</label>
+            <Select
+              value={board}
+              onChange={setBoard}
+              options={BOARD_OPTIONS}
+              className="w-full"
+            />
+          </div>
+        </div>
+
+        {error && (
+          <div className="rounded-md bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] border border-[color-mix(in_srgb,var(--danger)_25%,transparent)] px-4 py-3 text-body-s text-danger">
+            {error}
           </div>
         )}
-      </div>
 
-      <div className="grid grid-cols-2 gap-5">
-        <div>
-          <label className="block text-sm font-medium text-ink mb-1.5">Job title</label>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="w-full px-4 py-2.5 rounded-apple bg-surface border border-surface-tertiary text-sm text-ink placeholder:text-ink-tertiary focus:outline-none focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
-            placeholder="Physics PGT Teacher"
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-ink mb-1.5">Subject</label>
-          <input
-            type="text"
-            value={subject}
-            onChange={(e) => setSubject(e.target.value)}
-            className="w-full px-4 py-2.5 rounded-apple bg-surface border border-surface-tertiary text-sm text-ink placeholder:text-ink-tertiary focus:outline-none focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
-            placeholder="Physics"
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-ink mb-1.5">Level</label>
-          <select
-            value={level}
-            onChange={(e) => setLevel(e.target.value)}
-            className="w-full px-4 py-2.5 rounded-apple bg-surface border border-surface-tertiary text-sm text-ink focus:outline-none focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent appearance-none"
+        <div className="flex gap-3">
+          <Button
+            type="submit"
+            variant="secondary"
+            size="lg"
+            loading={loading && !parsed}
           >
-            {LEVELS.map((l) => (
-              <option key={l} value={l}>{l}</option>
-            ))}
-          </select>
+            Save as draft
+          </Button>
+          {parsed && (
+            <Button
+              type="button"
+              variant="primary"
+              size="lg"
+              onClick={handlePublish}
+              loading={loading}
+            >
+              Post role
+            </Button>
+          )}
         </div>
-        <div>
-          <label className="block text-sm font-medium text-ink mb-1.5">Board</label>
-          <select
-            value={board}
-            onChange={(e) => setBoard(e.target.value)}
-            className="w-full px-4 py-2.5 rounded-apple bg-surface border border-surface-tertiary text-sm text-ink focus:outline-none focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent appearance-none"
-          >
-            {BOARDS.map((b) => (
-              <option key={b} value={b}>{b}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {error && (
-        <div className="px-4 py-3 rounded-apple bg-red-50 text-sm text-danger">{error}</div>
-      )}
-
-      <div className="flex gap-3">
-        <button
-          type="submit"
-          disabled={loading}
-          className="py-2.5 px-8 rounded-apple bg-surface-secondary text-ink text-sm font-medium hover:bg-surface-tertiary disabled:opacity-50 transition-colors"
-        >
-          {loading && !parsed ? "Saving..." : "Save as Draft"}
-        </button>
-        {parsed && (
-          <button
-            type="button"
-            onClick={handlePublish}
-            disabled={loading}
-            className="py-2.5 px-8 rounded-apple bg-accent text-white text-sm font-medium hover:bg-accent-hover active:bg-accent-pressed disabled:opacity-50 transition-colors"
-          >
-            {loading ? "Publishing..." : "Publish Job"}
-          </button>
-        )}
-      </div>
-    </form>
+      </form>
+    </Card>
   );
 }
