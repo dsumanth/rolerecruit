@@ -1,0 +1,217 @@
+"use client";
+
+import { useState, useMemo, useRef, useEffect } from "react";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { useUser } from "@clerk/nextjs";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { TalentControls } from "@/components/talent/talent-controls";
+import { PoolSelector } from "@/components/talent/pool-selector";
+import { GlobalCriteriaPanel } from "@/components/talent/global-criteria-panel";
+import { ApplicationTable } from "@/components/pipeline/application-table";
+import type { Application } from "@/components/pipeline/application-table";
+
+export default function TalentBankPage() {
+  const { user } = useUser();
+  const profile = useQuery(api.users.getByClerkId, user?.id ? { userId: user.id } : "skip");
+  const schoolId = profile?.schoolId;
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedPoolId, setSelectedPoolId] = useState<string | "all">("all");
+  const [selectedStages, setSelectedStages] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState<"newest" | "score" | "name">("newest");
+  const [showPoolManager, setShowPoolManager] = useState(false);
+  const [showCriteriaPanel, setShowCriteriaPanel] = useState(false);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+    const timer = setTimeout(() => setDebouncedSearch(query), 300);
+    return () => clearTimeout(timer);
+  };
+
+  const pools = useQuery(api.pools.listForSchool, schoolId ? { schoolId } : "skip") ?? [];
+
+  const candidates = useQuery(
+    api.candidates.listForSchool,
+    schoolId
+      ? {
+          schoolId,
+          poolId: selectedPoolId === "all" ? undefined : selectedPoolId,
+        } as any
+      : "skip"
+  ) ?? [];
+
+  const searchFiltered = useMemo(() => {
+    if (!debouncedSearch.trim()) return candidates;
+    const q = debouncedSearch.toLowerCase();
+    return candidates.filter(
+      (c: any) =>
+        c.name?.toLowerCase().includes(q) ||
+        c.email?.toLowerCase().includes(q) ||
+        c.location?.toLowerCase().includes(q) ||
+        c.subjects?.some((s: string) => s.toLowerCase().includes(q))
+    );
+  }, [candidates, debouncedSearch]);
+
+  const stageFiltered = useMemo(() => {
+    if (selectedStages.length === 0) return searchFiltered;
+    return searchFiltered.filter((c: any) => selectedStages.includes(c.stage));
+  }, [searchFiltered, selectedStages]);
+
+  const sorted = useMemo(() => {
+    const apps = [...stageFiltered];
+    switch (sortBy) {
+      case "score":
+        return apps.sort((a: any, b: any) => (b.globalScore ?? 0) - (a.globalScore ?? 0));
+      case "name":
+        return apps.sort((a: any, b: any) =>
+          (a.name ?? "").localeCompare(b.name ?? "")
+        );
+      case "newest":
+      default:
+        return apps;
+    }
+  }, [stageFiltered, sortBy]);
+
+  const stageCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const c of searchFiltered) {
+      counts[c.stage] = (counts[c.stage] ?? 0) + 1;
+    }
+    return counts;
+  }, [searchFiltered]);
+
+  const poolCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const c of candidates) {
+      if (c.poolIds) {
+        for (const pid of c.poolIds) {
+          counts[pid] = (counts[pid] ?? 0) + 1;
+        }
+      }
+    }
+    return counts;
+  }, [candidates]);
+
+  const poolsWithCounts = pools.map((p: any) => ({
+    _id: p._id,
+    name: p.name,
+    createdBy: p.createdBy,
+    tags: p.tags,
+    candidateCount: poolCounts[p._id] ?? 0,
+  }));
+
+  const tableApplications: Application[] = sorted.map((c: any) => ({
+    _id: c.applicationId ?? c._id,
+    candidateId: c._id,
+    stage: c.stage,
+    aiMatchScore: c.aiMatchScore,
+    globalScore: c.globalScore,
+    poolNames: c.poolNames,
+    candidate: {
+      _id: c._id,
+      name: c.name,
+      phone: c.phone,
+      email: c.email,
+      location: c.location,
+      qualifications: c.qualifications,
+      certifications: c.certifications,
+      boardExperience: c.boardExperience,
+      subjects: c.subjects,
+      yearsExperience: c.yearsExperience,
+      currentSchool: c.currentSchool,
+      resumeUrl: c.resumeUrl,
+    },
+  }));
+
+  const isLoading = candidates === undefined;
+
+  return (
+    <div className="space-y-6 p-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-ink">Talent Bank</h1>
+          <p className="text-sm text-ink-secondary mt-1">
+            Browse and manage all candidates across your school
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setShowPoolManager(!showPoolManager)}
+          >
+            Manage Pools
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setShowCriteriaPanel(true)}
+          >
+            Global Criteria
+          </Button>
+        </div>
+      </div>
+
+      {showPoolManager && schoolId && (
+        <PoolSelector schoolId={schoolId} pools={poolsWithCounts} />
+      )}
+
+      {showCriteriaPanel && schoolId && (
+        <GlobalCriteriaPanel
+          schoolId={schoolId}
+          onClose={() => setShowCriteriaPanel(false)}
+        />
+      )}
+
+      <TalentControls
+        searchQuery={searchQuery}
+        onSearchChange={handleSearchChange}
+        selectedPoolId={selectedPoolId}
+        onPoolChange={setSelectedPoolId}
+        pools={poolsWithCounts.map((p: any) => ({
+          _id: p._id,
+          name: p.name,
+          count: p.candidateCount,
+        }))}
+        selectedStages={selectedStages}
+        onStagesChange={setSelectedStages}
+        stageCounts={stageCounts}
+        sortBy={sortBy}
+        onSortChange={setSortBy}
+        totalCount={candidates.length}
+        filteredCount={stageFiltered.length}
+      />
+
+      {isLoading ? (
+        <div className="rounded-apple bg-surface shadow-elevation-low p-12 text-center">
+          <p className="text-sm text-ink-secondary">Loading candidates...</p>
+        </div>
+      ) : tableApplications.length === 0 ? (
+        <EmptyState
+          icon={
+            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+            </svg>
+          }
+          title="No candidates found"
+          description={
+            searchQuery || selectedPoolId !== "all" || selectedStages.length > 0
+              ? "Try adjusting your search or filters."
+              : "Candidates will appear here when you source them from jobs, email ingestion, or the careers portal."
+          }
+        />
+      ) : (
+        <ApplicationTable
+          applications={tableApplications}
+          sortBy={sortBy}
+          onSortChange={setSortBy}
+          showScoreAs="global"
+          showPoolBadges={true}
+        />
+      )}
+    </div>
+  );
+}
