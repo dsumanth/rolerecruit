@@ -2,13 +2,121 @@
 @tailwind components;
 @tailwind utilities;
 
-html {
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
+@layer base {
+  :root {
+    /* Ink */
+    --ink-1: #0f0f12;
+    --ink-2: #6e6e76;
+    --ink-3: #a1a1a8;
+
+    /* Accent */
+    --accent: #0071e3;
+    --accent-2: #5b7cff;
+    --accent-soft: rgba(0, 113, 227, 0.08);
+
+    /* Status */
+    --success: #34c759;
+    --warning: #ff9f0a;
+    --danger:  #ff3b30;
+    --purple:  #a855f7;
+
+    /* Surfaces */
+    --canvas-base: #f0f1f7;
+    --canvas-atm-1: rgba(91, 124, 255, 0.10);
+    --canvas-atm-2: rgba(255, 159, 10, 0.06);
+    --card-bg: #ffffff;
+    --card-elev-bg: #ffffff;
+    --chrome-bg: rgba(255, 255, 255, 0.65);
+    --chrome-border: rgba(255, 255, 255, 0.7);
+    --floating-bg: rgba(255, 255, 255, 0.8);
+
+    /* Hairlines */
+    --hairline: rgba(0, 0, 0, 0.06);
+    --hairline-strong: rgba(0, 0, 0, 0.10);
+
+    /* Elevation shadows */
+    --elev-1: 0 1px 3px rgba(0, 0, 0, 0.04);
+    --elev-2: 0 4px 16px rgba(0, 0, 0, 0.06);
+    --elev-3: 0 8px 30px rgba(0, 0, 0, 0.10);
+    --elev-4: 0 24px 60px rgba(0, 0, 0, 0.18);
+
+    /* Marketing canvas (separate, for /careers) */
+    --marketing-base: #fafafa;
+  }
+
+  [data-theme="dark"] {
+    --ink-1: #f5f5f7;
+    --ink-2: #98989f;
+    --ink-3: #6e6e76;
+
+    --accent: #0a84ff;
+    --accent-2: #7c93ff;
+    --accent-soft: rgba(10, 132, 255, 0.15);
+
+    --success: #30d158;
+    --warning: #ff9f0a;
+    --danger:  #ff453a;
+    --purple:  #bf5af2;
+
+    --canvas-base: #0a0a14;
+    --canvas-atm-1: rgba(91, 124, 255, 0.20);
+    --canvas-atm-2: rgba(168, 85, 247, 0.14);
+    --card-bg: #1a1a24;
+    --card-elev-bg: #22222e;
+    --chrome-bg: rgba(20, 20, 28, 0.6);
+    --chrome-border: rgba(255, 255, 255, 0.06);
+    --floating-bg: rgba(28, 28, 38, 0.7);
+
+    --hairline: rgba(255, 255, 255, 0.06);
+    --hairline-strong: rgba(255, 255, 255, 0.10);
+
+    --elev-1: 0 1px 3px rgba(0, 0, 0, 0.20);
+    --elev-2: 0 4px 16px rgba(0, 0, 0, 0.30);
+    --elev-3: 0 8px 30px rgba(0, 0, 0, 0.40);
+    --elev-4: 0 24px 60px rgba(0, 0, 0, 0.50);
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    color: var(--ink-1);
+    background-color: var(--canvas-base);
+    background-image:
+      radial-gradient(circle at 8% -5%, var(--canvas-atm-1) 0%, transparent 45%),
+      radial-gradient(circle at 95% 100%, var(--canvas-atm-2) 0%, transparent 45%);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+
+  body[data-canvas="marketing"] {
+    background-color: var(--marketing-base);
+    background-image: none;
+  }
 }
 
-body {
-  background-color: #f5f5f7;
-  color: #1d1d1f;
+@layer utilities {
+  /* Typography scale (also exposed as Tailwind utilities via config) */
+  .text-display-xl { font-size: 56px; line-height: 60px; letter-spacing: -0.04em; font-weight: 700; }
+  .text-display-l  { font-size: 36px; line-height: 40px; letter-spacing: -0.03em; font-weight: 700; }
+  .text-display-m  { font-size: 28px; line-height: 32px; letter-spacing: -0.025em; font-weight: 700; }
+  .text-display-s  { font-size: 22px; line-height: 28px; letter-spacing: -0.02em; font-weight: 600; }
+  .text-title-l    { font-size: 17px; line-height: 24px; letter-spacing: -0.01em; font-weight: 600; }
+  .text-title-m    { font-size: 15px; line-height: 22px; font-weight: 600; }
+  .text-body-l     { font-size: 16px; line-height: 26px; font-weight: 400; }
+  .text-body       { font-size: 14px; line-height: 20px; font-weight: 400; }
+  .text-body-s     { font-size: 13px; line-height: 18px; font-weight: 400; }
+  .text-caption    { font-size: 12px; line-height: 16px; font-weight: 400; }
+  .text-micro      { font-size: 11px; line-height: 14px; letter-spacing: 0.06em; font-weight: 500; text-transform: uppercase; }
+
+  .text-gradient-ink {
+    background-image: linear-gradient(180deg, var(--ink-1) 0%, color-mix(in srgb, var(--ink-1) 65%, var(--ink-2)) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
 }
