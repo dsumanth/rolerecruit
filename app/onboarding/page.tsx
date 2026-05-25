@@ -6,6 +6,15 @@ import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { ReactNode } from "react";
+import { Button, Card, Input, Select } from "@/components/ui";
+
+const BOARD_OPTIONS = [
+  { value: "CBSE", label: "CBSE" },
+  { value: "ICSE", label: "ICSE" },
+  { value: "IB", label: "IB" },
+  { value: "IGCSE", label: "IGCSE" },
+  { value: "State", label: "State Board" },
+];
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -51,69 +60,62 @@ export default function OnboardingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-surface-secondary flex items-center justify-center">
-      <div className="max-w-lg w-full mx-auto p-8">
-        <h1 className="text-2xl font-bold tracking-tight text-ink mb-2">
-          Set up your school
-        </h1>
-        <p className="text-ink-secondary mb-8">
-          Create your school profile to start hiring.
-        </p>
+    <div>
+      <h1 className="text-display-s text-ink mb-2">Welcome to RoleRecruit</h1>
+      <p className="text-body-s text-ink-secondary mb-8">
+        Create your school profile to start hiring.
+      </p>
 
+      <Card padding="lg" elevation={1}>
         <form onSubmit={handleSubmit} className="space-y-5">
           <Field label="Your name">
-            <input
+            <Input
+              size="md"
               type="text"
               value={userName}
               onChange={(e) => setUserName(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-apple bg-surface border border-surface-tertiary text-sm text-ink placeholder:text-ink-tertiary focus:outline-none focus:ring-2 focus:ring-[#0071e3] focus:border-transparent"
               placeholder="Priya Sharma"
               required
             />
           </Field>
 
           <Field label="School name">
-            <input
+            <Input
+              size="md"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-apple bg-surface border border-surface-tertiary text-sm text-ink placeholder:text-ink-tertiary focus:outline-none focus:ring-2 focus:ring-[#0071e3] focus:border-transparent"
               placeholder="Delhi Public School"
               required
             />
           </Field>
 
           <Field label="Board">
-            <select
+            <Select
               value={board}
-              onChange={(e) => setBoard(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-apple bg-surface border border-surface-tertiary text-sm text-ink focus:outline-none focus:ring-2 focus:ring-[#0071e3] focus:border-transparent appearance-none"
-            >
-              <option value="CBSE">CBSE</option>
-              <option value="ICSE">ICSE</option>
-              <option value="IB">IB</option>
-              <option value="IGCSE">IGCSE</option>
-              <option value="State">State Board</option>
-            </select>
+              onChange={setBoard}
+              options={BOARD_OPTIONS}
+              className="w-full"
+            />
           </Field>
 
           <div className="grid grid-cols-2 gap-4">
             <Field label="City">
-              <input
+              <Input
+                size="md"
                 type="text"
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-apple bg-surface border border-surface-tertiary text-sm text-ink placeholder:text-ink-tertiary focus:outline-none focus:ring-2 focus:ring-[#0071e3] focus:border-transparent"
                 placeholder="Hyderabad"
                 required
               />
             </Field>
             <Field label="State">
-              <input
+              <Input
+                size="md"
                 type="text"
                 value={state_}
                 onChange={(e) => setState_(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-apple bg-surface border border-surface-tertiary text-sm text-ink placeholder:text-ink-tertiary focus:outline-none focus:ring-2 focus:ring-[#0071e3] focus:border-transparent"
                 placeholder="Telangana"
                 required
               />
@@ -121,20 +123,22 @@ export default function OnboardingPage() {
           </div>
 
           {error && (
-            <div className="px-4 py-3 rounded-apple bg-[#fff2f0] text-sm text-[#ff3b30]">
+            <div className="rounded-md bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] border border-[color-mix(in_srgb,var(--danger)_25%,transparent)] px-4 py-3 text-body-s text-danger">
               {error}
             </div>
           )}
 
-          <button
+          <Button
             type="submit"
-            disabled={loading}
-            className="w-full py-2.5 rounded-apple bg-[#0071e3] text-white text-sm font-medium hover:bg-[#0077ed] active:bg-[#004999] disabled:opacity-50 transition-colors"
+            variant="primary"
+            size="lg"
+            loading={loading}
+            className="w-full"
           >
-            {loading ? "Creating..." : "Create School"}
-          </button>
+            Get started
+          </Button>
         </form>
-      </div>
+      </Card>
     </div>
   );
 }
@@ -142,7 +146,7 @@ export default function OnboardingPage() {
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">
-      <span className="block text-sm font-medium text-ink mb-1.5">{label}</span>
+      <span className="block text-body-s font-medium text-ink mb-1.5">{label}</span>
       {children}
     </label>
   );
