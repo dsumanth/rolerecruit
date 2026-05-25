@@ -91,7 +91,7 @@ export function JobSidebar({
               className={cn(
                 "w-full p-3 flex justify-center transition-colors duration-normal",
                 selectedJobId === job._id
-                  ? "text-accent bg-accent/5 border-r-2 border-accent"
+                  ? "text-accent bg-accent-soft border-r-2 border-accent"
                   : "text-ink-tertiary hover:text-ink hover:bg-surface-secondary",
               )}
               title={`${job.title} (${applicationCounts[job._id] ?? 0})`}
@@ -107,7 +107,7 @@ export function JobSidebar({
               className={cn(
                 "w-full text-left px-4 py-2.5 transition-colors duration-normal flex items-center justify-between",
                 selectedJobId === job._id
-                  ? "bg-accent/5 border-r-2 border-accent"
+                  ? "bg-accent-soft border-r-2 border-accent"
                   : "hover:bg-surface-secondary",
               )}
             >

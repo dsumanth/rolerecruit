@@ -27,7 +27,7 @@ interface Props {
 function matchScoreVariant(score: number) {
   if (score >= 80) return "success" as const;
   if (score >= 50) return "warning" as const;
-  return "default" as const;
+  return "neutral" as const;
 }
 
 export function CandidateCard({ app, isDragging, onClick }: Props) {
@@ -36,8 +36,8 @@ export function CandidateCard({ app, isDragging, onClick }: Props) {
       type="button"
       onClick={onClick}
       className={cn(
-        "w-full text-left p-3 rounded-apple bg-surface-secondary transition-shadow",
-        isDragging && "shadow-menu rotate-1 bg-surface"
+        "w-full text-left p-3 rounded-md bg-surface border border-hairline shadow-elev-1 transition-shadow",
+        isDragging && "shadow-elev-3 rotate-1"
       )}
     >
       <div className="flex items-center justify-between">

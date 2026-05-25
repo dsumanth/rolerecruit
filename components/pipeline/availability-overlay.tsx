@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { Button, Card } from "@/components/ui";
 
 interface Slot {
   start: string;
@@ -39,7 +40,7 @@ export function AvailabilityOverlay({ schoolId, date, onSlotSelect, selectedSlot
   if (!date) return null;
 
   return (
-    <div className="border border-surface-tertiary rounded-apple p-3">
+    <Card padding="sm">
       <p className="text-xs font-medium text-ink-secondary mb-2">Available Times</p>
       {loading ? (
         <p className="text-xs text-ink-tertiary">Loading...</p>
@@ -48,20 +49,17 @@ export function AvailabilityOverlay({ schoolId, date, onSlotSelect, selectedSlot
       ) : (
         <div className="flex flex-wrap gap-1.5">
           {slots.map((slot) => (
-            <button
+            <Button
               key={slot.startMs}
+              size="sm"
+              variant={selectedSlotMs === slot.startMs ? "primary" : "secondary"}
               onClick={() => onSlotSelect(slot)}
-              className={`text-xs px-2.5 py-1 rounded-full transition-colors ${
-                selectedSlotMs === slot.startMs
-                  ? "bg-accent text-white"
-                  : "bg-surface-secondary text-ink hover:bg-surface-tertiary"
-              }`}
             >
               {slot.start}
-            </button>
+            </Button>
           ))}
         </div>
       )}
-    </div>
+    </Card>
   );
 }

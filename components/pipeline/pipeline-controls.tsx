@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui";
 
 interface StageConfig {
   id: string;
@@ -20,6 +21,12 @@ interface PipelineControlsProps {
   sortBy: "newest" | "score" | "name";
   onSortChange: (sort: "newest" | "score" | "name") => void;
 }
+
+const SORT_OPTIONS = [
+  { value: "newest", label: "Newest" },
+  { value: "score", label: "Highest Score" },
+  { value: "name", label: "Name A-Z" },
+];
 
 export function PipelineControls({
   searchQuery,
@@ -56,15 +63,11 @@ export function PipelineControls({
           />
         </div>
 
-        <select
+        <Select
           value={sortBy}
-          onChange={(e) => onSortChange(e.target.value as "newest" | "score" | "name")}
-          className="text-xs px-3 py-1.5 rounded-apple bg-surface border border-surface-tertiary text-ink-secondary focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent appearance-none"
-        >
-          <option value="newest">Newest</option>
-          <option value="score">Highest Score</option>
-          <option value="name">Name A-Z</option>
-        </select>
+          onChange={(v) => onSortChange(v as "newest" | "score" | "name")}
+          options={SORT_OPTIONS}
+        />
       </div>
 
       <div className="flex gap-1.5 flex-wrap">
@@ -73,7 +76,7 @@ export function PipelineControls({
           className={cn(
             "text-xs px-3 py-1.5 rounded-full font-medium transition-all duration-normal",
             allSelected
-              ? "bg-accent text-white"
+              ? "bg-accent-soft text-accent"
               : "bg-surface-secondary text-ink-secondary hover:bg-surface-tertiary",
           )}
         >
@@ -87,7 +90,7 @@ export function PipelineControls({
             className={cn(
               "text-xs px-3 py-1.5 rounded-full font-medium transition-all duration-normal",
               selectedStage === stage.id
-                ? "bg-accent text-white"
+                ? "bg-accent-soft text-accent"
                 : "bg-surface-secondary text-ink-secondary hover:bg-surface-tertiary",
             )}
           >
