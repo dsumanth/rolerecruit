@@ -110,7 +110,7 @@ export function TalentControls({
               "text-xs px-3 py-1.5 rounded-full font-medium transition-all duration-normal",
               selectedPoolId === "all"
                 ? "bg-accent text-white"
-                : "bg-surface-secondary text-ink-secondary hover:bg-surface-tertiary",
+                : "bg-surface-canvas text-ink-secondary hover:bg-hairline",
             )}
           >
             All
@@ -124,7 +124,7 @@ export function TalentControls({
                 "text-xs px-3 py-1.5 rounded-full font-medium transition-all duration-normal",
                 selectedPoolId === pool._id
                   ? "bg-accent text-white"
-                  : "bg-surface-secondary text-ink-secondary hover:bg-surface-tertiary",
+                  : "bg-surface-canvas text-ink-secondary hover:bg-hairline",
               )}
             >
               {pool.name}
@@ -141,7 +141,7 @@ export function TalentControls({
             "text-xs px-3 py-1.5 rounded-full font-medium transition-all duration-normal",
             allStagesSelected
               ? "bg-accent text-white"
-              : "bg-surface-secondary text-ink-secondary hover:bg-surface-tertiary",
+              : "bg-surface-canvas text-ink-secondary hover:bg-hairline",
           )}
         >
           All
@@ -155,7 +155,7 @@ export function TalentControls({
               "text-xs px-3 py-1.5 rounded-full font-medium transition-all duration-normal",
               selectedStages.includes(stage)
                 ? "bg-accent text-white"
-                : "bg-surface-secondary text-ink-secondary hover:bg-surface-tertiary",
+                : "bg-surface-canvas text-ink-secondary hover:bg-hairline",
             )}
           >
             {STAGE_LABELS[stage]}

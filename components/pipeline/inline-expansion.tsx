@@ -126,7 +126,7 @@ function InfoTabContent({
       </div>
 
       {availableTransitions.length > 0 && (
-        <div className="col-span-2 mt-2 pt-3 border-t border-surface-tertiary">
+        <div className="col-span-2 mt-2 pt-3 border-t border-hairline">
           <p className="text-xs text-ink-secondary mb-1.5">Move to:</p>
           <div className="flex flex-wrap gap-1.5">
             {availableTransitions.map((t: any) => (
@@ -141,7 +141,7 @@ function InfoTabContent({
                     onSwitchTab("outreach");
                   }
                 }}
-                className="text-xs px-2.5 py-1 rounded-full bg-surface-secondary text-ink hover:bg-accent hover:text-white transition-colors"
+                className="text-xs px-2.5 py-1 rounded-full bg-surface-canvas text-ink hover:bg-accent hover:text-white transition-colors"
               >
                 → {getStageName(t.toStageId)}
               </button>

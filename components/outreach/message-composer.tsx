@@ -146,7 +146,7 @@ export function MessageComposer({
               "text-xs px-2.5 py-1 rounded-full whitespace-nowrap transition-colors",
               type === t.value
                 ? "bg-accent text-white"
-                : "bg-surface-secondary text-ink-secondary hover:bg-surface-tertiary"
+                : "bg-surface-canvas text-ink-secondary hover:bg-hairline"
             )}
           >
             {t.label}
@@ -199,7 +199,7 @@ export function MessageComposer({
         onChange={(e) => setBody(e.target.value)}
         rows={4}
         placeholder={`Message for ${candidateName}...`}
-        className="w-full px-4 py-2.5 rounded-apple bg-surface border border-surface-tertiary text-sm text-ink placeholder:text-ink-tertiary focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent resize-none"
+        className="w-full px-4 py-2.5 rounded-apple bg-surface border border-hairline text-sm text-ink placeholder:text-ink-tertiary focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent resize-none"
       />
 
       {result === "success" && (

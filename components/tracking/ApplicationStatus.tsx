@@ -21,7 +21,7 @@ export function ApplicationStatus({ stage, jobTitle, candidateName, schoolName }
 
   return (
     <div className="max-w-lg mx-auto">
-      <div className="rounded-apple bg-surface border border-surface-tertiary p-8 text-center">
+      <div className="rounded-apple bg-surface border border-hairline p-8 text-center">
         <div className="text-4xl mb-4">📋</div>
         <h2 className="text-xl font-bold text-ink">Hi {candidateName}</h2>
         <p className="text-sm text-ink-secondary mt-2">

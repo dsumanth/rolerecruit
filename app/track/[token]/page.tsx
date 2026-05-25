@@ -16,7 +16,7 @@ export default function TrackPage() {
   if (!app) {
     return (
       <div className="max-w-lg mx-auto px-6 py-20">
-        <div className="rounded-apple bg-surface border border-surface-tertiary p-8 text-center">
+        <div className="rounded-apple bg-surface border border-hairline p-8 text-center">
           <div className="text-4xl mb-4">🔍</div>
           <h2 className="text-xl font-bold text-ink">Application Not Found</h2>
           <p className="text-sm text-ink-secondary mt-2">This tracking link is invalid or has expired.</p>
@@ -26,7 +26,7 @@ export default function TrackPage() {
   }
 
   return (
-    <div className="min-h-screen bg-surface-secondary py-20 px-6">
+    <div className="min-h-screen bg-surface-canvas py-20 px-6">
       <ApplicationStatus
         stage={app.stage}
         jobTitle={app.job?.title}

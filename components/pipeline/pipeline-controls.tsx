@@ -77,7 +77,7 @@ export function PipelineControls({
             "text-xs px-3 py-1.5 rounded-full font-medium transition-all duration-normal",
             allSelected
               ? "bg-accent-soft text-accent"
-              : "bg-surface-secondary text-ink-secondary hover:bg-surface-tertiary",
+              : "bg-surface-canvas text-ink-secondary hover:bg-hairline",
           )}
         >
           All
@@ -91,7 +91,7 @@ export function PipelineControls({
               "text-xs px-3 py-1.5 rounded-full font-medium transition-all duration-normal",
               selectedStage === stage.id
                 ? "bg-accent-soft text-accent"
-                : "bg-surface-secondary text-ink-secondary hover:bg-surface-tertiary",
+                : "bg-surface-canvas text-ink-secondary hover:bg-hairline",
             )}
           >
             {stage.name}

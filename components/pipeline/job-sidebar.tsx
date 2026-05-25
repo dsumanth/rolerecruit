@@ -35,13 +35,13 @@ export function JobSidebar({
   return (
     <aside
       className={cn(
-        "shrink-0 border-r border-surface-tertiary bg-surface transition-all duration-slow ease-apple-ease flex flex-col",
+        "shrink-0 border-r border-hairline bg-surface transition-all duration-slow ease-apple-ease flex flex-col",
         collapsed ? "w-12" : "w-60",
       )}
     >
       <div
         className={cn(
-          "flex items-center border-b border-surface-tertiary",
+          "flex items-center border-b border-hairline",
           collapsed ? "justify-center py-4" : "px-4 py-3 justify-between",
         )}
       >
@@ -52,7 +52,7 @@ export function JobSidebar({
         )}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="text-ink-tertiary hover:text-ink transition-colors duration-normal p-1 rounded-apple hover:bg-surface-secondary"
+          className="text-ink-tertiary hover:text-ink transition-colors duration-normal p-1 rounded-apple hover:bg-surface-canvas"
         >
           {collapsed ? (
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -92,7 +92,7 @@ export function JobSidebar({
                 "w-full p-3 flex justify-center transition-colors duration-normal",
                 selectedJobId === job._id
                   ? "text-accent bg-accent-soft border-r-2 border-accent"
-                  : "text-ink-tertiary hover:text-ink hover:bg-surface-secondary",
+                  : "text-ink-tertiary hover:text-ink hover:bg-surface-canvas",
               )}
               title={`${job.title} (${applicationCounts[job._id] ?? 0})`}
             >
@@ -108,7 +108,7 @@ export function JobSidebar({
                 "w-full text-left px-4 py-2.5 transition-colors duration-normal flex items-center justify-between",
                 selectedJobId === job._id
                   ? "bg-accent-soft border-r-2 border-accent"
-                  : "hover:bg-surface-secondary",
+                  : "hover:bg-surface-canvas",
               )}
             >
               <div className="min-w-0">

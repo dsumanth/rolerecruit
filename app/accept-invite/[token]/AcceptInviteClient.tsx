@@ -83,7 +83,7 @@ function AcceptInviteInner({
         <div className="flex gap-3 justify-center">
           <a
             href={`/sign-in?redirect_url=${encodeURIComponent(returnUrl)}`}
-            className="inline-flex items-center px-5 py-2.5 rounded-apple bg-surface-secondary text-ink text-sm font-medium hover:bg-[#e8e8ed] transition-colors"
+            className="inline-flex items-center px-5 py-2.5 rounded-apple bg-surface-canvas text-ink text-sm font-medium hover:bg-[#e8e8ed] transition-colors"
           >
             Sign In
           </a>
@@ -170,7 +170,7 @@ export function AcceptInviteClient({
   token: string;
 }) {
   return (
-    <div className="min-h-screen bg-surface-secondary flex items-center justify-center p-6">
+    <div className="min-h-screen bg-surface-canvas flex items-center justify-center p-6">
       <ConvexClientProvider>
         <AcceptInviteInner invite={invite} token={token} />
       </ConvexClientProvider>

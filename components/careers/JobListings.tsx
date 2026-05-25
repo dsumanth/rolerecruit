@@ -33,7 +33,7 @@ export function JobListings({ jobs, slug }: Props) {
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="Search by title or subject..."
-        className="w-full max-w-md px-4 py-2.5 rounded-apple bg-surface border border-surface-tertiary text-sm text-ink placeholder:text-ink-tertiary focus:outline-none focus:ring-2 focus:ring-accent/20"
+        className="w-full max-w-md px-4 py-2.5 rounded-apple bg-surface border border-hairline text-sm text-ink placeholder:text-ink-tertiary focus:outline-none focus:ring-2 focus:ring-accent/20"
       />
       {filtered.length === 0 ? (
         <p className="text-ink-secondary text-sm py-8 text-center">No open positions {search ? "matching your search" : "at this time"}.</p>

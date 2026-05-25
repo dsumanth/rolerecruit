@@ -35,16 +35,16 @@ export function SuggestedMatches({ jobId, schoolId }: Props) {
   if (!matches || matches.length === 0) return null;
 
   return (
-    <div className="rounded-apple bg-surface border border-surface-tertiary p-5">
+    <div className="rounded-apple bg-surface border border-hairline p-5">
       <h3 className="text-sm font-semibold text-ink mb-4">Suggested Matches</h3>
       <div className="space-y-2">
         {matches.slice(0, 10).map((m: any) => (
-          <div key={m.candidateId ?? m.applicationId} className="flex items-center justify-between p-3 rounded-apple bg-surface-secondary">
+          <div key={m.candidateId ?? m.applicationId} className="flex items-center justify-between p-3 rounded-apple bg-surface-canvas">
             <div className="flex items-center gap-3">
               <div className={`text-xs px-2 py-1 rounded-full font-medium ${
                 m.score >= 85 ? "bg-green-50 text-success" :
                 m.score >= 60 ? "bg-amber-50 text-warning" :
-                "bg-surface-secondary text-ink-secondary"
+                "bg-surface-canvas text-ink-secondary"
               }`}>
                 {m.score}/100
               </div>

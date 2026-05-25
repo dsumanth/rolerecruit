@@ -14,12 +14,12 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 const TYPE_COLORS: Record<string, string> = {
-  shortlist: "bg-surface-secondary text-ink",
+  shortlist: "bg-surface-canvas text-ink",
   demo_schedule: "bg-green-50 text-success",
   feedback_request: "bg-accent/10 text-accent",
   offer: "bg-green-50 text-success",
   rejection: "bg-red-50 text-danger",
-  custom: "bg-surface-secondary text-ink-secondary",
+  custom: "bg-surface-canvas text-ink-secondary",
 };
 
 export function OutreachHistory({ jobId }: { jobId: string }) {
@@ -29,7 +29,7 @@ export function OutreachHistory({ jobId }: { jobId: string }) {
 
   if (!groups) {
     return (
-      <div className="rounded-apple bg-surface border border-surface-tertiary p-8 text-center">
+      <div className="rounded-apple bg-surface border border-hairline p-8 text-center">
         <p className="text-sm text-ink-secondary">Loading outreach history...</p>
       </div>
     );
@@ -37,7 +37,7 @@ export function OutreachHistory({ jobId }: { jobId: string }) {
 
   if (groups.length === 0) {
     return (
-      <div className="rounded-apple bg-surface border border-surface-tertiary p-8 text-center">
+      <div className="rounded-apple bg-surface border border-hairline p-8 text-center">
         <p className="text-sm text-ink-secondary">
           No messages sent yet. Open a candidate from the pipeline to send outreach.
         </p>
@@ -50,9 +50,9 @@ export function OutreachHistory({ jobId }: { jobId: string }) {
       {groups.map((group: any) => (
         <div
           key={group.applicationId}
-          className="rounded-apple bg-surface border border-surface-tertiary overflow-hidden"
+          className="rounded-apple bg-surface border border-hairline overflow-hidden"
         >
-          <div className="px-5 py-3 bg-surface-secondary border-b border-surface-tertiary">
+          <div className="px-5 py-3 bg-surface-canvas border-b border-hairline">
             <p className="text-sm font-medium text-ink">{group.candidateName}</p>
           </div>
           <div className="divide-y divide-[#e8e8ed]">
@@ -62,7 +62,7 @@ export function OutreachHistory({ jobId }: { jobId: string }) {
                   <span
                     className={cn(
                       "text-xs px-2 py-0.5 rounded-full",
-                      TYPE_COLORS[msg.type] ?? "bg-surface-secondary text-ink-secondary"
+                      TYPE_COLORS[msg.type] ?? "bg-surface-canvas text-ink-secondary"
                     )}
                   >
                     {TYPE_LABELS[msg.type] ?? msg.type}

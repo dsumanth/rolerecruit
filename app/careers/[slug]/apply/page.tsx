@@ -18,7 +18,7 @@ export default function ApplyPage() {
       <SchoolHeader name={school.name} board={school.board} city={school.city} />
       <div className="max-w-3xl mx-auto px-6 py-10">
         <Link href={`/careers/${slug}`} className="text-sm text-accent hover:underline mb-4 inline-block">← Back to jobs</Link>
-        <div className="rounded-apple bg-surface border border-surface-tertiary p-6">
+        <div className="rounded-apple bg-surface border border-hairline p-6">
           <h2 className="text-lg font-semibold text-ink mb-2">General Application</h2>
           <p className="text-sm text-ink-secondary mb-6">Submit your profile and we'll match you with future openings at {school.name}.</p>
           <ApplicationForm schoolId={school._id} slug={slug} />

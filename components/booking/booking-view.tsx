@@ -110,8 +110,8 @@ export function BookingView({ token, schoolId, jobTitle, schoolName }: Props) {
                   isSelected
                     ? "bg-accent text-white"
                     : isWeekend
-                    ? "bg-surface-secondary text-ink-tertiary opacity-40 cursor-not-allowed"
-                    : "bg-surface-secondary text-ink hover:bg-surface-tertiary"
+                    ? "bg-surface-canvas text-ink-tertiary opacity-40 cursor-not-allowed"
+                    : "bg-surface-canvas text-ink hover:bg-hairline"
                 }`}
               >
                 <div className="text-xs">{d.toLocaleDateString("en", { weekday: "short" })}</div>
@@ -138,7 +138,7 @@ export function BookingView({ token, schoolId, jobTitle, schoolName }: Props) {
                   className={`px-4 py-2 rounded-apple text-sm font-medium transition-colors ${
                     selectedSlot?.startMs === slot.startMs
                       ? "bg-accent text-white"
-                      : "bg-surface border border-surface-tertiary text-ink hover:border-accent"
+                      : "bg-surface border border-hairline text-ink hover:border-accent"
                   }`}
                 >
                   {slot.start}

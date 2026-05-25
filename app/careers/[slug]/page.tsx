@@ -22,7 +22,7 @@ export default function CareersPage() {
           <h2 className="text-lg font-semibold text-ink">Open Positions</h2>
         </div>
         <JobListings jobs={jobs ?? []} slug={slug} />
-        <div className="mt-8 p-6 rounded-apple bg-surface border border-surface-tertiary text-center">
+        <div className="mt-8 p-6 rounded-apple bg-surface border border-hairline text-center">
           <p className="text-ink font-medium mb-1">Don't see the right role?</p>
           <p className="text-sm text-ink-secondary mb-4">Submit a general application and we'll contact you when a matching position opens.</p>
           <Link

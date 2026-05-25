@@ -32,7 +32,7 @@ function StarRating({ value, onChange }: { value: number; onChange: (v: number) 
           onClick={() => onChange(star)}
           className={cn(
             "text-xl transition-colors",
-            star <= value ? "text-warning" : "text-surface-tertiary"
+            star <= value ? "text-warning" : "text-hairline"
           )}
         >
           ★
@@ -55,7 +55,7 @@ export function FeedbackForm({ token }: Props) {
 
   if (!submission) {
     return (
-      <div className="rounded-apple bg-surface border border-surface-tertiary p-8 text-center max-w-md mx-auto">
+      <div className="rounded-apple bg-surface border border-hairline p-8 text-center max-w-md mx-auto">
         <p className="text-sm text-ink-secondary">Loading...</p>
       </div>
     );
@@ -63,7 +63,7 @@ export function FeedbackForm({ token }: Props) {
 
   if (!submission._id) {
     return (
-      <div className="rounded-apple bg-surface border border-surface-tertiary p-8 text-center max-w-md mx-auto">
+      <div className="rounded-apple bg-surface border border-hairline p-8 text-center max-w-md mx-auto">
         <h1 className="text-lg font-semibold text-ink mb-2">
           Invalid Link
         </h1>
@@ -76,7 +76,7 @@ export function FeedbackForm({ token }: Props) {
 
   if (submission.submitted || done) {
     return (
-      <div className="rounded-apple bg-surface border border-surface-tertiary p-8 text-center max-w-md mx-auto">
+      <div className="rounded-apple bg-surface border border-hairline p-8 text-center max-w-md mx-auto">
         <div className="text-3xl mb-3">✓</div>
         <h1 className="text-lg font-semibold text-ink mb-2">
           Feedback Submitted
@@ -119,7 +119,7 @@ export function FeedbackForm({ token }: Props) {
 
   return (
     <div className="max-w-md mx-auto">
-      <div className="rounded-apple bg-surface border border-surface-tertiary p-6">
+      <div className="rounded-apple bg-surface border border-hairline p-6">
         <h1 className="text-lg font-semibold text-ink mb-1">
           Demo Lesson Feedback
         </h1>
@@ -152,7 +152,7 @@ export function FeedbackForm({ token }: Props) {
               value={comments}
               onChange={(e) => setComments(e.target.value)}
               rows={3}
-              className="w-full px-4 py-2.5 rounded-apple bg-surface border border-surface-tertiary text-sm text-ink placeholder:text-ink-tertiary focus:outline-none focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent resize-none"
+              className="w-full px-4 py-2.5 rounded-apple bg-surface border border-hairline text-sm text-ink placeholder:text-ink-tertiary focus:outline-none focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent resize-none"
               placeholder="Any additional notes about the candidate..."
             />
           </div>
@@ -175,7 +175,7 @@ export function FeedbackForm({ token }: Props) {
                         : r.value === "reject"
                           ? "bg-red-50 text-danger border-[#ff3b30]"
                           : "bg-amber-50 text-warning border-[#ff9f0a]"
-                      : "bg-surface-secondary text-ink-secondary border-surface-tertiary hover:bg-surface-tertiary"
+                      : "bg-surface-canvas text-ink-secondary border-hairline hover:bg-hairline"
                   )}
                 >
                   {r.label}

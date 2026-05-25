@@ -93,7 +93,7 @@ export function DemoScheduler({
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="w-full px-4 py-2.5 rounded-apple bg-surface border border-surface-tertiary text-sm text-ink focus:outline-none focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
+          className="w-full px-4 py-2.5 rounded-apple bg-surface border border-hairline text-sm text-ink focus:outline-none focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
         />
       </div>
 
@@ -103,7 +103,7 @@ export function DemoScheduler({
           type="time"
           value={time}
           onChange={(e) => setTime(e.target.value)}
-          className="w-full px-4 py-2.5 rounded-apple bg-surface border border-surface-tertiary text-sm text-ink focus:outline-none focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
+          className="w-full px-4 py-2.5 rounded-apple bg-surface border border-hairline text-sm text-ink focus:outline-none focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
         />
       </div>
 
@@ -114,7 +114,7 @@ export function DemoScheduler({
           value={classLevel}
           onChange={(e) => setClassLevel(e.target.value)}
           placeholder="e.g. Class 11"
-          className="w-full px-4 py-2.5 rounded-apple bg-surface border border-surface-tertiary text-sm text-ink placeholder:text-ink-tertiary focus:outline-none focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
+          className="w-full px-4 py-2.5 rounded-apple bg-surface border border-hairline text-sm text-ink placeholder:text-ink-tertiary focus:outline-none focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
         />
       </div>
 
@@ -125,7 +125,7 @@ export function DemoScheduler({
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
           placeholder="e.g. Newton's Laws of Motion"
-          className="w-full px-4 py-2.5 rounded-apple bg-surface border border-surface-tertiary text-sm text-ink placeholder:text-ink-tertiary focus:outline-none focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
+          className="w-full px-4 py-2.5 rounded-apple bg-surface border border-hairline text-sm text-ink placeholder:text-ink-tertiary focus:outline-none focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
         />
       </div>
 
@@ -136,7 +136,7 @@ export function DemoScheduler({
           value={address}
           onChange={(e) => setAddress(e.target.value)}
           placeholder="School campus address"
-          className="w-full px-4 py-2.5 rounded-apple bg-surface border border-surface-tertiary text-sm text-ink placeholder:text-ink-tertiary focus:outline-none focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
+          className="w-full px-4 py-2.5 rounded-apple bg-surface border border-hairline text-sm text-ink placeholder:text-ink-tertiary focus:outline-none focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
         />
       </div>
 
