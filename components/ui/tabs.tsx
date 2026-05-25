@@ -1,40 +1,52 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import type { ReactNode } from "react";
 
-interface Tab {
-  key: string;
+interface TabItem {
+  value: string;
   label: string;
+  count?: number;
 }
 
 interface TabsProps {
-  tabs: readonly Tab[];
-  activeTab: string;
-  onTabChange: (key: string) => void;
+  items: TabItem[];
+  value: string;
+  onChange: (value: string) => void;
   className?: string;
 }
 
-export function Tabs({ tabs, activeTab, onTabChange, className }: TabsProps) {
+export function Tabs({ items, value, onChange, className }: TabsProps) {
   return (
-    <div className={cn("flex gap-1 border-b border-surface-tertiary", className)}>
-      {tabs.map((tab) => (
-        <button
-          key={tab.key}
-          type="button"
-          onClick={() => onTabChange(tab.key)}
-          className={cn(
-            "text-xs font-medium px-3 py-2 border-b-2 transition-all duration-normal ease-apple-ease",
-            activeTab === tab.key
-              ? "border-accent text-accent"
-              : "border-transparent text-ink-secondary hover:text-ink",
-          )}
-        >
-          {tab.label}
-        </button>
-      ))}
+    <div role="tablist" className={cn("flex gap-1 border-b border-hairline", className)}>
+      {items.map((item) => {
+        const active = item.value === value;
+        return (
+          <button
+            key={item.value}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onChange(item.value)}
+            className={cn(
+              "relative px-3.5 py-2 text-body-s transition-colors duration-fast ease-apple-out",
+              active ? "text-ink font-semibold" : "text-ink-secondary hover:text-ink",
+            )}
+          >
+            <span className="inline-flex items-center gap-1.5">
+              {item.label}
+              {item.count != null && (
+                <span className="text-caption text-ink-tertiary tabular-nums">{item.count}</span>
+              )}
+            </span>
+            {active && (
+              <span
+                aria-hidden
+                className="absolute left-3.5 right-3.5 -bottom-px h-[2px] rounded-full bg-accent-grad"
+              />
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }
-
-export type { Tab };
