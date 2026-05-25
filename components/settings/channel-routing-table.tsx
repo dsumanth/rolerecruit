@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { Card } from "@/components/ui";
 
 type ChannelPref = "whatsapp" | "email" | "both" | "none";
 
@@ -56,32 +56,32 @@ export function ChannelRoutingTable({ schoolId }: Props) {
   };
 
   return (
-    <div>
-      <h2 className="text-lg font-semibold text-ink mb-1">Message Channel Preferences</h2>
-      <p className="text-xs text-ink-secondary mb-6">
-        Choose which channels to use for each message type. When both are enabled, WhatsApp is tried first, falling back to email if the candidate has no WhatsApp number.
-      </p>
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-body-s font-semibold text-ink mb-1">Message Channel Preferences</h2>
+        <p className="text-body-s text-ink-secondary">
+          Choose which channels to use for each message type. When both are enabled, WhatsApp is tried first, falling back to email if the candidate has no WhatsApp number.
+        </p>
+      </div>
 
-      <div className="rounded-apple border border-surface-tertiary overflow-hidden">
-        <div className="flex px-4 py-2.5 bg-surface-secondary text-xs font-medium uppercase tracking-wider text-ink-secondary">
+      <Card padding="none" elevation={1}>
+        <div className="flex px-4 py-2.5 border-b border-hairline text-caption font-medium uppercase tracking-wider text-ink-secondary">
           <div className="flex-[2]">Message Type</div>
           <div className="flex-1 text-center">WhatsApp</div>
           <div className="flex-1 text-center">Email</div>
         </div>
-        {MESSAGE_TYPES.map(({ key, label }, i) => (
+        {MESSAGE_TYPES.map(({ key, label }) => (
           <div
             key={key}
-            className={`flex px-4 py-3 border-t border-surface-tertiary items-center ${
-              i % 2 === 1 ? "bg-surface-secondary/50" : ""
-            }`}
+            className="flex px-4 py-3 border-b border-hairline last:border-b-0 items-center"
           >
-            <div className="flex-[2] text-sm font-medium text-ink">{label}</div>
+            <div className="flex-[2] text-body-s font-medium text-ink">{label}</div>
             <div className="flex-1 flex justify-center">
               <input
                 type="checkbox"
                 checked={hasChannel(prefs[key] ?? "both", "whatsapp")}
                 onChange={() => handleToggle(key, "whatsapp")}
-                className="w-4 h-4 rounded accent-accent"
+                className="w-4 h-4 rounded accent-[var(--accent)]"
               />
             </div>
             <div className="flex-1 flex justify-center">
@@ -89,12 +89,12 @@ export function ChannelRoutingTable({ schoolId }: Props) {
                 type="checkbox"
                 checked={hasChannel(prefs[key] ?? "both", "email")}
                 onChange={() => handleToggle(key, "email")}
-                className="w-4 h-4 rounded accent-accent"
+                className="w-4 h-4 rounded accent-[var(--accent)]"
               />
             </div>
           </div>
         ))}
-      </div>
+      </Card>
     </div>
   );
 }
