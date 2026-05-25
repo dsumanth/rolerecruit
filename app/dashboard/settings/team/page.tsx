@@ -5,6 +5,7 @@ import { api } from "@/convex/_generated/api";
 import { useUser } from "@clerk/nextjs";
 import { RoleBadge } from "@/components/auth/role-gate";
 import { useState, useEffect } from "react";
+import { Button, Card, Input, Select } from "@/components/ui";
 
 export default function TeamSettingsPage() {
   const { user } = useUser();
@@ -58,96 +59,90 @@ export default function TeamSettingsPage() {
     }
   }, [roles, seeded, profile?.schoolId, seedDefaults]);
 
-  if (!members) return <p className="text-sm text-ink-secondary">Loading...</p>;
+  if (!members) return <p className="text-body-s text-ink-secondary">Loading...</p>;
+
+  const roleOptions = (roles ?? []).map((r) => ({ value: r.name, label: r.name }));
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-ink">Team</h1>
-          <p className="text-ink-secondary mt-1">Manage your school's hiring team and permissions.</p>
+          <h1 className="text-title-l text-ink">Team</h1>
+          <p className="text-body-s text-ink-secondary mt-1">Manage your school's hiring team and permissions.</p>
         </div>
       </div>
 
       {canManageTeam && (
-        <div className="rounded-apple bg-surface border border-surface-tertiary p-5 mb-6">
-          <h2 className="text-sm font-semibold text-ink mb-4">Invite Team Member</h2>
+        <Card padding="md" elevation={1} className="mb-6">
+          <h2 className="text-body-s font-semibold text-ink mb-4">Invite Team Member</h2>
           <form onSubmit={handleInvite} className="flex items-end gap-3">
             <div className="flex-1">
-              <label className="block text-xs font-medium text-ink-secondary mb-1">Email</label>
-              <input
+              <label className="block text-caption font-medium text-ink-secondary mb-1">Email</label>
+              <Input
                 type="email"
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
-                className="w-full px-3 py-2 rounded-apple bg-surface-secondary border border-surface-tertiary text-sm"
                 placeholder="colleague@school.edu"
                 required
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-ink-secondary mb-1">Role</label>
-              <select
+              <label className="block text-caption font-medium text-ink-secondary mb-1">Role</label>
+              <Select
                 value={inviteRole}
-                onChange={(e) => setInviteRole(e.target.value)}
-                className="px-3 py-2 rounded-apple bg-surface-secondary border border-surface-tertiary text-sm min-w-[140px]"
-                required
-              >
-                <option value="">Select role...</option>
-                {roles?.map((r) => (
-                  <option key={r._id} value={r.name}>{r.name}</option>
-                ))}
-              </select>
+                onChange={setInviteRole}
+                options={roleOptions}
+                placeholder="Select role..."
+              />
             </div>
-            <button
+            <Button
               type="submit"
-              disabled={inviting}
-              className="px-4 py-2 rounded-apple bg-[#0071e3] text-white text-sm font-medium hover:bg-[#0077ed] disabled:opacity-50 transition-colors"
+              variant="primary"
+              disabled={inviting || !inviteEmail || !inviteRole}
+              loading={inviting}
             >
-              {inviting ? "Sending..." : "Send Invite"}
-            </button>
+              Send Invite
+            </Button>
           </form>
           {inviteError && (
-            <p className="mt-3 text-xs text-[#ff3b30]">{inviteError}</p>
+            <p className="mt-3 text-caption text-danger">{inviteError}</p>
           )}
           {inviteSuccess && (
-            <p className="mt-3 text-xs text-[#34c759]">Invitation sent!</p>
+            <p className="mt-3 text-caption text-success">Invitation sent!</p>
           )}
-        </div>
+        </Card>
       )}
 
       {invitations && invitations.length > 0 && (
-        <div className="rounded-apple bg-surface border border-surface-tertiary overflow-hidden mb-6">
-          <div className="px-5 py-3 bg-[#fff9f0] border-b border-surface-tertiary">
-            <h2 className="text-sm font-semibold text-ink">Pending Invitations</h2>
+        <Card padding="none" elevation={1} className="mb-6 overflow-hidden">
+          <div className="px-5 py-3 border-b border-hairline">
+            <h2 className="text-body-s font-semibold text-ink">Pending Invitations</h2>
           </div>
-          <div className="grid grid-cols-4 gap-4 px-5 py-2 bg-surface-secondary border-b border-surface-tertiary text-xs font-medium text-ink-secondary">
+          <div className="grid grid-cols-4 gap-4 px-5 py-2 border-b border-hairline text-caption font-medium text-ink-secondary">
             <span>Email</span>
             <span>Role</span>
             <span>Invited</span>
             <span>Actions</span>
           </div>
           {invitations.map((inv) => (
-            <div key={inv._id} className="grid grid-cols-4 gap-4 px-5 py-3 border-b border-surface-tertiary last:border-b-0 items-center text-sm">
+            <div key={inv._id} className="grid grid-cols-4 gap-4 px-5 py-3 border-b border-hairline last:border-b-0 items-center text-body-s">
               <span className="text-ink">{inv.email}</span>
               <span><RoleBadge role={inv.role} /></span>
-              <span className="text-xs text-ink-secondary">{new Date(inv.createdAt).toLocaleDateString()}</span>
+              <span className="text-caption text-ink-secondary">{new Date(inv.createdAt).toLocaleDateString()}</span>
               <span>
                 {canManageTeam && (
-                  <button
-                    onClick={() => revokeInvite({ inviteId: inv._id })}
-                    className="text-xs text-[#ff3b30] hover:underline"
-                  >
+                  <Button variant="ghost" size="sm" onClick={() => revokeInvite({ inviteId: inv._id })}>
                     Revoke
-                  </button>
+                  </Button>
                 )}
               </span>
             </div>
           ))}
-        </div>
+        </Card>
       )}
 
-      <div className="rounded-apple bg-surface border border-surface-tertiary overflow-hidden">
-        <div className="grid grid-cols-4 gap-4 px-5 py-3 bg-surface-secondary border-b border-surface-tertiary text-xs font-medium text-ink-secondary">
+      <Card padding="none" elevation={1} className="overflow-hidden">
+        <div className="grid grid-cols-4 gap-4 px-5 py-3 border-b border-hairline text-caption font-medium text-ink-secondary">
           <span>Name</span>
           <span>Email</span>
           <span>Role</span>
@@ -155,12 +150,12 @@ export default function TeamSettingsPage() {
         </div>
 
         {members.length === 0 ? (
-          <div className="px-5 py-8 text-center text-sm text-ink-secondary">
+          <div className="px-5 py-8 text-center text-body-s text-ink-secondary">
             No team members yet.
           </div>
         ) : (
           members.map((m) => (
-            <div key={m.userId} className="grid grid-cols-4 gap-4 px-5 py-3 border-b border-surface-tertiary last:border-b-0 items-center text-sm">
+            <div key={m.userId} className="grid grid-cols-4 gap-4 px-5 py-3 border-b border-hairline last:border-b-0 items-center text-body-s">
               <span className="text-ink font-medium">{m.name}</span>
               <span className="text-ink-secondary">{m.email || "N/A"}</span>
               <span>
@@ -168,17 +163,13 @@ export default function TeamSettingsPage() {
               </span>
               <span>
                 {canManageTeam && m.userId !== user?.id ? (
-                  <select
+                  <Select
                     value={m.role}
-                    onChange={(e) => updateRole({ userId: m.userId, role: e.target.value })}
-                    className="text-xs px-2 py-1 rounded bg-surface-secondary border border-surface-tertiary text-ink"
-                  >
-                    {roles?.map((r) => (
-                      <option key={r._id} value={r.name}>{r.name}</option>
-                    ))}
-                  </select>
+                    onChange={(next) => updateRole({ userId: m.userId, role: next })}
+                    options={roleOptions}
+                  />
                 ) : (
-                  <span className="text-xs text-ink-tertiary">
+                  <span className="text-caption text-ink-tertiary">
                     {m.userId === user?.id ? "You" : "Admin only"}
                   </span>
                 )}
@@ -186,7 +177,7 @@ export default function TeamSettingsPage() {
             </div>
           ))
         )}
-      </div>
+      </Card>
     </div>
   );
 }

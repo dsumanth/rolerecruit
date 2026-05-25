@@ -5,6 +5,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useUser } from "@clerk/nextjs";
 import type { Id } from "@/convex/_generated/dataModel";
+import { Badge, Button, Card, Input } from "@/components/ui";
 
 const ROLE_LABELS: Record<string, string> = {
   hr_admin: "HR Admin",
@@ -52,7 +53,7 @@ export default function RolesPage() {
   }, [roles, seeded, profile?.schoolId, seedDefaults]);
 
   if (!profile || !roles) {
-    return <div className="p-8 text-ink-secondary text-sm">Loading...</div>;
+    return <div className="p-8 text-ink-secondary text-body-s">Loading...</div>;
   }
 
   const togglePerm = (key: string, current: string[]) => {
@@ -122,12 +123,14 @@ export default function RolesPage() {
   return (
     <div className="max-w-2xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-ink mb-1">Roles & Permissions</h1>
-        <p className="text-sm text-ink-secondary">Manage roles and what each team member can access.</p>
+        <h1 className="text-title-l text-ink mb-1">Roles & Permissions</h1>
+        <p className="text-body-s text-ink-secondary">Manage roles and what each team member can access.</p>
       </div>
 
       {error && (
-        <div className="px-4 py-3 rounded-apple bg-[#fff2f0] text-sm text-[#ff3b30]">{error}</div>
+        <div className="rounded-md bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] border border-[color-mix(in_srgb,var(--danger)_25%,transparent)] px-4 py-3 text-body-s text-danger">
+          {error}
+        </div>
       )}
 
       {roles.map((role) => {
@@ -136,45 +139,35 @@ export default function RolesPage() {
         const perms = isEditing ? editPermissions : role.permissions;
 
         return (
-          <div key={role._id} className="rounded-apple bg-surface border border-surface-tertiary p-5">
+          <Card key={role._id} padding="md" elevation={1}>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-ink">
+                <span className="text-body-s font-semibold text-ink">
                   {ROLE_LABELS[role.name] ?? role.name}
                 </span>
                 {role.isSystem && (
-                  <span className="text-xs px-1.5 py-0.5 rounded-full bg-surface-secondary text-ink-secondary">system</span>
+                  <Badge variant="neutral">system</Badge>
                 )}
               </div>
               <div className="flex items-center gap-2">
                 {isEditing ? (
                   <>
-                    <button
-                      onClick={() => saveEdit(role._id)}
-                      disabled={saving}
-                      className="text-xs px-3 py-1.5 rounded-apple bg-[#0071e3] text-white font-medium hover:bg-[#0077ed] disabled:opacity-50"
-                    >
+                    <Button variant="primary" size="sm" onClick={() => saveEdit(role._id)} disabled={saving} loading={saving}>
                       Save
-                    </button>
-                    <button onClick={cancelEdit} className="text-xs text-ink-secondary hover:text-ink">
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={cancelEdit}>
                       Cancel
-                    </button>
+                    </Button>
                   </>
                 ) : isHRAdmin ? null : (
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => startEdit(role)}
-                      className="text-xs text-accent hover:underline"
-                    >
+                    <Button variant="ghost" size="sm" onClick={() => startEdit(role)}>
                       Edit
-                    </button>
+                    </Button>
                     {!role.isSystem && (
-                      <button
-                        onClick={() => handleDelete(role._id)}
-                        className="text-xs text-[#ff3b30] hover:underline"
-                      >
+                      <Button variant="danger" size="sm" onClick={() => handleDelete(role._id)}>
                         Delete
-                      </button>
+                      </Button>
                     )}
                   </div>
                 )}
@@ -182,96 +175,90 @@ export default function RolesPage() {
             </div>
 
             {isHRAdmin ? (
-              <p className="text-xs text-ink-secondary">Full access to everything. Permissions cannot be modified.</p>
+              <p className="text-caption text-ink-secondary">Full access to everything. Permissions cannot be modified.</p>
             ) : (
               <div className="flex flex-wrap gap-1.5">
                 {ALL_PERMISSIONS.map((p) => {
                   const checked = perms.includes(p.key) || perms.includes("*");
                   return isEditing ? (
-                    <label key={p.key} className="flex items-center gap-1.5 text-xs text-ink-secondary cursor-pointer">
+                    <label key={p.key} className="flex items-center gap-1.5 text-caption text-ink-secondary cursor-pointer">
                       <input
                         type="checkbox"
                         checked={checked}
                         onChange={() => setEditPermissions(togglePerm(p.key, editPermissions))}
-                        className="w-3.5 h-3.5"
+                        className="w-3.5 h-3.5 accent-[var(--accent)]"
                       />
                       {p.label}
                     </label>
+                  ) : checked ? (
+                    <Badge key={p.key} variant="info">{p.label}</Badge>
                   ) : (
-                    <span
-                      key={p.key}
-                      className={`text-xs px-2 py-0.5 rounded-full ${
-                        checked ? "bg-[#e8f0fe] text-accent" : "bg-surface-secondary text-ink-tertiary"
-                      }`}
-                    >
-                      {p.label}
-                    </span>
+                    <Badge key={p.key} variant="neutral">{p.label}</Badge>
                   );
                 })}
               </div>
             )}
-          </div>
+          </Card>
         );
       })}
 
       {showCreate ? (
-        <form onSubmit={handleCreate} className="rounded-apple bg-surface border border-surface-tertiary p-5 space-y-4">
-          <h3 className="text-sm font-semibold text-ink">Create Role</h3>
-          <div>
-            <label className="block text-xs font-medium text-ink-secondary mb-1">Role Name</label>
-            <input
-              type="text"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              className="w-full px-3 py-2 rounded-apple bg-surface-secondary border border-surface-tertiary text-sm"
-              placeholder="e.g. Senior Teacher"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-ink-secondary mb-2">Permissions</label>
-            <div className="flex flex-wrap gap-2">
-              {ALL_PERMISSIONS.map((p) => (
-                <label key={p.key} className="flex items-center gap-1.5 text-xs text-ink-secondary cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={newPermissions.includes(p.key)}
-                    onChange={() => setNewPermissions(togglePerm(p.key, newPermissions))}
-                    className="w-3.5 h-3.5"
-                  />
-                  {p.label}
-                </label>
-              ))}
+        <Card padding="md" elevation={1}>
+          <form onSubmit={handleCreate} className="space-y-4">
+            <h3 className="text-body-s font-semibold text-ink">Create Role</h3>
+            <div>
+              <label className="block text-caption font-medium text-ink-secondary mb-1">Role Name</label>
+              <Input
+                type="text"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="e.g. Senior Teacher"
+                required
+              />
             </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              type="submit"
-              disabled={saving || !newName.trim()}
-              className="px-4 py-2 rounded-apple bg-[#0071e3] text-white text-sm font-medium hover:bg-[#0077ed] disabled:opacity-50"
-            >
-              {saving ? "Creating..." : "Create Role"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setShowCreate(false);
-                setNewName("");
-                setNewPermissions([]);
-              }}
-              className="text-xs text-ink-secondary hover:text-ink"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
+            <div>
+              <label className="block text-caption font-medium text-ink-secondary mb-2">Permissions</label>
+              <div className="flex flex-wrap gap-2">
+                {ALL_PERMISSIONS.map((p) => (
+                  <label key={p.key} className="flex items-center gap-1.5 text-caption text-ink-secondary cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={newPermissions.includes(p.key)}
+                      onChange={() => setNewPermissions(togglePerm(p.key, newPermissions))}
+                      className="w-3.5 h-3.5 accent-[var(--accent)]"
+                    />
+                    {p.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={saving || !newName.trim()}
+                loading={saving}
+              >
+                Create Role
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setShowCreate(false);
+                  setNewName("");
+                  setNewPermissions([]);
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </Card>
       ) : (
-        <button
-          onClick={() => setShowCreate(true)}
-          className="px-4 py-2 rounded-apple bg-[#0071e3] text-white text-sm font-medium hover:bg-[#0077ed]"
-        >
-          + Add Role
-        </button>
+        <Button variant="primary" iconLeft="Plus" onClick={() => setShowCreate(true)}>
+          Add Role
+        </Button>
       )}
     </div>
   );
