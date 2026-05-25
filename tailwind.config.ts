@@ -30,6 +30,8 @@ const config: Config = {
           floating: "var(--floating-bg)",
           canvas: "var(--canvas-base)",
           marketing: "var(--marketing-base)",
+          secondary: "var(--canvas-base)",   // bridge: plan 2 migrates call sites
+          tertiary: "var(--hairline)",         // bridge: plan 2 migrates call sites
         },
         hairline: {
           DEFAULT: "var(--hairline)",
