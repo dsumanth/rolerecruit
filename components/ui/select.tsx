@@ -1,23 +1,45 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import type { SelectHTMLAttributes, ReactNode } from "react";
+import { Dropdown, DropdownItem } from "./dropdown";
+import { Icon } from "./icon";
 
-interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
-  children: ReactNode;
+interface Option {
+  value: string;
+  label: string;
 }
 
-export function Select({ className, children, ...props }: SelectProps) {
+interface SelectProps {
+  value: string;
+  onChange: (value: string) => void;
+  options: Option[];
+  placeholder?: string;
+  className?: string;
+}
+
+export function Select({ value, onChange, options, placeholder = "Choose", className }: SelectProps) {
+  const current = options.find((o) => o.value === value);
   return (
-    <select
-      className={cn(
-        "w-full px-4 py-2.5 rounded-apple bg-surface border border-surface-tertiary text-sm text-ink appearance-none transition-all duration-normal ease-apple-ease",
-        "focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent",
-        className,
-      )}
-      {...props}
+    <Dropdown
+      align="end"
+      trigger={
+        <button
+          type="button"
+          className={cn(
+            "inline-flex items-center gap-2 rounded-sm border border-hairline-strong bg-surface px-3 py-[7px] text-body-s text-ink hover:border-accent transition-colors duration-fast",
+            className,
+          )}
+        >
+          <span>{current?.label ?? placeholder}</span>
+          <Icon name="ChevronDown" size={13} color="var(--ink-3)" />
+        </button>
+      }
     >
-      {children}
-    </select>
+      {options.map((o) => (
+        <DropdownItem key={o.value} onSelect={() => onChange(o.value)}>
+          {o.label}
+        </DropdownItem>
+      ))}
+    </Dropdown>
   );
 }
