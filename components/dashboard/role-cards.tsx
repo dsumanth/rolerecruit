@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
+import { Badge, Card, EmptyState, Button } from "@/components/ui";
 
 interface Props {
   schoolId: string;
@@ -23,40 +23,32 @@ const STAGE_COLORS: Record<string, string> = {
   sourced: "bg-ink-tertiary",
   screened: "bg-ink-secondary",
   demo_scheduled: "bg-accent",
-  demo_completed: "bg-purple-600",
+  demo_completed: "bg-purple",
   offer_sent: "bg-warning",
   hired: "bg-success",
 };
 
-interface Application {
-  _id: string;
-  stage: string;
-}
+interface Application { _id: string; stage: string }
 
-function statusBadgeVariant(status: string) {
-  if (status === "active") return "success" as const;
-  if (status === "draft") return "default" as const;
-  return "danger" as const;
+function jobStatusBadge(status: string) {
+  if (status === "active") return <Badge dot variant="success">Active</Badge>;
+  if (status === "draft") return <Badge dot variant="neutral">Draft</Badge>;
+  return <Badge dot variant="neutral">Closed</Badge>;
 }
 
 export function RoleCards({ schoolId }: Props) {
   const jobs = useQuery(api.jobs.listBySchool, { schoolId: schoolId as any });
-  const pipeline = useQuery(api.dashboard.getPipelineBreakdown, {
-    schoolId: schoolId as any,
-  });
+  const pipeline = useQuery(api.dashboard.getPipelineBreakdown, { schoolId: schoolId as any });
 
   if (!jobs || !pipeline) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-3">
         {[1, 2, 3].map((i) => (
-          <div
-            key={i}
-            className="rounded-apple bg-surface border border-surface-tertiary p-5 animate-pulse"
-          >
-            <div className="h-5 w-48 bg-surface-secondary rounded mb-2" />
-            <div className="h-3 w-32 bg-surface-secondary rounded mb-4" />
-            <div className="h-2 w-full bg-surface-secondary rounded" />
-          </div>
+          <Card key={i} padding="md" elevation={1}>
+            <div className="h-5 w-48 bg-hairline rounded animate-pulse mb-2" />
+            <div className="h-3 w-32 bg-hairline rounded animate-pulse mb-4" />
+            <div className="h-2 w-full bg-hairline rounded animate-pulse" />
+          </Card>
         ))}
       </div>
     );
@@ -64,15 +56,17 @@ export function RoleCards({ schoolId }: Props) {
 
   if (jobs.length === 0) {
     return (
-      <div className="rounded-apple bg-surface border border-surface-tertiary p-8 text-center">
-        <p className="text-ink-secondary text-sm">No open roles.</p>
-        <Link
-          href="/dashboard/jobs/new"
-          className="inline-block mt-3 text-sm text-accent hover:text-accent-hover"
-        >
-          Post your first role
-        </Link>
-      </div>
+      <Card padding="lg" elevation={1}>
+        <EmptyState
+          title="No open roles"
+          description="Post your first role to start tracking candidates."
+          action={
+            <Link href="/dashboard/jobs/new">
+              <Button variant="ink" iconLeft="Plus">Post your first role</Button>
+            </Link>
+          }
+        />
+      </Card>
     );
   }
 
@@ -83,59 +77,52 @@ export function RoleCards({ schoolId }: Props) {
         const total = apps.length;
 
         return (
-          <Link
-            key={job._id}
-            href={`/dashboard/jobs/${job._id}`}
-            className="block rounded-apple bg-surface border border-surface-tertiary p-5 hover:border-accent transition-colors"
-          >
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <h3 className="text-sm font-semibold text-ink">
-                  {job.title}
-                </h3>
-                <p className="text-[13px] text-ink-secondary mt-0.5">
-                  {job.subject} · {job.level} · {job.board}
-                </p>
+          <Link key={job._id} href={`/dashboard/jobs/${job._id}`} className="block">
+            <Card padding="md" elevation={1} interactive>
+              <div className="flex items-start justify-between mb-3">
+                <div className="min-w-0">
+                  <h3 className="text-title-m text-ink truncate">{job.title}</h3>
+                  <p className="text-caption text-ink-secondary mt-0.5">
+                    {job.subject} <span className="text-ink-tertiary">·</span>{" "}
+                    {job.level} <span className="text-ink-tertiary">·</span>{" "}
+                    {job.board}
+                  </p>
+                </div>
+                {jobStatusBadge(job.status)}
               </div>
-              <Badge variant={statusBadgeVariant(job.status)}>
-                {job.status}
-              </Badge>
-            </div>
 
-            {total > 0 ? (
-              <div className="space-y-1.5">
-                <div className="flex h-2 rounded-full overflow-hidden bg-surface-secondary">
-                  {Object.entries(STAGE_LABELS).map(([stage]) => {
-                    const count = apps.filter(
-                      (a: Application) => a.stage === stage
-                    ).length;
-                    if (count === 0) return null;
-                    return (
-                      <div
-                        key={stage}
-                        className={cn("h-full transition-all", STAGE_COLORS[stage])}
-                        style={{ width: `${(count / total) * 100}%` }}
-                      />
-                    );
-                  })}
+              {total > 0 ? (
+                <div className="space-y-1.5">
+                  <div className="flex h-1.5 rounded-full overflow-hidden bg-hairline gap-[2px]">
+                    {Object.entries(STAGE_LABELS).map(([stage]) => {
+                      const count = apps.filter((a: Application) => a.stage === stage).length;
+                      if (count === 0) return null;
+                      return (
+                        <div
+                          key={stage}
+                          className={cn("h-full rounded-sm", STAGE_COLORS[stage])}
+                          style={{ width: `${(count / total) * 100}%` }}
+                        />
+                      );
+                    })}
+                  </div>
+                  <div className="flex flex-wrap gap-3 text-caption text-ink-secondary mt-2">
+                    {Object.entries(STAGE_LABELS).map(([stage, label]) => {
+                      const count = apps.filter((a: Application) => a.stage === stage).length;
+                      if (count === 0) return null;
+                      return (
+                        <span key={stage} className="inline-flex items-center gap-1.5">
+                          <span className={cn("h-1.5 w-1.5 rounded-sm", STAGE_COLORS[stage])} />
+                          {label} <span className="text-ink font-medium tabular-nums">{count}</span>
+                        </span>
+                      );
+                    })}
+                  </div>
                 </div>
-                <div className="flex gap-3 text-xs text-ink-secondary">
-                  {Object.entries(STAGE_LABELS).map(([stage, label]) => {
-                    const count = apps.filter(
-                      (a: Application) => a.stage === stage
-                    ).length;
-                    if (count === 0) return null;
-                    return (
-                      <span key={stage}>
-                        {label}: {count}
-                      </span>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : (
-              <p className="text-xs text-ink-tertiary">No candidates in pipeline</p>
-            )}
+              ) : (
+                <p className="text-caption text-ink-tertiary">No candidates in pipeline</p>
+              )}
+            </Card>
           </Link>
         );
       })}

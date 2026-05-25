@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireProfile } from "@/lib/auth";
+import { PageHeader, Button } from "@/components/ui";
 import { StatsBar } from "@/components/dashboard/stats-bar";
 import { RoleCards } from "@/components/dashboard/role-cards";
 
@@ -8,26 +9,29 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-bold tracking-tight text-ink">
-          Dashboard
-        </h1>
-        <Link
-          href="/dashboard/jobs/new"
-          className="py-2.5 px-5 rounded-apple bg-[#0071e3] text-white text-sm font-medium hover:bg-[#0077ed] active:bg-[#004999] transition-colors"
-        >
-          Post New Role
-        </Link>
-      </div>
+      <PageHeader
+        eyebrow={`Welcome back, ${(profile.name ?? "").split(" ")[0] || "there"}`}
+        title="Dashboard"
+        actions={
+          <Link href="/dashboard/jobs/new">
+            <Button variant="ink" iconLeft="Plus" size="md">
+              Post role
+            </Button>
+          </Link>
+        }
+      />
 
-      <div className="space-y-6">
+      <div className="space-y-7">
         <StatsBar schoolId={profile.schoolId} />
-        <div>
-          <h2 className="text-sm font-semibold text-ink mb-3">
-            Active Roles
-          </h2>
+        <section>
+          <div className="flex items-baseline justify-between mb-3">
+            <h2 className="text-micro text-ink-secondary">Active roles</h2>
+            <Link href="/dashboard/jobs" className="text-body-s font-medium text-accent">
+              View all →
+            </Link>
+          </div>
           <RoleCards schoolId={profile.schoolId} />
-        </div>
+        </section>
       </div>
     </div>
   );
