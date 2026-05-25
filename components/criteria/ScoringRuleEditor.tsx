@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Button, Input } from "@/components/ui";
 import { DimensionSlider } from "./DimensionSlider";
 
 interface Dimension {
@@ -33,25 +34,42 @@ export function ScoringRuleEditor({ initialDimensions = [], onSave, saving }: Pr
   return (
     <div className="space-y-4">
       {dimensions.length === 0 ? (
-        <p className="text-sm text-ink-secondary py-4 text-center">No criteria configured. Use AI suggestions to get started.</p>
+        <p className="text-body-s text-ink-secondary py-4 text-center">
+          No criteria configured. Use AI suggestions to get started.
+        </p>
       ) : (
-        dimensions.map((d) => (
-          <DimensionSlider key={d.name} {...d} onWeightChange={handleWeightChange} onRemove={handleRemove} />
-        ))
+        <div className="space-y-3">
+          {dimensions.map((d) => (
+            <DimensionSlider key={d.name} {...d} onWeightChange={handleWeightChange} onRemove={handleRemove} />
+          ))}
+        </div>
       )}
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-ink mb-1">Minimum Score</label>
-          <input type="number" value={minimumScore} onChange={(e) => setMinimumScore(parseInt(e.target.value))} className="w-full px-4 py-2 rounded-apple bg-surface border border-surface-tertiary text-sm" />
+          <label className="block text-body-s font-medium text-ink mb-1">Minimum score</label>
+          <Input
+            type="number"
+            value={minimumScore}
+            onChange={(e) => setMinimumScore(parseInt(e.target.value))}
+          />
         </div>
         <div>
-          <label className="block text-sm font-medium text-ink mb-1">Auto-Reject Below</label>
-          <input type="number" value={autoRejectScore} onChange={(e) => setAutoRejectScore(parseInt(e.target.value))} className="w-full px-4 py-2 rounded-apple bg-surface border border-surface-tertiary text-sm" />
+          <label className="block text-body-s font-medium text-ink mb-1">Auto-reject below</label>
+          <Input
+            type="number"
+            value={autoRejectScore}
+            onChange={(e) => setAutoRejectScore(parseInt(e.target.value))}
+          />
         </div>
       </div>
-      <button type="button" onClick={() => onSave(dimensions, minimumScore, autoRejectScore)} disabled={saving} className="py-2.5 px-5 rounded-apple bg-accent text-white text-sm font-medium hover:bg-accent-hover disabled:opacity-50">
-        {saving ? "Saving..." : "Save Criteria"}
-      </button>
+      <Button
+        variant="primary"
+        size="md"
+        loading={saving}
+        onClick={() => onSave(dimensions, minimumScore, autoRejectScore)}
+      >
+        Save Criteria
+      </Button>
     </div>
   );
 }

@@ -1,3 +1,5 @@
+import { Card, Button } from "@/components/ui";
+
 interface SuggestedDimension {
   name: string;
   weight: number;
@@ -17,30 +19,35 @@ interface Props {
 
 export function AISuggestedCriteria({ suggested, loading, onAccept, onGenerate }: Props) {
   return (
-    <div className="rounded-apple bg-surface border border-surface-tertiary p-5 mb-6">
-      <h3 className="text-sm font-semibold text-ink mb-3">AI Suggested Criteria</h3>
+    <Card padding="md" elevation={1}>
+      <h3 className="text-body-s font-semibold text-ink mb-3">AI suggested criteria</h3>
       {loading ? (
-        <p className="text-sm text-ink-secondary">Generating suggestions...</p>
+        <p className="text-body-s text-ink-secondary">Generating suggestions...</p>
       ) : suggested ? (
         <>
           <div className="space-y-2 mb-4">
             {suggested.dimensions.map((d) => (
-              <div key={d.name} className="flex justify-between text-sm">
+              <div key={d.name} className="flex justify-between text-body-s">
                 <span className="text-ink">{d.name}</span>
-                <span className="text-ink-secondary">{(d.weight * 100).toFixed(0)}%</span>
+                <span className="text-ink-secondary tabular-nums">{(d.weight * 100).toFixed(0)}%</span>
               </div>
             ))}
           </div>
           <div className="flex gap-2">
-            <button type="button" onClick={onAccept} className="py-2 px-4 rounded-apple bg-accent text-white text-xs font-medium hover:bg-accent-hover">Accept All</button>
-            <button type="button" onClick={onGenerate} className="py-2 px-4 rounded-apple bg-surface-secondary text-xs text-ink">Regenerate</button>
+            <Button variant="primary" size="sm" onClick={onAccept}>Accept All</Button>
+            <Button variant="secondary" size="sm" onClick={onGenerate}>Regenerate</Button>
           </div>
         </>
       ) : (
-        <button type="button" onClick={onGenerate} className="py-2 px-4 rounded-apple bg-accent/10 text-accent text-sm font-medium hover:bg-accent/10">
-          Generate AI Suggestions
-        </button>
+        <div className="rounded-md bg-accent-soft p-4">
+          <p className="text-body-s text-ink mb-3">
+            Let AI propose dimensions and weights based on this role.
+          </p>
+          <Button variant="primary" size="md" iconLeft="Sparkles" onClick={onGenerate}>
+            Generate AI Suggestions
+          </Button>
+        </div>
       )}
-    </div>
+    </Card>
   );
 }
