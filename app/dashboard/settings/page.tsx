@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useUser } from "@clerk/nextjs";
+import { Button, Card, Input, Toggle } from "@/components/ui";
 
 export default function SettingsPage() {
   const { user } = useUser();
@@ -16,6 +17,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   if (school && !loaded) {
     setSlug(school.slug ?? "");
@@ -26,6 +28,7 @@ export default function SettingsPage() {
   const handleSave = async () => {
     if (!profile?.schoolId) return;
     setSaving(true);
+    setError(null);
     try {
       await updateSettings({
         schoolId: profile.schoolId,
@@ -35,14 +38,14 @@ export default function SettingsPage() {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (e: any) {
-      alert(e.message ?? "Failed to save");
+      setError(e.message ?? "Failed to save");
     } finally {
       setSaving(false);
     }
   };
 
   if (!school || !profile) {
-    return <div className="text-ink-secondary text-sm">Loading...</div>;
+    return <div className="text-ink-secondary text-body-s">Loading...</div>;
   }
 
   const subdomainUrl = school.slug
@@ -55,36 +58,40 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-2xl space-y-6">
-      <h1 className="text-2xl font-bold tracking-tight text-ink">General</h1>
+      {error && (
+        <div className="rounded-md bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] border border-[color-mix(in_srgb,var(--danger)_25%,transparent)] px-4 py-3 text-body-s text-danger">
+          {error}
+        </div>
+      )}
 
       {/* Careers Portal */}
-      <div className="rounded-apple bg-surface border border-surface-tertiary p-5">
-        <h2 className="text-sm font-semibold text-ink mb-1">Careers Portal</h2>
-        <p className="text-sm text-ink-secondary mb-4">Your school's public careers page. Candidates apply here and receive tracking links.</p>
+      <Card padding="md" elevation={1}>
+        <h2 className="text-body-s font-semibold text-ink mb-1">Careers Portal</h2>
+        <p className="text-body-s text-ink-secondary mb-4">Your school's public careers page. Candidates apply here and receive tracking links.</p>
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-ink mb-1">Subdomain</label>
-            <p className="text-xs text-ink-tertiary mb-2">
+            <label className="block text-body-s font-medium text-ink mb-1">Subdomain</label>
+            <p className="text-caption text-ink-tertiary mb-2">
               Pick your school's careers portal URL. The slug uses lowercase letters, numbers, and hyphens.
             </p>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-ink-tertiary">https://</span>
-              <input
+              <span className="text-body-s text-ink-tertiary">https://</span>
+              <Input
                 type="text"
                 value={slug}
                 onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 50))}
-                className="flex-1 px-3 py-2 rounded-apple bg-surface-secondary border border-surface-tertiary text-sm"
+                className="flex-1"
                 placeholder="harvest-international"
               />
-              <span className="text-sm text-ink-tertiary">.rolerecruit.com</span>
+              <span className="text-body-s text-ink-tertiary">.rolerecruit.com</span>
             </div>
           </div>
 
           {subdomainUrl && (
             <div className="flex items-center gap-3">
-              <span className="text-sm text-ink-secondary">Your portal:</span>
-              <a href={subdomainUrl} target="_blank" rel="noopener" className="text-sm text-accent hover:underline">
+              <span className="text-body-s text-ink-secondary">Your portal:</span>
+              <a href={subdomainUrl} target="_blank" rel="noopener" className="text-body-s text-accent hover:underline">
                 {subdomainUrl}
               </a>
             </div>
@@ -92,105 +99,96 @@ export default function SettingsPage() {
 
           {fallbackUrl && (
             <div className="flex items-center gap-3">
-              <span className="text-sm text-ink-secondary">Fallback:</span>
-              <a href={fallbackUrl} target="_blank" rel="noopener" className="text-sm text-accent hover:underline">
+              <span className="text-body-s text-ink-secondary">Fallback:</span>
+              <a href={fallbackUrl} target="_blank" rel="noopener" className="text-body-s text-accent hover:underline">
                 {fallbackUrl}
               </a>
             </div>
           )}
         </div>
-      </div>
+      </Card>
 
       {/* WhatsApp Settings */}
-      <div className="rounded-apple bg-surface border border-surface-tertiary p-5">
-        <h2 className="text-sm font-semibold text-ink mb-1">Candidate Notifications</h2>
-        <p className="text-sm text-ink-secondary mb-4">
+      <Card padding="md" elevation={1}>
+        <h2 className="text-body-s font-semibold text-ink mb-1">Candidate Notifications</h2>
+        <p className="text-body-s text-ink-secondary mb-4">
           How candidates receive application tracking links and updates.
         </p>
 
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-ink">WhatsApp Notifications</p>
-              <p className="text-xs text-ink-tertiary">Auto-fallback to email when disabled or when candidate has no phone</p>
+              <p className="text-body-s font-medium text-ink">WhatsApp Notifications</p>
+              <p className="text-caption text-ink-tertiary">Auto-fallback to email when disabled or when candidate has no phone</p>
             </div>
-            <label className="flex items-center gap-3 cursor-pointer">
-              <span className="text-xs text-ink-secondary">{whatsappEnabled ? "On" : "Off"}</span>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={whatsappEnabled}
-                onClick={() => setWhatsappEnabled(!whatsappEnabled)}
-                className={`w-11 h-6 rounded-full transition-colors relative ${whatsappEnabled ? "bg-[#34c759]" : "bg-[#e8e8ed]"}`}
-              >
-                <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-surface shadow transition-transform ${whatsappEnabled ? "translate-x-[22px]" : "translate-x-0.5"}`} />
-              </button>
-            </label>
+            <div className="flex items-center gap-3">
+              <span className="text-caption text-ink-secondary">{whatsappEnabled ? "On" : "Off"}</span>
+              <Toggle
+                checked={whatsappEnabled}
+                onCheckedChange={setWhatsappEnabled}
+                label="WhatsApp Notifications"
+              />
+            </div>
           </div>
 
-          <div className="border-t border-surface-tertiary pt-4">
-            <p className="text-sm font-medium text-ink mb-2">WhatsApp Business API Configuration</p>
-            <p className="text-xs text-ink-secondary mb-3">
+          <div className="border-t border-hairline pt-4">
+            <p className="text-body-s font-medium text-ink mb-2">WhatsApp Business API Configuration</p>
+            <p className="text-caption text-ink-secondary mb-3">
               Powered by Gupshup. Add these environment variables to your deployment. Contact support to configure your WhatsApp Business number.
             </p>
             <div className="space-y-2">
-              <div className="flex items-center justify-between py-1.5 px-3 rounded bg-surface-secondary">
-                <span className="text-xs font-mono text-ink">GUPSHUP_API_KEY</span>
-                <span className="text-xs text-ink-secondary">Set in deployment</span>
+              <div className="flex items-center justify-between py-1.5 px-3 rounded-xs bg-surface-canvas">
+                <span className="text-caption font-mono text-ink">GUPSHUP_API_KEY</span>
+                <span className="text-caption text-ink-secondary">Set in deployment</span>
               </div>
-              <div className="flex items-center justify-between py-1.5 px-3 rounded bg-surface-secondary">
-                <span className="text-xs font-mono text-ink">GUPSHUP_APP_NAME</span>
-                <span className="text-xs text-ink-secondary">Required</span>
+              <div className="flex items-center justify-between py-1.5 px-3 rounded-xs bg-surface-canvas">
+                <span className="text-caption font-mono text-ink">GUPSHUP_APP_NAME</span>
+                <span className="text-caption text-ink-secondary">Required</span>
               </div>
-              <div className="flex items-center justify-between py-1.5 px-3 rounded bg-surface-secondary">
-                <span className="text-xs font-mono text-ink">GUPSHUP_SOURCE_NUMBER</span>
-                <span className="text-xs text-ink-secondary">Required</span>
+              <div className="flex items-center justify-between py-1.5 px-3 rounded-xs bg-surface-canvas">
+                <span className="text-caption font-mono text-ink">GUPSHUP_SOURCE_NUMBER</span>
+                <span className="text-caption text-ink-secondary">Required</span>
               </div>
-              <div className="flex items-center justify-between py-1.5 px-3 rounded bg-surface-secondary">
-                <span className="text-xs font-mono text-ink">DEEPSEEK_API_KEY</span>
-                <span className="text-xs text-ink-secondary">Set in deployment</span>
+              <div className="flex items-center justify-between py-1.5 px-3 rounded-xs bg-surface-canvas">
+                <span className="text-caption font-mono text-ink">DEEPSEEK_API_KEY</span>
+                <span className="text-caption text-ink-secondary">Set in deployment</span>
               </div>
-              <div className="flex items-center justify-between py-1.5 px-3 rounded bg-surface-secondary">
-                <span className="text-xs font-mono text-ink">RESEND_API_KEY</span>
-                <span className="text-xs text-ink-secondary">Set in deployment</span>
+              <div className="flex items-center justify-between py-1.5 px-3 rounded-xs bg-surface-canvas">
+                <span className="text-caption font-mono text-ink">RESEND_API_KEY</span>
+                <span className="text-caption text-ink-secondary">Set in deployment</span>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Email Ingestion Setup */}
-      <div className="rounded-apple bg-surface border border-surface-tertiary p-5">
-        <h2 className="text-sm font-semibold text-ink mb-1">Email Ingestion</h2>
-        <p className="text-sm text-ink-secondary mb-4">
+      <Card padding="md" elevation={1}>
+        <h2 className="text-body-s font-semibold text-ink mb-1">Email Ingestion</h2>
+        <p className="text-body-s text-ink-secondary mb-4">
           Forward Naukri/Indeed/LinkedIn notification emails to automatically parse and add candidates.
         </p>
         {slug ? (
-          <div className="p-3 rounded bg-surface-secondary text-sm font-mono text-ink border border-surface-tertiary">
+          <div className="p-3 rounded-xs bg-surface-canvas text-body-s font-mono text-ink border border-hairline">
             {slug}@inbound.rolerecruit.com
           </div>
         ) : (
-          <p className="text-sm text-[#ff9500]">Set a subdomain slug first to get your inbound email address.</p>
+          <p className="text-body-s text-warning">Set a subdomain slug first to get your inbound email address.</p>
         )}
-        <p className="text-xs text-ink-tertiary mt-2">
+        <p className="text-caption text-ink-tertiary mt-2">
           Configure Resend inbound webhook to point to <code className="text-ink">/api/email-ingestion</code>
         </p>
-      </div>
+      </Card>
 
-      <button
+      <Button
         type="button"
         onClick={handleSave}
         disabled={saving}
-        className={`py-2.5 px-5 rounded-apple text-sm font-medium transition-colors ${
-          saved
-            ? "bg-[#34c759] text-white"
-            : saving
-            ? "bg-[#aeaeb2] text-white cursor-not-allowed"
-            : "bg-[#0071e3] text-white hover:bg-[#0077ed]"
-        }`}
+        loading={saving}
+        variant="primary"
       >
-        {saving ? "Saving..." : saved ? "Saved" : "Save Settings"}
-      </button>
+        {saved ? "Saved" : "Save Settings"}
+      </Button>
     </div>
   );
 }

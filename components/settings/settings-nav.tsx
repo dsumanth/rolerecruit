@@ -2,57 +2,59 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Icon, type IconName } from "@/components/ui";
 import { RoleGate } from "@/components/auth/role-gate";
+import { cn } from "@/lib/utils";
 
-const SETTINGS_TABS = [
-  { key: "general", label: "General", href: "/dashboard/settings" },
-  { key: "roles", label: "Roles & Permissions", href: "/dashboard/settings/roles", permission: "settings:manage" },
-  { key: "team", label: "Team", href: "/dashboard/settings/team", permission: "team" },
-  { key: "pipeline", label: "Pipeline", href: "/dashboard/settings/pipeline" },
-  { key: "messaging", label: "Messaging", href: "/dashboard/settings/messaging" },
-  { key: "calendar", label: "Calendar", href: "/dashboard/settings/calendar" },
-] as const;
+interface NavItem {
+  href: string;
+  label: string;
+  icon: IconName;
+  permission?: string;
+}
+
+const ITEMS: NavItem[] = [
+  { href: "/dashboard/settings", label: "General", icon: "Settings" },
+  { href: "/dashboard/settings/calendar", label: "Calendar", icon: "Calendar" },
+  { href: "/dashboard/settings/messaging", label: "Messaging", icon: "MessageSquare" },
+  { href: "/dashboard/settings/pipeline", label: "Pipeline stages", icon: "Kanban" },
+  { href: "/dashboard/settings/roles", label: "Roles", icon: "Shield", permission: "settings:manage" },
+  { href: "/dashboard/settings/team", label: "Team", icon: "Users", permission: "team" },
+];
 
 export function SettingsNav() {
   const pathname = usePathname();
-
-  // Determine active tab: exact match for /dashboard/settings (general),
-  // otherwise check if the pathname starts with the tab's href
-  const activeTab = pathname === "/dashboard/settings" ? "general" : pathname?.split("/").pop();
-
   return (
-    <nav className="w-48 shrink-0 border-r border-surface-tertiary py-6 px-3">
-      <p className="px-3 mb-1 text-xs font-medium uppercase tracking-wider text-ink-tertiary">
-        Settings
-      </p>
-      <div className="space-y-0.5 mt-2">
-        {SETTINGS_TABS.map((tab) => {
-          const isActive = tab.key === activeTab;
+    <nav className="flex flex-col gap-px">
+      {ITEMS.map((item) => {
+        const active =
+          pathname === item.href ||
+          (item.href !== "/dashboard/settings" && pathname?.startsWith(item.href));
+        const link = (
+          <Link
+            href={item.href}
+            aria-current={active ? "page" : undefined}
+            className={cn(
+              "flex items-center gap-[11px] rounded-sm px-3 py-2 text-body-s font-medium transition-colors duration-fast",
+              active
+                ? "bg-surface-floating shadow-elev-1 text-ink"
+                : "text-ink hover:bg-accent-soft",
+            )}
+          >
+            <Icon name={item.icon} size={16} color={active ? "var(--accent)" : "var(--ink-2)"} />
+            {item.label}
+          </Link>
+        );
 
-          const link = (
-            <Link
-              href={tab.href}
-              className={`block px-3 py-2 rounded-apple text-sm transition-colors ${
-                isActive
-                  ? "bg-surface-secondary text-accent font-medium"
-                  : "text-ink hover:bg-surface-secondary"
-              }`}
-            >
-              {tab.label}
-            </Link>
+        if (item.permission) {
+          return (
+            <RoleGate key={item.href} requiredAction={item.permission} fallback={null}>
+              {link}
+            </RoleGate>
           );
-
-          if ("permission" in tab && tab.permission) {
-            return (
-              <RoleGate key={tab.key} requiredAction={tab.permission} fallback={null}>
-                {link}
-              </RoleGate>
-            );
-          }
-
-          return <div key={tab.key}>{link}</div>;
-        })}
-      </div>
+        }
+        return <div key={item.href}>{link}</div>;
+      })}
     </nav>
   );
 }
