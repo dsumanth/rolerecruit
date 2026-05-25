@@ -125,7 +125,7 @@ export function GlobalCriteriaPanel({ schoolId, onClose }: GlobalCriteriaPanelPr
               {existing.scoringRules.dimensions.map((dim: any) => (
                 <div key={dim.name} className="flex items-center justify-between px-3 py-2 rounded-apple bg-surface-secondary">
                   <span className="text-sm text-ink">{dim.name}</span>
-                  <Badge variant="default">
+                  <Badge variant="neutral">
                     {Math.round(dim.weight * 100)}%
                   </Badge>
                 </div>

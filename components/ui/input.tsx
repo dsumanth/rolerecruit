@@ -17,6 +17,9 @@ const sizeClasses: Record<InputSize, string> = {
   lg: "h-11 text-body px-4",
 };
 
+const BASE_CLASSES =
+  "w-full rounded-sm bg-surface border border-hairline-strong text-ink placeholder:text-ink-tertiary outline-none transition-all duration-fast ease-apple-out focus:border-accent focus:ring-2 focus:ring-accent-soft";
+
 export function Input({ size = "md", iconLeft, className, ...props }: InputProps) {
   if (iconLeft) {
     return (
@@ -26,12 +29,7 @@ export function Input({ size = "md", iconLeft, className, ...props }: InputProps
         </span>
         <input
           {...props}
-          className={cn(
-            "w-full rounded-sm bg-surface border border-hairline-strong text-ink placeholder:text-ink-tertiary outline-none transition-all duration-fast ease-apple-out focus:border-accent focus:ring-2 focus:ring-accent-soft",
-            "pl-8",
-            sizeClasses[size],
-            className,
-          )}
+          className={cn(BASE_CLASSES, "pl-8", sizeClasses[size], className)}
         />
       </div>
     );
@@ -40,11 +38,7 @@ export function Input({ size = "md", iconLeft, className, ...props }: InputProps
   return (
     <input
       {...props}
-      className={cn(
-        "w-full rounded-sm bg-surface border border-hairline-strong text-ink placeholder:text-ink-tertiary outline-none transition-all duration-fast ease-apple-out focus:border-accent focus:ring-2 focus:ring-accent-soft",
-        sizeClasses[size],
-        className,
-      )}
+      className={cn(BASE_CLASSES, sizeClasses[size], className)}
     />
   );
 }

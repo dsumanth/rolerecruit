@@ -21,7 +21,7 @@ export function Toggle({ checked, onCheckedChange, label, disabled, className }:
       onClick={() => !disabled && onCheckedChange(!checked)}
       className={cn(
         "relative inline-flex h-[22px] w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-fast ease-apple-out",
-        checked ? "bg-success" : "bg-[var(--hairline-strong)]",
+        checked ? "bg-success" : "bg-hairline-strong",
         disabled && "cursor-not-allowed opacity-50",
         className,
       )}

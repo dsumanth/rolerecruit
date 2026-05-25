@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { RoleGate } from "@/components/auth/role-gate";
 import { Avatar } from "@/components/ui/avatar";
+import { BrandMark } from "@/components/ui/brand-mark";
 import { Icon, type IconName } from "@/components/ui/icon";
 import { Dropdown, DropdownDivider, DropdownItem, DropdownLabel } from "@/components/ui/dropdown";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
@@ -33,9 +34,7 @@ export function Sidebar({ userName, userRole }: SidebarProps) {
   return (
     <aside className="w-[232px] shrink-0 bg-surface-chrome backdrop-blur-24 border-r border-chrome flex flex-col">
       <div className="flex items-center gap-2.5 px-4 pt-5 pb-5">
-        <div className="h-[26px] w-[26px] rounded-[7px] bg-accent-grad text-white text-[14px] font-bold flex items-center justify-center tracking-tight shadow-[0_2px_6px_rgba(0,113,227,0.3)]">
-          R
-        </div>
+        <BrandMark className="shadow-[0_2px_6px_rgba(0,113,227,0.3)]" />
         <span className="text-title-m text-ink">RoleRecruit</span>
       </div>
 

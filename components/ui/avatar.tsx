@@ -7,9 +7,9 @@ interface AvatarProps {
   className?: string;
 }
 
-function initial(name: string): string {
+export function nameInitial(name: string, fallback = "?"): string {
   const t = name.trim();
-  if (!t) return "?";
+  if (!t) return fallback;
   return t[0].toUpperCase();
 }
 
@@ -35,7 +35,7 @@ export function Avatar({ name, src, size = 28, className }: AvatarProps) {
         className,
       )}
     >
-      {initial(name)}
+      {nameInitial(name)}
     </div>
   );
 }

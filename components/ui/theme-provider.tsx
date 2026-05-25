@@ -33,12 +33,18 @@ function resolve(theme: Theme): ResolvedTheme {
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(() => readStored());
-  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => resolve(readStored()));
+  // Single lazy initializer reads localStorage once and derives both values.
+  const [{ theme, resolvedTheme }, setThemeState] = useState<{
+    theme: Theme;
+    resolvedTheme: ResolvedTheme;
+  }>(() => {
+    const t = readStored();
+    return { theme: t, resolvedTheme: resolve(t) };
+  });
 
   const apply = useCallback((next: Theme) => {
     const r = resolve(next);
-    setResolvedTheme(r);
+    setThemeState((prev) => ({ ...prev, resolvedTheme: r }));
     if (typeof document !== "undefined") {
       document.documentElement.setAttribute("data-theme", r);
     }
@@ -46,7 +52,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const setTheme = useCallback(
     (next: Theme) => {
-      setThemeState(next);
+      setThemeState((prev) => ({ ...prev, theme: next }));
       window.localStorage.setItem(STORAGE_KEY, next);
       apply(next);
     },

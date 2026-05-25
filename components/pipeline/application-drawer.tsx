@@ -10,7 +10,12 @@ import { Tabs } from "@/components/ui/tabs";
 import { Select } from "@/components/ui/select";
 import { MessageComposer } from "@/components/outreach/message-composer";
 import { DemoScheduler } from "@/components/outreach/demo-scheduler";
-import type { Tab } from "@/components/ui/tabs";
+
+interface TabItem {
+  value: string;
+  label: string;
+  count?: number;
+}
 
 interface Candidate {
   _id: string;
@@ -51,11 +56,11 @@ const STAGE_LABELS: Record<string, string> = {
   rejected: "Rejected",
 };
 
-const DRAWER_TABS: Tab[] = [
-  { key: "info", label: "Info" },
-  { key: "outreach", label: "Outreach" },
-  { key: "demo", label: "Demo" },
-  { key: "evaluate", label: "Evaluate" },
+const DRAWER_TABS: TabItem[] = [
+  { value: "info", label: "Info" },
+  { value: "outreach", label: "Outreach" },
+  { value: "demo", label: "Demo" },
+  { value: "evaluate", label: "Evaluate" },
 ];
 
 export function ApplicationDrawer({ app, schoolName, onClose }: Props) {
@@ -82,9 +87,9 @@ export function ApplicationDrawer({ app, schoolName, onClose }: Props) {
           </div>
 
           <Tabs
-            tabs={DRAWER_TABS}
-            activeTab={tab}
-            onTabChange={setTab}
+            items={DRAWER_TABS}
+            value={tab}
+            onChange={setTab}
             className="mb-5"
           />
 
@@ -297,12 +302,13 @@ function EvaluateTab({ applicationId }: { applicationId: string }) {
         <label className="block text-xs text-ink-secondary mb-1">Evaluator Role</label>
         <Select
           value={evaluatorRole}
-          onChange={(e) => setEvaluatorRole(e.target.value)}
-        >
-          <option value="principal">Principal</option>
-          <option value="hod">HOD</option>
-          <option value="hr_admin">HR Admin</option>
-        </Select>
+          onChange={setEvaluatorRole}
+          options={[
+            { value: "principal", label: "Principal" },
+            { value: "hod", label: "HOD" },
+            { value: "hr_admin", label: "HR Admin" },
+          ]}
+        />
       </div>
 
       {result === "success" && (

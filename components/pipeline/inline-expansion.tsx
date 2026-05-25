@@ -58,14 +58,14 @@ export function InlineExpansion({ app }: InlineExpansionProps) {
   return (
     <div className="border-t border-surface-tertiary bg-surface-secondary/50 px-6 py-4">
       <Tabs
-        tabs={[
-          { key: "info", label: "Info" },
-          { key: "outreach", label: "Outreach" },
-          { key: "demo", label: "Demo" },
-          { key: "evaluate", label: "Evaluate" },
+        items={[
+          { value: "info", label: "Info" },
+          { value: "outreach", label: "Outreach" },
+          { value: "demo", label: "Demo" },
+          { value: "evaluate", label: "Evaluate" },
         ]}
-        activeTab={tab}
-        onTabChange={setTab}
+        value={tab}
+        onChange={setTab}
       />
 
       <div className="mt-4">
@@ -253,11 +253,15 @@ function EvaluateTabContent({ applicationId }: { applicationId: string }) {
 
       <div>
         <label className="block text-xs text-ink-secondary mb-1">Evaluator Role</label>
-        <Select value={evaluatorRole} onChange={(e) => setEvaluatorRole(e.target.value)}>
-          <option value="principal">Principal</option>
-          <option value="hod">HOD</option>
-          <option value="hr_admin">HR Admin</option>
-        </Select>
+        <Select
+          value={evaluatorRole}
+          onChange={setEvaluatorRole}
+          options={[
+            { value: "principal", label: "Principal" },
+            { value: "hod", label: "HOD" },
+            { value: "hr_admin", label: "HR Admin" },
+          ]}
+        />
       </div>
 
       {result === "success" && (

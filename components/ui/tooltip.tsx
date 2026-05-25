@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import type { ReactElement, ReactNode } from "react";
+import { cn } from "@/lib/utils";
 
 interface TooltipProps {
   content: ReactNode;
@@ -35,10 +36,10 @@ export function Tooltip({ content, children, delay = 400, side = "top" }: Toolti
       {open && (
         <span
           role="tooltip"
-          className={
-            "pointer-events-none absolute left-1/2 z-50 -translate-x-1/2 whitespace-nowrap rounded-sm bg-[var(--ink-1)] px-2 py-1 text-caption text-[var(--card-bg)] shadow-elev-2 " +
-            (side === "top" ? "bottom-full mb-1.5" : "top-full mt-1.5")
-          }
+          className={cn(
+            "pointer-events-none absolute left-1/2 z-50 -translate-x-1/2 whitespace-nowrap rounded-sm bg-ink px-2 py-1 text-caption text-surface shadow-elev-2",
+            side === "top" ? "bottom-full mb-1.5" : "top-full mt-1.5",
+          )}
         >
           {content}
         </span>

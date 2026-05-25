@@ -168,7 +168,7 @@ export function ApplicationTable({
                     {showPoolBadges && app.poolNames && app.poolNames.length > 0 && (
                       <div className="flex gap-1 mt-1 flex-wrap">
                         {app.poolNames.map((poolName) => (
-                          <Badge key={poolName} variant="default" className="text-[10px] px-1.5 py-0">
+                          <Badge key={poolName} variant="neutral" className="text-[10px] px-1.5 py-0">
                             {poolName}
                           </Badge>
                         ))}
@@ -190,7 +190,7 @@ export function ApplicationTable({
                     )}
                   </div>
                   <div>
-                    <Badge variant="default">
+                    <Badge variant="neutral">
                       {STAGE_LABELS[app.stage] ?? app.stage}
                     </Badge>
                   </div>

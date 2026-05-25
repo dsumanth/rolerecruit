@@ -24,6 +24,8 @@ interface ToastContextValue {
 
 const ToastContext = createContext<ToastContextValue | null>(null);
 
+const MAX_TOASTS = 5;
+
 const VARIANT_ICON: Record<ToastVariant, IconName> = {
   success: "CheckCircle2",
   error: "XCircle",
@@ -51,7 +53,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       message: input.message,
       duration: input.duration ?? 4000,
     };
-    setItems((prev) => [...prev, next]);
+    setItems((prev) => [...prev.slice(-(MAX_TOASTS - 1)), next]);
   }, []);
 
   return (

@@ -61,12 +61,11 @@ export function Dropdown({ trigger, children, align = "start", side = "bottom", 
         <div
           role="menu"
           className={cn(
-            "absolute z-50 min-w-[200px] rounded-md border bg-[var(--floating-bg)] backdrop-blur-20 p-1 shadow-elev-3",
+            "absolute z-50 min-w-[200px] rounded-md border border-chrome bg-surface-floating backdrop-blur-20 p-1 shadow-elev-3",
             side === "bottom" ? "top-full mt-2" : "bottom-full mb-2",
             align === "end" ? "right-0" : "left-0",
             className,
           )}
-          style={{ borderColor: "var(--chrome-border)" }}
         >
           <DropdownCloseContext.Provider value={close}>{children}</DropdownCloseContext.Provider>
         </div>
@@ -90,7 +89,6 @@ export function DropdownItem({ onSelect, children, destructive, disabled }: Drop
       type="button"
       disabled={disabled}
       onClick={() => {
-        if (disabled) return;
         onSelect();
         close();
       }}

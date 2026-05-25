@@ -1,4 +1,5 @@
-export { Avatar } from "./avatar";
+export { Avatar, nameInitial } from "./avatar";
+export { BrandMark } from "./brand-mark";
 export { Badge } from "./badge";
 export { Button } from "./button";
 export { Card } from "./card";

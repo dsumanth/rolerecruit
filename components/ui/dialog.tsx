@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useId } from "react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Icon } from "./icon";
@@ -24,6 +24,8 @@ export function Dialog({
   children,
   footer,
 }: DialogProps) {
+  const titleId = useId();
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -45,9 +47,11 @@ export function Dialog({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={title}
-      className="fixed inset-0 z-50 flex"
-      style={{ alignItems: isDrawer ? "stretch" : "center", justifyContent: isDrawer ? "flex-end" : "center" }}
+      aria-labelledby={titleId}
+      className={cn(
+        "fixed inset-0 z-50 flex",
+        isDrawer ? "items-stretch justify-end" : "items-center justify-center",
+      )}
     >
       <div
         aria-hidden
@@ -64,7 +68,7 @@ export function Dialog({
       >
         <div className="flex items-start justify-between gap-3 p-5 border-b border-hairline">
           <div className="min-w-0">
-            <h2 className="text-title-l text-ink">{title}</h2>
+            <h2 id={titleId} className="text-title-l text-ink">{title}</h2>
             {description && <p className="mt-1 text-body-s text-ink-secondary">{description}</p>}
           </div>
           <button
