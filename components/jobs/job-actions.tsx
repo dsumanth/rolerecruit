@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { Button } from "@/components/ui";
 
 interface Props {
   jobId: string;
@@ -44,54 +45,52 @@ export function JobActions({ jobId, status }: Props) {
   };
 
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap gap-3">
-        {(status === "draft" || status === "paused") && (
-          <button
-            onClick={handlePublish}
-            disabled={loading}
-            className="py-2.5 px-5 rounded-apple bg-accent text-white text-sm font-medium hover:bg-accent-hover active:bg-accent-pressed disabled:opacity-50 transition-colors"
-          >
-            {loading ? "Publishing..." : "Publish Job"}
-          </button>
-        )}
+    <div className="flex flex-wrap items-center gap-2">
+      {(status === "draft" || status === "paused") && (
+        <Button variant="primary" size="md" loading={loading} onClick={handlePublish}>
+          Publish Job
+        </Button>
+      )}
 
-        {status === "active" && (
-          <>
-            <button
-              onClick={() => router.push(`/dashboard/jobs/${jobId}/pipeline`)}
-              className="py-2.5 px-5 rounded-apple bg-accent text-white text-sm font-medium hover:bg-accent-hover active:bg-accent-pressed transition-colors"
-            >
-              View Pipeline
-            </button>
-            <button
-              onClick={() => router.push(`/dashboard/jobs/${jobId}/sourcing`)}
-              className="py-2.5 px-5 rounded-apple bg-surface-secondary text-ink text-sm font-medium hover:bg-surface-tertiary transition-colors"
-            >
-              Source Candidates
-            </button>
-            <button
-              onClick={handleClose}
-              disabled={loading}
-              className="py-2.5 px-5 rounded-apple bg-red-50 text-danger text-sm font-medium hover:bg-red-100 disabled:opacity-50 transition-colors"
-            >
-              Close Job
-            </button>
-          </>
-        )}
-
-        {status === "filled" || status === "closed" ? (
-          <button
+      {status === "active" && (
+        <>
+          <Button
+            variant="primary"
+            size="md"
             onClick={() => router.push(`/dashboard/jobs/${jobId}/pipeline`)}
-            className="py-2.5 px-5 rounded-apple bg-surface-secondary text-ink text-sm font-medium hover:bg-surface-tertiary transition-colors"
           >
             View Pipeline
-          </button>
-        ) : null}
-      </div>
+          </Button>
+          <Button
+            variant="secondary"
+            size="md"
+            onClick={() => router.push(`/dashboard/jobs/${jobId}/sourcing`)}
+          >
+            Source Candidates
+          </Button>
+          <Button
+            variant="danger"
+            size="md"
+            loading={loading}
+            onClick={handleClose}
+          >
+            Close Job
+          </Button>
+        </>
+      )}
+
+      {(status === "filled" || status === "closed") && (
+        <Button
+          variant="secondary"
+          size="md"
+          onClick={() => router.push(`/dashboard/jobs/${jobId}/pipeline`)}
+        >
+          View Pipeline
+        </Button>
+      )}
 
       {error && (
-        <div className="px-4 py-3 rounded-apple bg-red-50 text-sm text-danger">{error}</div>
+        <span className="text-body-s text-danger">{error}</span>
       )}
     </div>
   );

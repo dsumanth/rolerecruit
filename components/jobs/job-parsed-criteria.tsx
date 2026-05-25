@@ -1,93 +1,78 @@
+import { Card, Badge } from "@/components/ui";
+
+interface ParsedCriteria {
+  subjects: string[];
+  board: string;
+  level: string;
+  requiredQualifications: string[];
+  preferredQualifications: string[];
+  minExperience?: number | null;
+  skills: string[];
+}
+
 interface Props {
-  criteria: {
-    subjects: string[];
-    board: string;
-    level: string;
-    requiredQualifications: string[];
-    preferredQualifications: string[];
-    minExperience?: number | null;
-    skills: string[];
-  };
+  criteria?: ParsedCriteria | null;
 }
 
 export function JobParsedCriteria({ criteria }: Props) {
+  if (!criteria) {
+    return (
+      <Card padding="lg" elevation={1}>
+        <p className="text-body-s text-ink-secondary">
+          No parsed criteria yet. Once the role description is processed, requirements and skills will appear here.
+        </p>
+      </Card>
+    );
+  }
+
   return (
-    <div className="rounded-apple bg-surface border border-surface-tertiary p-5">
-      <h2 className="text-sm font-semibold text-ink mb-3">
-        AI-Parsed Criteria
-      </h2>
-      <div className="space-y-4">
-        {criteria.subjects.length > 0 && (
-          <div>
-            <p className="text-xs text-ink-tertiary mb-1">Subjects</p>
-            <div className="flex flex-wrap gap-1.5">
-              {criteria.subjects.map((s) => (
-                <span
-                  key={s}
-                  className="text-xs px-2 py-0.5 rounded-full bg-surface-secondary text-ink"
-                >
-                  {s}
-                </span>
-              ))}
-            </div>
+    <div className="space-y-5">
+      {criteria.subjects.length > 0 && (
+        <Card padding="md" elevation={1}>
+          <div className="text-micro text-ink-secondary mb-2">Subjects</div>
+          <div className="flex flex-wrap gap-2">
+            {criteria.subjects.map((s) => (
+              <Badge key={s} variant="neutral">{s}</Badge>
+            ))}
           </div>
-        )}
-
-        {criteria.requiredQualifications.length > 0 && (
-          <div>
-            <p className="text-xs text-ink-tertiary mb-1">Required Qualifications</p>
-            <div className="flex flex-wrap gap-1.5">
-              {criteria.requiredQualifications.map((q) => (
-                <span
-                  key={q}
-                  className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-danger"
-                >
-                  {q}
-                </span>
-              ))}
-            </div>
+        </Card>
+      )}
+      {criteria.requiredQualifications.length > 0 && (
+        <Card padding="md" elevation={1}>
+          <div className="text-micro text-ink-secondary mb-2">Required qualifications</div>
+          <div className="flex flex-wrap gap-2">
+            {criteria.requiredQualifications.map((q) => (
+              <Badge key={q} variant="info">{q}</Badge>
+            ))}
           </div>
-        )}
-
-        {criteria.preferredQualifications.length > 0 && (
-          <div>
-            <p className="text-xs text-ink-tertiary mb-1">Preferred Qualifications</p>
-            <div className="flex flex-wrap gap-1.5">
-              {criteria.preferredQualifications.map((q) => (
-                <span
-                  key={q}
-                  className="text-xs px-2 py-0.5 rounded-full bg-green-50 text-success"
-                >
-                  {q}
-                </span>
-              ))}
-            </div>
+        </Card>
+      )}
+      {criteria.preferredQualifications.length > 0 && (
+        <Card padding="md" elevation={1}>
+          <div className="text-micro text-ink-secondary mb-2">Preferred qualifications</div>
+          <div className="flex flex-wrap gap-2">
+            {criteria.preferredQualifications.map((q) => (
+              <Badge key={q} variant="success">{q}</Badge>
+            ))}
           </div>
-        )}
-
-        {criteria.skills.length > 0 && (
-          <div>
-            <p className="text-xs text-ink-tertiary mb-1">Skills</p>
-            <div className="flex flex-wrap gap-1.5">
-              {criteria.skills.map((s) => (
-                <span
-                  key={s}
-                  className="text-xs px-2 py-0.5 rounded-full bg-surface-secondary text-ink"
-                >
-                  {s}
-                </span>
-              ))}
-            </div>
+        </Card>
+      )}
+      {criteria.skills.length > 0 && (
+        <Card padding="md" elevation={1}>
+          <div className="text-micro text-ink-secondary mb-2">Skills</div>
+          <div className="flex flex-wrap gap-2">
+            {criteria.skills.map((s) => (
+              <Badge key={s} variant="neutral">{s}</Badge>
+            ))}
           </div>
-        )}
-
-        {criteria.minExperience != null && (
-          <div>
-            <p className="text-xs text-ink-tertiary mb-0.5">Minimum Experience</p>
-            <p className="text-sm text-ink">{criteria.minExperience} years</p>
-          </div>
-        )}
-      </div>
+        </Card>
+      )}
+      {criteria.minExperience != null && (
+        <Card padding="md" elevation={1}>
+          <div className="text-micro text-ink-secondary mb-2">Minimum experience</div>
+          <div className="text-body-s text-ink">{criteria.minExperience} years</div>
+        </Card>
+      )}
     </div>
   );
 }

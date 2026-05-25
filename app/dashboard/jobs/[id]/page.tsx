@@ -1,143 +1,98 @@
-"use client";
-
+import { notFound } from "next/navigation";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useQuery } from "convex/react";
+import { fetchQuery } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
+import { requireProfile } from "@/lib/auth";
+import { PageHeader, Badge } from "@/components/ui";
 import { JobActions } from "@/components/jobs/job-actions";
 import { JobParsedCriteria } from "@/components/jobs/job-parsed-criteria";
-import { SuggestedMatches } from "@/components/dashboard/SuggestedMatches";
-import { OutreachHistory } from "@/components/outreach/outreach-history";
-import { useState } from "react";
 
-const TABS = ["details", "pipeline", "sourcing", "outreach", "criteria", "matches"] as const;
+interface Props {
+  params: { id: string };
+}
 
-export default function JobDetailPage() {
-  const { id } = useParams<{ id: string }>();
-  const job = useQuery(api.jobs.get, { jobId: id as any });
-  const [tab, setTab] = useState<string>("details");
+function jobBadge(status: string) {
+  if (status === "active") return <Badge dot variant="success">Active</Badge>;
+  if (status === "draft") return <Badge dot variant="neutral">Draft</Badge>;
+  return <Badge dot variant="neutral">Closed</Badge>;
+}
 
-  if (!job) {
-    return (
-      <div>
-        <Link href="/dashboard/jobs" className="text-sm text-accent hover:text-[#0077ed] mb-4 inline-block">
-          ← Back to Jobs
-        </Link>
-        <div className="rounded-apple bg-surface border border-surface-tertiary p-8 text-center">
-          <p className="text-sm text-ink-secondary">Loading...</p>
-        </div>
-      </div>
-    );
-  }
+export default async function JobDetailPage({ params }: Props) {
+  await requireProfile();
+  const job = await fetchQuery(api.jobs.get, { jobId: params.id as Id<"jobPostings"> });
+  if (!job) notFound();
 
   return (
-    <div className="max-w-3xl">
-      <Link href="/dashboard/jobs" className="text-sm text-accent hover:text-[#0077ed] mb-4 inline-block">
-        ← Back to Jobs
-      </Link>
+    <div>
+      <PageHeader
+        back={{ href: "/dashboard/jobs", label: "Jobs" }}
+        title={job.title}
+        subtitle={[job.subject, job.level, job.board].filter(Boolean).join(" · ")}
+        status={jobBadge(job.status)}
+        actions={<JobActions jobId={params.id} status={job.status} />}
+      />
 
-      <div className="mb-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold tracking-tight text-ink">{job.title}</h1>
-          <span className={`text-xs px-2.5 py-1 rounded-full ${
-            job.status === "active"
-              ? "bg-[#e8f5e9] text-[#34c759]"
-              : job.status === "draft"
-              ? "bg-surface-secondary text-ink-secondary"
-              : "bg-[#fff2f0] text-[#ff3b30]"
-          }`}>
-            {job.status}
-          </span>
-        </div>
-        <p className="text-sm text-ink-secondary mt-1">{job.subject} · {job.level} · {job.board}</p>
+      <JobTabs jobId={params.id} active="overview" />
+
+      <div className="grid grid-cols-[1fr_320px] gap-7 items-start mt-7">
+        <main className="min-w-0">
+          <JobParsedCriteria criteria={job.parsedCriteria} />
+        </main>
+        <aside className="rounded-lg bg-surface-floating backdrop-blur-20 border border-chrome p-5 shadow-elev-1">
+          <div className="text-micro text-ink-secondary mb-3">Quick facts</div>
+          <dl className="space-y-3 text-body-s">
+            <Fact label="Subject" value={job.subject} />
+            <Fact label="Level" value={job.level} />
+            <Fact label="Board" value={job.board} />
+            <Fact label="Experience" value={job.minExperience != null ? `${job.minExperience}+ years` : null} />
+            <Fact label="Qualifications" value={job.qualifications?.join(" · ")} />
+          </dl>
+        </aside>
       </div>
+    </div>
+  );
+}
 
-      {/* Tab navigation */}
-      <div className="flex gap-0.5 mb-6 border-b border-surface-tertiary">
-        {TABS.map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
-              tab === t
-                ? "border-[#0071e3] text-accent"
-                : "border-transparent text-ink-secondary hover:text-ink"
-            }`}
-          >
-            {t === "details" ? "Details" :
-             t === "pipeline" ? "Pipeline" :
-             t === "sourcing" ? "Sourcing" :
-             t === "outreach" ? "Outreach" :
-             t === "criteria" ? "Scoring" :
-             "Matches"}
-          </button>
-        ))}
-      </div>
+function Fact({ label, value }: { label: string; value?: string | null }) {
+  if (!value) return null;
+  return (
+    <div>
+      <dt className="text-micro text-ink-secondary mb-0.5">{label}</dt>
+      <dd className="text-ink">{value}</dd>
+    </div>
+  );
+}
 
-      {/* Tab content */}
-      {tab === "details" && (
-        <div className="space-y-6">
-          <div className="rounded-apple bg-surface border border-surface-tertiary p-5">
-            <h2 className="text-sm font-semibold text-ink mb-3">Job Description</h2>
-            <p className="text-sm text-ink whitespace-pre-wrap">{job.naturalLanguageDescription}</p>
-          </div>
-          <div className="rounded-apple bg-surface border border-surface-tertiary p-5">
-            <h2 className="text-sm font-semibold text-ink mb-3">Structured Criteria</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <div><p className="text-xs text-ink-tertiary mb-0.5">Subject</p><p className="text-sm text-ink">{job.subject}</p></div>
-              <div><p className="text-xs text-ink-tertiary mb-0.5">Level</p><p className="text-sm text-ink">{job.level}</p></div>
-              <div><p className="text-xs text-ink-tertiary mb-0.5">Board</p><p className="text-sm text-ink">{job.board}</p></div>
-              <div><p className="text-xs text-ink-tertiary mb-0.5">Qualifications</p><p className="text-sm text-ink">{job.qualifications.join(", ")}</p></div>
-            </div>
-          </div>
-          {job.parsedCriteria && <JobParsedCriteria criteria={job.parsedCriteria} />}
-          <JobActions jobId={id} status={job.status} />
-        </div>
-      )}
-
-      {tab === "pipeline" && (
-        <div className="rounded-apple bg-surface border border-surface-tertiary p-5">
-          <p className="text-sm text-ink-secondary mb-4">Pipeline management for this position.</p>
+function JobTabs({ jobId, active }: { jobId: string; active: "overview" | "pipeline" | "sourcing" | "criteria" }) {
+  const tabs: Array<{ value: typeof active; label: string; href: string }> = [
+    { value: "overview", label: "Overview", href: `/dashboard/jobs/${jobId}` },
+    { value: "pipeline", label: "Pipeline", href: `/dashboard/jobs/${jobId}/pipeline` },
+    { value: "sourcing", label: "Sourcing", href: `/dashboard/jobs/${jobId}/sourcing` },
+    { value: "criteria", label: "Criteria", href: `/dashboard/jobs/${jobId}/criteria` },
+  ];
+  return (
+    <div role="tablist" className="flex gap-1 border-b border-hairline">
+      {tabs.map((t) => {
+        const a = t.value === active;
+        return (
           <Link
-            href={`/dashboard/jobs/${id}/pipeline`}
-            className="py-2.5 px-5 rounded-apple bg-[#0071e3] text-white text-sm font-medium hover:bg-[#0077ed] transition-colors inline-block"
+            key={t.value}
+            href={t.href}
+            role="tab"
+            aria-selected={a}
+            className={`relative px-3.5 py-2 text-body-s ${a ? "text-ink font-semibold" : "text-ink-secondary hover:text-ink"} transition-colors duration-fast`}
           >
-            Open Pipeline Board
+            {t.label}
+            {a && (
+              <span
+                aria-hidden
+                className="absolute left-3.5 right-3.5 -bottom-px h-[2px] rounded-full bg-accent-grad"
+              />
+            )}
           </Link>
-        </div>
-      )}
-
-      {tab === "sourcing" && (
-        <div className="rounded-apple bg-surface border border-surface-tertiary p-5">
-          <p className="text-sm text-ink-secondary mb-4">Source candidates from job boards and talent banks.</p>
-          <Link
-            href={`/dashboard/jobs/${id}/sourcing`}
-            className="py-2.5 px-5 rounded-apple bg-[#0071e3] text-white text-sm font-medium hover:bg-[#0077ed] transition-colors inline-block"
-          >
-            Open Sourcing
-          </Link>
-        </div>
-      )}
-
-      {tab === "outreach" && (
-        <OutreachHistory jobId={id} />
-      )}
-
-      {tab === "criteria" && (
-        <div className="rounded-apple bg-surface border border-surface-tertiary p-5">
-          <p className="text-sm text-ink-secondary mb-4">Configure AI-powered scoring criteria for candidate matching.</p>
-          <Link
-            href={`/dashboard/jobs/${id}/criteria`}
-            className="py-2.5 px-5 rounded-apple bg-[#0071e3] text-white text-sm font-medium hover:bg-[#0077ed] transition-colors inline-block"
-          >
-            Open Criteria Editor
-          </Link>
-        </div>
-      )}
-
-      {tab === "matches" && (
-        <SuggestedMatches jobId={id} schoolId={job.schoolId} />
-      )}
+        );
+      })}
     </div>
   );
 }
