@@ -1,18 +1,24 @@
-import { ConvexClientProvider } from "@/components/ConvexClientProvider";
-import "@/app/globals.css";
+import { fetchQuery } from "convex/nextjs";
+import { api } from "@/convex/_generated/api";
+import { MarketingTopbar } from "@/components/careers/MarketingTopbar";
 
-export default function CareersPortalLayout({
+export default async function SchoolLayout({
   children,
   params,
 }: {
   children: React.ReactNode;
   params: { slug: string };
 }) {
+  const school = await fetchQuery(api.careers.getSchoolBySlug, { slug: params.slug });
+
+  if (!school) {
+    return <>{children}</>;
+  }
+
   return (
-    <ConvexClientProvider>
-      <div className="min-h-screen bg-surface-secondary">
-        {children}
-      </div>
-    </ConvexClientProvider>
+    <>
+      <MarketingTopbar schoolName={school.name} schoolSlug={params.slug} />
+      {children}
+    </>
   );
 }
