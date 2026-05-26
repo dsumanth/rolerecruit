@@ -1,6 +1,7 @@
 import { mutation, query, internalMutation, internalAction } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
+import { PARSED_FACETS_VERSION, EMBEDDING_VERSION } from "./versions";
 
 export const create = mutation({
   args: {
@@ -111,5 +112,115 @@ export const listForSchool = query({
     }
 
     return Array.from(candidateMap.values());
+  },
+});
+
+// ============================================================================
+// Phase 1: compiled candidate data (Task 13)
+// ============================================================================
+
+const _facetValueValidator = v.object({
+  value: v.string(),
+  evidence: v.object({
+    quote: v.string(),
+    offset: v.number(),
+    context: v.string(),
+  }),
+});
+const _facetArrayValidator = v.array(_facetValueValidator);
+
+export const writeCompiledData = internalMutation({
+  args: {
+    candidateId: v.id("candidates"),
+    parsedFacets: v.object({
+      specializations: _facetArrayValidator,
+      gradeLevels: _facetArrayValidator,
+      pedagogicalApproach: _facetArrayValidator,
+      leadershipRoles: _facetArrayValidator,
+      extracurricular: _facetArrayValidator,
+      languages: _facetArrayValidator,
+      schoolTypes: _facetArrayValidator,
+      keyAchievements: _facetArrayValidator,
+      redFlags: _facetArrayValidator,
+      extras: v.record(v.string(), _facetArrayValidator),
+    }),
+    candidateSummary: v.string(),
+    rawChunks: v.array(v.object({
+      text: v.string(),
+      section: v.union(
+        v.literal("header"), v.literal("experience"), v.literal("pedagogy"),
+        v.literal("achievements"), v.literal("leadership"), v.literal("other"),
+      ),
+      offset: v.number(),
+    })),
+    facetEmbeddings: v.optional(v.object({
+      overall: v.array(v.float64()),
+      experience: v.array(v.float64()),
+      pedagogy: v.array(v.float64()),
+      achievements: v.array(v.float64()),
+      leadership: v.array(v.float64()),
+    })),
+    parsingNotes: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.candidateId, {
+      parsedFacets: args.parsedFacets,
+      candidateSummary: args.candidateSummary,
+      rawChunks: args.rawChunks,
+      facetEmbeddings: args.facetEmbeddings,
+      parsedVersion: PARSED_FACETS_VERSION,
+      embeddingVersion: args.facetEmbeddings ? EMBEDDING_VERSION : undefined,
+      parsedAt: Date.now(),
+      parsingNotes: args.parsingNotes,
+    });
+  },
+});
+
+export const setOrigin = internalMutation({
+  args: {
+    candidateId: v.id("candidates"),
+    origin: v.union(
+      v.literal("fresh_application"),
+      v.literal("talent_pool"),
+      v.literal("agent_sourced"),
+      v.literal("referral"),
+      v.literal("manual_import"),
+    ),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.candidateId, { origin: args.origin });
+  },
+});
+
+export const hardFilter = query({
+  args: {
+    subjects: v.optional(v.array(v.string())),
+    minYears: v.optional(v.number()),
+    boards: v.optional(v.array(v.string())),
+    limit: v.optional(v.number()),
+    excludeCandidateIds: v.optional(v.array(v.id("candidates"))),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 200;
+    const exclude = new Set((args.excludeCandidateIds ?? []).map(String));
+    const all = await ctx.db.query("candidates").collect();
+    const filtered = all.filter((c) => {
+      if (exclude.has(String(c._id))) return false;
+      if (args.subjects?.length) {
+        const hit = args.subjects.some((s) =>
+          c.subjects.some((cs) => cs.toLowerCase().includes(s.toLowerCase()))
+        );
+        if (!hit) return false;
+      }
+      if (args.minYears != null && (c.yearsExperience ?? 0) < args.minYears) return false;
+      if (args.boards?.length) {
+        const hit = args.boards.some((b) =>
+          c.boardExperience.some((cb) => cb.toLowerCase().includes(b.toLowerCase()))
+        );
+        if (!hit) return false;
+      }
+      return true;
+    });
+    return filtered.slice(0, limit);
   },
 });
