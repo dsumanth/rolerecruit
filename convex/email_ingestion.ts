@@ -50,6 +50,15 @@ export const receiveEmail = httpAction(async (ctx, request) => {
     sourceChannel: "email_parsed",
   });
 
+  await ctx.runMutation(internal.candidates.setOrigin as any, {
+    candidateId,
+    origin: "fresh_application",
+  });
+  await ctx.scheduler.runAfter(0, api.intake.parseAndStoreCandidate as any, {
+    candidateId,
+    rawText: emailText.substring(0, 4000),
+  });
+
   const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
   let trackingToken = "";
   for (let i = 0; i < 32; i++) {

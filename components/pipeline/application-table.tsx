@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { InlineExpansion } from "@/components/pipeline/inline-expansion";
+import { PoolOriginBadge } from "@/components/shared/pool-origin-badge";
 
 type BadgeVariant = "neutral" | "info" | "success" | "warning" | "danger";
 
@@ -26,6 +27,7 @@ interface Application {
   aiMatchScore?: number;
   globalScore?: number;
   poolNames?: string[];
+  source?: "careers_site" | "talent_pool_match" | "agent_sourced" | "triage_cross_match" | "manual";
   candidate?: {
     _id: string;
     name: string;
@@ -178,6 +180,7 @@ export function ApplicationTable({
                     <p className="font-medium text-ink">
                       {app.candidate?.name ?? "Unknown"}
                     </p>
+                    <PoolOriginBadge source={app.source} />
                     {showPoolBadges && app.poolNames && app.poolNames.length > 0 && (
                       <div className="flex gap-1 mt-1 flex-wrap">
                         {app.poolNames.map((poolName) => (

@@ -2,6 +2,8 @@ import { action, internalAction } from "./_generated/server";
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
 import OpenAI from "openai";
+import { JOB_EMBEDDING_VERSION } from "./versions";
+import { JOB_SECTION_SPLITTER_SYSTEM } from "./prompts/jobSectionSplitter";
 
 const SYSTEM_PROMPT = `You are an AI that parses natural language job descriptions for Indian K-12 schools into structured criteria.
 
@@ -69,5 +71,57 @@ export const parseJobWithAI = action({
     });
 
     return { parsedCriteria: parsed };
+  },
+});
+
+export const computeRoleEmbeddings = action({
+  args: { jobId: v.id("jobPostings") },
+  handler: async (ctx, args): Promise<void> => {
+    const job = await ctx.runQuery(api.jobs.get as any, { jobId: args.jobId });
+    if (!job) return;
+
+    // 1. Split JD into 5 sections via DeepSeek (or fallback to raw text)
+    const apiKey = process.env.DEEPSEEK_API_KEY;
+    let sections: { overall: string; experience: string; pedagogy: string; achievements: string; leadership: string };
+    const fallback = job.naturalLanguageDescription || `${job.title} ${job.subject} ${job.board} ${job.level}`;
+
+    if (!apiKey) {
+      sections = { overall: fallback, experience: fallback, pedagogy: fallback, achievements: fallback, leadership: fallback };
+    } else {
+      try {
+        const client = new OpenAI({ apiKey, baseURL: "https://api.deepseek.com" });
+        const res = await client.chat.completions.create({
+          model: "deepseek-v4-flash",
+          max_tokens: 1024,
+          temperature: 0,
+          messages: [
+            { role: "system", content: JOB_SECTION_SPLITTER_SYSTEM },
+            { role: "user", content: `${job.title} (${job.subject}, ${job.board}, ${job.level}, min ${job.minExperience ?? 0}y): ${job.naturalLanguageDescription}` },
+          ],
+        });
+        const text = res.choices[0]?.message?.content ?? "";
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        sections = jsonMatch ? JSON.parse(jsonMatch[0]) : { overall: fallback, experience: fallback, pedagogy: fallback, achievements: fallback, leadership: fallback };
+        // Defensive: ensure all 5 keys present and non-empty
+        for (const k of ["overall", "experience", "pedagogy", "achievements", "leadership"] as const) {
+          if (!sections[k] || typeof sections[k] !== "string" || !sections[k].length) {
+            sections[k] = fallback;
+          }
+        }
+      } catch {
+        sections = { overall: fallback, experience: fallback, pedagogy: fallback, achievements: fallback, leadership: fallback };
+      }
+    }
+
+    // 2. Embed all 5 sections in one batched call
+    const roleEmbeddings = await ctx.runAction(api.embeddings.embedBatch, { sections });
+    if (!roleEmbeddings) return;
+
+    // 3. Persist via jobs:setRoleEmbeddings
+    await ctx.runMutation(api.jobs.setRoleEmbeddings as any, {
+      jobId: args.jobId,
+      roleEmbeddings,
+      version: JOB_EMBEDDING_VERSION,
+    });
   },
 });

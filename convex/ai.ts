@@ -2,6 +2,8 @@ import OpenAI from "openai";
 import { action } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
+import { FACET_EXTRACTION_SYSTEM, EMPTY_PARSED_FACETS } from "./prompts/facetExtraction";
+import type { ParsedProfile } from "./types";
 
 const INDIAN_EDUCATION_TAXONOMY = `
 You are an AI that parses natural language job descriptions for Indian K-12 schools into structured criteria.
@@ -158,63 +160,47 @@ export const scoreCandidates = action({
   },
 });
 
-const PROFILE_PARSING_SYSTEM = `You are an AI that extracts structured information from resumes, profiles, and email notifications about Indian K-12 teacher candidates.
-
-Extract the following fields where available. Use null or empty arrays for missing data. Return ONLY a JSON object (no markdown, no explanation):
-
-{
-  "name": string | null,
-  "email": string | null,
-  "phone": string | null,
-  "location": string | null,
-  "qualifications": string[],
-  "certifications": string[],
-  "boardExperience": string[],
-  "subjects": string[],
-  "yearsExperience": number | null,
-  "currentSchool": string | null
+function emptyProfile(): ParsedProfile {
+  return {
+    name: null, email: null, phone: null, location: null,
+    qualifications: [], certifications: [], boardExperience: [],
+    subjects: [], yearsExperience: null, currentSchool: null,
+    parsedFacets: EMPTY_PARSED_FACETS,
+    candidateSummary: "",
+    rawChunks: [],
+  };
 }
 
-Qualification examples: B.Ed, D.El.Ed, M.Ed, M.Sc, B.Sc, Ph.D
-Certification examples: CTET, State TET, NET, UGC-NET
-Board examples: CBSE, ICSE, IB, IGCSE, State Board
-Subject examples: English, Hindi, Mathematics, Physics, Chemistry, Biology, History, Geography, Economics, Computer Science, Sanskrit`;
-
 export const parseProfileFromText = action({
-  args: {
-    text: v.string(),
-  },
-  handler: async (_ctx, args) => {
+  args: { text: v.string() },
+  handler: async (_ctx, args): Promise<ParsedProfile> => {
     const client = getClient();
-    if (!client) {
-      return {
-        name: null, email: null, phone: null, location: null,
-        qualifications: [], certifications: [], boardExperience: [],
-        subjects: [], yearsExperience: null, currentSchool: null,
-      };
-    }
+    if (!client) return emptyProfile();
 
     const response = await client.chat.completions.create({
       model: "deepseek-v4-flash",
-      max_tokens: 512,
+      max_tokens: 4096,
       temperature: 0,
       messages: [
-        { role: "system", content: PROFILE_PARSING_SYSTEM },
-        { role: "user", content: args.text.substring(0, 4000) },
+        { role: "system", content: FACET_EXTRACTION_SYSTEM },
+        { role: "user", content: args.text.substring(0, 12000) },
       ],
     });
 
     const text = response.choices[0]?.message?.content ?? "";
     try {
       const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) return JSON.parse(jsonMatch[0]);
-      throw new Error("No JSON found");
-    } catch {
+      if (!jsonMatch) throw new Error("No JSON");
+      const parsed = JSON.parse(jsonMatch[0]);
       return {
-        name: null, email: null, phone: null, location: null,
-        qualifications: [], certifications: [], boardExperience: [],
-        subjects: [], yearsExperience: null, currentSchool: null,
+        ...emptyProfile(),
+        ...parsed,
+        parsedFacets: { ...EMPTY_PARSED_FACETS, ...(parsed.parsedFacets ?? {}) },
+        rawChunks: Array.isArray(parsed.rawChunks) ? parsed.rawChunks : [],
+        candidateSummary: typeof parsed.candidateSummary === "string" ? parsed.candidateSummary : "",
       };
+    } catch {
+      return emptyProfile();
     }
   },
 });

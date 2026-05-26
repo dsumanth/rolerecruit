@@ -133,7 +133,7 @@ export default function RolesPage() {
         </div>
       )}
 
-      {roles.map((role) => {
+      {roles.map((role: (typeof roles)[number]) => {
         const isEditing = editingId === role._id;
         const isHRAdmin = role.name === "hr_admin";
         const perms = isEditing ? editPermissions : role.permissions;

@@ -9,6 +9,15 @@ import { PageHeader, Badge, Button, Card } from "@/components/ui";
 
 type RunStatus = "running" | "completed" | "failed" | string;
 
+interface SourcingRun {
+  _id: string;
+  status: RunStatus;
+  startedAt: number;
+  candidatesFound?: number;
+  candidatesScored?: number;
+  error?: string;
+}
+
 function jobBadge(status: string) {
   if (status === "active") return <Badge dot variant="success">Active</Badge>;
   if (status === "draft") return <Badge dot variant="neutral">Draft</Badge>;
@@ -83,7 +92,7 @@ export default function SourcingPage({ params }: { params: { id: string } }) {
               Sourcing history
             </div>
             <div className="space-y-2">
-              {sourcingRuns.map((run) => (
+              {(sourcingRuns as SourcingRun[]).map((run) => (
                 <Card key={run._id} padding="md" elevation={1} interactive>
                   <div className="flex flex-wrap items-center gap-3">
                     {runBadge(run.status)}

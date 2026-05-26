@@ -179,8 +179,8 @@ export function PipelineStageEditor({ schoolId }: Props) {
 
       <div className="flex gap-3 overflow-x-auto pb-4">
         {stages
-          .sort((a, b) => a.order - b.order)
-          .map((stage) => (
+          .sort((a: Stage, b: Stage) => a.order - b.order)
+          .map((stage: Stage) => (
             <div key={stage.id} className="flex-shrink-0 w-44 group">
               <Card padding="sm" elevation={1}>
                 <div className="flex items-center justify-between mb-2">
@@ -214,10 +214,10 @@ export function PipelineStageEditor({ schoolId }: Props) {
                 </button>
                 <div className="mt-3 space-y-1">
                   {stages
-                    .filter(s => s.id !== stage.id)
-                    .map(targetStage => {
+                    .filter((s: Stage) => s.id !== stage.id)
+                    .map((targetStage: Stage) => {
                       const connected = transitions.some(
-                        t => t.fromStageId === stage.id && t.toStageId === targetStage.id,
+                        (t: Transition) => t.fromStageId === stage.id && t.toStageId === targetStage.id,
                       );
                       return (
                         <div key={targetStage.id} className="flex items-center gap-1">

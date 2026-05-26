@@ -61,7 +61,7 @@ export default function TeamSettingsPage() {
 
   if (!members) return <p className="text-body-s text-ink-secondary">Loading...</p>;
 
-  const roleOptions = (roles ?? []).map((r) => ({ value: r.name, label: r.name }));
+  const roleOptions = (roles ?? []).map((r: { name: string }) => ({ value: r.name, label: r.name }));
 
   return (
     <div>
@@ -124,7 +124,7 @@ export default function TeamSettingsPage() {
             <span>Invited</span>
             <span>Actions</span>
           </div>
-          {invitations.map((inv) => (
+          {invitations.map((inv: (typeof invitations)[number]) => (
             <div key={inv._id} className="grid grid-cols-4 gap-4 px-5 py-3 border-b border-hairline last:border-b-0 items-center text-body-s">
               <span className="text-ink">{inv.email}</span>
               <span><RoleBadge role={inv.role} /></span>
@@ -154,7 +154,7 @@ export default function TeamSettingsPage() {
             No team members yet.
           </div>
         ) : (
-          members.map((m) => (
+          members.map((m: (typeof members)[number]) => (
             <div key={m.userId} className="grid grid-cols-4 gap-4 px-5 py-3 border-b border-hairline last:border-b-0 items-center text-body-s">
               <span className="text-ink font-medium">{m.name}</span>
               <span className="text-ink-secondary">{m.email || "N/A"}</span>

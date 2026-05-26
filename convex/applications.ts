@@ -1,6 +1,6 @@
 import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   sourced: ["screened", "rejected", "on_hold"],
@@ -28,6 +28,7 @@ export const create = mutation({
     jobPostingId: v.optional(v.id("jobPostings")),
     schoolId: v.id("schools"),
     aiMatchScore: v.optional(v.number()),
+    skipTriage: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const config = await ctx.db
@@ -39,7 +40,7 @@ export const create = mutation({
       ?.sort((a, b) => a.order - b.order)
       .find(s => !s.isTerminal)?.id ?? "sourced";
 
-    return await ctx.db.insert("applications", {
+    const applicationId = await ctx.db.insert("applications", {
       candidateId: args.candidateId,
       jobPostingId: args.jobPostingId,
       schoolId: args.schoolId,
@@ -47,6 +48,11 @@ export const create = mutation({
       aiMatchScore: args.aiMatchScore,
       createdAt: Date.now(),
     });
+    await ctx.db.patch(applicationId, { source: "careers_site", matchedAt: Date.now() });
+    if (!args.skipTriage) {
+      await ctx.scheduler.runAfter(0, api.triage.runTriage, { applicationId });
+    }
+    return applicationId;
   },
 });
 
@@ -196,6 +202,44 @@ export const getUnmatchedForSchool = query({
     }
 
     return candidatesWithApps;
+  },
+});
+
+export const setSource = internalMutation({
+  args: {
+    applicationId: v.id("applications"),
+    source: v.union(
+      v.literal("careers_site"),
+      v.literal("talent_pool_match"),
+      v.literal("agent_sourced"),
+      v.literal("triage_cross_match"),
+      v.literal("manual"),
+    ),
+    matchedFromPoolId: v.optional(v.id("pools")),
+  },
+  handler: async (ctx, args) => {
+    const patch: any = { source: args.source, matchedAt: Date.now() };
+    if (args.matchedFromPoolId) patch.matchedFromPoolId = args.matchedFromPoolId;
+    await ctx.db.patch(args.applicationId, patch);
+  },
+});
+
+export const setTriageResult = internalMutation({
+  args: {
+    applicationId: v.id("applications"),
+    triageOutcome: v.union(
+      v.literal("auto_shortlisted"),
+      v.literal("auto_rejected"),
+      v.literal("human_review"),
+      v.literal("cross_role_suggested"),
+    ),
+    triageDecisionId: v.id("triageDecisions"),
+    matchReasons: v.array(v.string()),
+    aiMatchScore: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const { applicationId, ...patch } = args;
+    await ctx.db.patch(applicationId, patch);
   },
 });
 
