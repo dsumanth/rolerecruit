@@ -38,7 +38,7 @@ describe("intake", () => {
       rawText: "B.Ed and 5 years PGT Physics. Led JEE prep coaching.",
     });
     const c = await t.query("candidates:get", { candidateId: candId });
-    expect(c!.parsedVersion).toBe("facets-v1");
+    expect(c!.parsedVersion).toBe("facets-v2");
     expect(c!.embeddingVersion).toBe("emb-text3sm-v1");
     expect(c!.facetEmbeddings).toBeDefined();
     expect(c!.facetEmbeddings!.overall.length).toBe(1536);
