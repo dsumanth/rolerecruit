@@ -224,3 +224,50 @@ export const hardFilter = query({
     return filtered.slice(0, limit);
   },
 });
+
+// ============================================================================
+// Phase 2 — Dynamic Facet Promotion helpers
+// ============================================================================
+// These mutations shuffle a single candidate's parsedFacets.extras bag between
+// the un-prefixed key and the `__promoted__<key>` namespace. They are called
+// per-candidate from the facetPromotion backfill internalActions during
+// promote/demote lifecycle transitions.
+
+export const promoteFacetForCandidate = internalMutation({
+  args: {
+    candidateId: v.id("candidates"),
+    key: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const c = await ctx.db.get(args.candidateId);
+    if (!c || !c.parsedFacets) return;
+    const extras = { ...c.parsedFacets.extras };
+    const values = extras[args.key];
+    if (!values) return;
+    delete extras[args.key];
+    extras[`__promoted__${args.key}`] = values;
+    await ctx.db.patch(args.candidateId, {
+      parsedFacets: { ...c.parsedFacets, extras },
+    });
+  },
+});
+
+export const demoteFacetForCandidate = internalMutation({
+  args: {
+    candidateId: v.id("candidates"),
+    key: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const c = await ctx.db.get(args.candidateId);
+    if (!c || !c.parsedFacets) return;
+    const extras = { ...c.parsedFacets.extras };
+    const promotedKey = `__promoted__${args.key}`;
+    const values = extras[promotedKey];
+    if (!values) return;
+    delete extras[promotedKey];
+    extras[args.key] = values;
+    await ctx.db.patch(args.candidateId, {
+      parsedFacets: { ...c.parsedFacets, extras },
+    });
+  },
+});

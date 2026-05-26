@@ -1,5 +1,5 @@
 // tests/convex/facetPromotion.test.ts
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { convexTest } from "convex-test";
 import schema from "../../convex/schema";
 import * as facetPromotion from "../../convex/facetPromotion";
@@ -123,5 +123,63 @@ describe("facetPromotion", () => {
       key: "__promoted__AI_curriculum_design",
     });
     expect(promoted).toBeNull();
+  });
+
+  it("promote moves extras values to __promoted__<key> for every carrying candidate", async () => {
+    vi.useFakeTimers();
+    try {
+      const t = convexTest(schema, modules);
+      const c1 = await seedCandidateWithExtras(t, "AI_curriculum_design", "designed AI curriculum");
+      const c2 = await seedCandidateWithExtras(t, "AI_curriculum_design", "AI lessons for grade 9");
+      const c3 = await seedCandidateWithExtras(t, "STEM_lab_setup", "built STEM lab");
+
+      await t.action("facetPromotion:trackExtrasFrequency", {});
+      await t.mutation("facetPromotion:promote", { key: "AI_curriculum_design", actorUserId: "test_admin" });
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+      // Promoted candidates: values moved to __promoted__<key>
+      const updated1 = await t.query("candidates:get", { candidateId: c1 });
+      const updated2 = await t.query("candidates:get", { candidateId: c2 });
+      expect(updated1!.parsedFacets!.extras).not.toHaveProperty("AI_curriculum_design");
+      expect(updated1!.parsedFacets!.extras).toHaveProperty("__promoted__AI_curriculum_design");
+      expect(updated2!.parsedFacets!.extras).toHaveProperty("__promoted__AI_curriculum_design");
+
+      // Unrelated candidate untouched
+      const updated3 = await t.query("candidates:get", { candidateId: c3 });
+      expect(updated3!.parsedFacets!.extras).toHaveProperty("STEM_lab_setup");
+
+      // Promotion row has status="promoted"
+      const row = await t.query("facetPromotion:getByKey", { key: "AI_curriculum_design" });
+      expect(row!.status).toBe("promoted");
+      expect(row!.promotedAt).toBeDefined();
+
+      // listPromotedKeys exposes it
+      const keys = await t.query("facetPromotion:listPromotedKeys", {});
+      expect(keys).toContain("AI_curriculum_design");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("demote moves __promoted__<key> values back to extras[key]", async () => {
+    vi.useFakeTimers();
+    try {
+      const t = convexTest(schema, modules);
+      const c1 = await seedCandidateWithExtras(t, "AI_curriculum_design", "designed curriculum");
+      await t.action("facetPromotion:trackExtrasFrequency", {});
+      await t.mutation("facetPromotion:promote", { key: "AI_curriculum_design", actorUserId: "admin" });
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+      await t.mutation("facetPromotion:demote", { key: "AI_curriculum_design", actorUserId: "admin" });
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+      const c = await t.query("candidates:get", { candidateId: c1 });
+      expect(c!.parsedFacets!.extras).toHaveProperty("AI_curriculum_design");
+      expect(c!.parsedFacets!.extras).not.toHaveProperty("__promoted__AI_curriculum_design");
+
+      const row = await t.query("facetPromotion:getByKey", { key: "AI_curriculum_design" });
+      expect(row!.status).toBe("demoted");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
