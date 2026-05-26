@@ -168,3 +168,33 @@ export const updateCalendarConnectedInternal = internalMutation({
     await ctx.db.patch(args.schoolId, { googleCalendarConnected: args.connected });
   },
 });
+
+export const getTriageConfig = query({
+  args: { schoolId: v.id("schools") },
+  handler: async (ctx, args) => {
+    const school = await ctx.db.get(args.schoolId);
+    if (!school) return null;
+    return {
+      triageEnabled: school.triageEnabled ?? false,
+      autoShortlistThreshold: school.autoShortlistThreshold ?? 0.85,
+      autoRejectThreshold: school.autoRejectThreshold ?? 0.30,
+      autoSendDelaySec: school.autoSendDelaySec ?? 14400,
+      redFlagOverrideCount: school.redFlagOverrideCount ?? 2,
+    };
+  },
+});
+
+export const updateTriageConfig = mutation({
+  args: {
+    schoolId: v.id("schools"),
+    triageEnabled: v.optional(v.boolean()),
+    autoShortlistThreshold: v.optional(v.number()),
+    autoRejectThreshold: v.optional(v.number()),
+    autoSendDelaySec: v.optional(v.number()),
+    redFlagOverrideCount: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const { schoolId, ...patch } = args;
+    await ctx.db.patch(schoolId, patch);
+  },
+});

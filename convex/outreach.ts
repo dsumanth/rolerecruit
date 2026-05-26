@@ -122,3 +122,25 @@ export const saveFailedMessage = internalMutation({
     });
   },
 });
+
+export const createDraft = internalMutation({
+  args: {
+    applicationId: v.id("applications"),
+    candidateId: v.id("candidates"),
+    type: v.union(
+      v.literal("shortlist"),
+      v.literal("rejection"),
+      v.literal("cross_role_suggestion"),
+    ),
+    channel: v.union(v.literal("whatsapp"), v.literal("email")),
+    body: v.string(),
+    scheduledSendAt: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.insert("outreachMessages", {
+      ...args,
+      status: args.scheduledSendAt ? "scheduled" : "draft_pending_approval",
+      draftedBy: "triage_agent",
+    });
+  },
+});
