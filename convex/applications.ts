@@ -28,6 +28,7 @@ export const create = mutation({
     jobPostingId: v.optional(v.id("jobPostings")),
     schoolId: v.id("schools"),
     aiMatchScore: v.optional(v.number()),
+    skipTriage: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const config = await ctx.db
@@ -48,7 +49,9 @@ export const create = mutation({
       createdAt: Date.now(),
     });
     await ctx.db.patch(applicationId, { source: "careers_site", matchedAt: Date.now() });
-    await ctx.scheduler.runAfter(0, api.triage.runTriage, { applicationId });
+    if (!args.skipTriage) {
+      await ctx.scheduler.runAfter(0, api.triage.runTriage, { applicationId });
+    }
     return applicationId;
   },
 });

@@ -151,6 +151,7 @@ export const runTriage = action({
         candidateId: app.candidateId,
         jobPostingId: cr.roleId as any,
         schoolId: app.schoolId,
+        skipTriage: true,
       });
       await ctx.runMutation(internal.applications.setSource, {
         applicationId: newAppId,
