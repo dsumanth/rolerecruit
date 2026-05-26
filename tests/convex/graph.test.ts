@@ -25,8 +25,17 @@ const modules = {
   "_generated/api.js": async () => apiModule,
 };
 
+const ORIGINAL_DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY;
+
 beforeEach(() => {
   process.env.EMBEDDING_PROVIDER = "stub";
+  // Restore DEEPSEEK_API_KEY before each test — one test deletes it to exercise
+  // the no-LLM fallback path; without this restore the deletion leaks across tests.
+  if (ORIGINAL_DEEPSEEK_KEY === undefined) {
+    delete process.env.DEEPSEEK_API_KEY;
+  } else {
+    process.env.DEEPSEEK_API_KEY = ORIGINAL_DEEPSEEK_KEY;
+  }
 });
 
 describe("graph canonicalization", () => {
