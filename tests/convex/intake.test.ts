@@ -1,6 +1,7 @@
 // tests/convex/intake.test.ts
 import { describe, it, expect, beforeEach } from "vitest";
 import { convexTest } from "convex-test";
+import { PARSED_FACETS_VERSION } from "../../convex/versions";
 import schema from "../../convex/schema";
 import * as intake from "../../convex/intake";
 import * as ai from "../../convex/ai";
@@ -38,7 +39,7 @@ describe("intake", () => {
       rawText: "B.Ed and 5 years PGT Physics. Led JEE prep coaching.",
     });
     const c = await t.query("candidates:get", { candidateId: candId });
-    expect(c!.parsedVersion).toBe("facets-v2");
+    expect(c!.parsedVersion).toBe(PARSED_FACETS_VERSION);
     expect(c!.embeddingVersion).toBe("emb-text3sm-v1");
     expect(c!.facetEmbeddings).toBeDefined();
     expect(c!.facetEmbeddings!.overall.length).toBe(1536);

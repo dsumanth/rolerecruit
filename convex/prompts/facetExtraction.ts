@@ -63,6 +63,7 @@ OUTPUT — return ONLY a JSON object (no markdown, no explanation) with these to
 }
 
 // Preserved for compatibility — same as buildFacetExtractionPrompt([])
+// DO NOT REMOVE until all callers migrate to buildFacetExtractionPrompt
 export const FACET_EXTRACTION_SYSTEM = buildFacetExtractionPrompt([]);
 
 export const EMPTY_PARSED_FACETS = {
