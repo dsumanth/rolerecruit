@@ -23,7 +23,9 @@ export default async function globalSetup() {
 
   let output: string;
   try {
-    output = execSync("npx convex run seed:seedE2E --prod false", {
+    // `convex run <fn> [args]` — args must be a JSON object string, not flags.
+    // Empty `{}` because seedE2E takes no args.
+    output = execSync("npx convex run seed:seedE2E '{}'", {
       cwd: process.cwd(),
       encoding: "utf-8",
       // Give the action up to 60 s (embedding calls can be slow)

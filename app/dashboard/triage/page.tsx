@@ -3,14 +3,16 @@ import { useQuery } from "convex/react";
 import { useUser } from "@clerk/nextjs";
 import { api } from "@/convex/_generated/api";
 import { TriageCard } from "@/components/triage/triage-card";
-import { useState } from "react";
+import { PageHeader } from "@/components/ui/page-header";
+import { Tabs } from "@/components/ui/tabs";
+import { useMemo, useState } from "react";
 
 const TABS = [
-  { key: "human_review", label: "Needs Review" },
-  { key: "auto_shortlisted", label: "Auto-Shortlisted" },
-  { key: "auto_rejected", label: "Auto-Rejected" },
-  { key: "cross_role_suggested", label: "Cross-Role" },
-];
+  { value: "human_review", label: "Needs Review" },
+  { value: "auto_shortlisted", label: "Auto-Shortlisted" },
+  { value: "auto_rejected", label: "Auto-Rejected" },
+  { value: "cross_role_suggested", label: "Cross-Role" },
+] as const;
 
 export default function TriagePage() {
   const { user } = useUser();
@@ -19,38 +21,53 @@ export default function TriagePage() {
   const schoolId = profile?.schoolId;
   const [tab, setTab] = useState<string>("human_review");
 
-  const queue = useQuery(
+  // Fetch everything once so we can show per-tab counts and filter client-side.
+  // The queue is naturally bounded (200 apps max in the query) so this is cheap.
+  const allItems = useQuery(
     api.triage.queueForSchool,
-    schoolId ? { schoolId, outcomes: [tab], limit: 100 } : "skip",
+    schoolId ? { schoolId, limit: 200 } : "skip",
   );
 
-  if (!schoolId) return <div className="p-6">Loading…</div>;
+  const counts = useMemo(() => {
+    if (!allItems) return {} as Record<string, number>;
+    return allItems.reduce<Record<string, number>>((acc, item: any) => {
+      const o = item.application?.triageOutcome ?? "human_review";
+      acc[o] = (acc[o] ?? 0) + 1;
+      return acc;
+    }, {});
+  }, [allItems]);
+
+  const items = useMemo(
+    () => (allItems ?? []).filter((i: any) => i.application?.triageOutcome === tab),
+    [allItems, tab],
+  );
+
+  const tabItems = TABS.map((t) => ({ value: t.value, label: t.label, count: counts[t.value] ?? 0 }));
+
+  if (!schoolId) {
+    return (
+      <div className="px-8 py-7 max-w-5xl mx-auto">
+        <p className="text-body-s text-ink-secondary">Loading…</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-semibold mb-4">Triage Queue</h1>
-      <div className="flex gap-1 border-b border-gray-200 mb-4">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`px-4 py-2 text-sm border-b-2 ${
-              tab === t.key
-                ? "border-blue-600 text-blue-700"
-                : "border-transparent text-gray-600 hover:text-gray-900"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+    <div className="px-8 py-7 max-w-5xl mx-auto">
+      <PageHeader
+        title="Triage Queue"
+        subtitle="The AI agent's decisions on new applications — approve, override, or send back to review."
+      />
+      <Tabs items={tabItems} value={tab} onChange={setTab} className="mb-5" />
       <div className="space-y-3">
-        {queue === undefined ? (
-          <div className="text-gray-500">Loading…</div>
-        ) : queue.length === 0 ? (
-          <div className="text-gray-500 py-8 text-center">No items in this queue.</div>
+        {allItems === undefined ? (
+          <p className="text-body-s text-ink-secondary">Loading…</p>
+        ) : items.length === 0 ? (
+          <div className="rounded-lg bg-surface border border-hairline py-10 text-center">
+            <p className="text-body-s text-ink-secondary">No items in this queue.</p>
+          </div>
         ) : (
-          queue.map((item: any) => (
+          items.map((item: any) => (
             <TriageCard key={item.application._id} item={item} userId={userId} />
           ))
         )}

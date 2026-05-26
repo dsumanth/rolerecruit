@@ -9,4 +9,11 @@ crons.interval(
   internal.outreach.dispatchScheduledOutreach,
 );
 
+crons.daily(
+  "track-extras-frequency",
+  { hourUTC: 3, minuteUTC: 0 }, // 03:00 UTC nightly
+  internal.facetPromotion.trackExtrasFrequency,
+  {},
+);
+
 export default crons;
