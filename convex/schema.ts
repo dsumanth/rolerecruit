@@ -41,6 +41,11 @@ export default defineSchema({
       rejection: v.optional(v.union(v.literal("whatsapp"), v.literal("email"), v.literal("both"), v.literal("none"))),
       custom: v.optional(v.union(v.literal("whatsapp"), v.literal("email"), v.literal("both"), v.literal("none"))),
     })),
+    triageEnabled: v.optional(v.boolean()),
+    autoShortlistThreshold: v.optional(v.number()),
+    autoRejectThreshold: v.optional(v.number()),
+    autoSendDelaySec: v.optional(v.number()),
+    redFlagOverrideCount: v.optional(v.number()),
   })
     .index("by_trust", ["trustId"])
     .index("by_name", ["name"])
@@ -144,6 +149,16 @@ export default defineSchema({
     ),
     createdAt: v.number(),
     filledAt: v.optional(v.number()),
+
+    // NEW: role embeddings — mirror candidate.facetEmbeddings for Stage 2 cosine math
+    roleEmbeddings: v.optional(v.object({
+      overall: v.array(v.float64()),
+      experience: v.array(v.float64()),
+      pedagogy: v.array(v.float64()),
+      achievements: v.array(v.float64()),
+      leadership: v.array(v.float64()),
+    })),
+    roleEmbeddingVersion: v.optional(v.string()),
   })
     .index("by_schoolId", ["schoolId"])
     .index("by_status", ["status"]),
@@ -270,12 +285,33 @@ export default defineSchema({
       })
     ),
     createdAt: v.number(),
+
+    // NEW
+    source: v.optional(v.union(
+      v.literal("careers_site"),
+      v.literal("talent_pool_match"),
+      v.literal("agent_sourced"),
+      v.literal("triage_cross_match"),
+      v.literal("manual"),
+    )),
+    matchedFromPoolId: v.optional(v.id("pools")),
+    matchedAt: v.optional(v.number()),
+    triageOutcome: v.optional(v.union(
+      v.literal("auto_shortlisted"),
+      v.literal("auto_rejected"),
+      v.literal("human_review"),
+      v.literal("cross_role_suggested"),
+    )),
+    triageDecisionId: v.optional(v.id("triageDecisions")),
+    matchReasons: v.optional(v.array(v.string())),
   })
     .index("by_jobPostingId", ["jobPostingId"])
     .index("by_candidateId", ["candidateId"])
     .index("by_schoolId", ["schoolId"])
     .index("by_stage", ["stage"])
-    .index("by_trackingToken", ["trackingToken"]),
+    .index("by_trackingToken", ["trackingToken"])
+    .index("by_schoolId_triageOutcome", ["schoolId", "triageOutcome"])
+    .index("by_source", ["source"]),
 
   evaluations: defineTable({
     applicationId: v.id("applications"),
@@ -309,19 +345,29 @@ export default defineSchema({
       v.literal("feedback_request"),
       v.literal("offer"),
       v.literal("rejection"),
-      v.literal("custom")
+      v.literal("custom"),
+      v.literal("cross_role_suggestion"),
     ),
     channel: v.union(v.literal("whatsapp"), v.literal("email")),
     body: v.string(),
-    sentAt: v.number(),
+    sentAt: v.optional(v.number()),  // optional — drafts have none yet
     status: v.union(
+      v.literal("draft_pending_approval"),
+      v.literal("scheduled"),
       v.literal("sent"),
       v.literal("delivered"),
-      v.literal("failed")
+      v.literal("failed"),
     ),
+    draftedBy: v.optional(v.union(
+      v.literal("triage_agent"),
+      v.literal("reverse_match_agent"),
+      v.literal("manual"),
+    )),
+    scheduledSendAt: v.optional(v.number()),
     externalId: v.optional(v.string()),
   })
-    .index("by_applicationId", ["applicationId"]),
+    .index("by_applicationId", ["applicationId"])
+    .index("by_status_scheduledSendAt", ["status", "scheduledSendAt"]),
 
   sourcingRuns: defineTable({
     jobPostingId: v.id("jobPostings"),
@@ -445,4 +491,51 @@ export default defineSchema({
     }),
     updatedAt: v.number(),
   }).index("by_schoolId", ["schoolId"]),
+
+  triageDecisions: defineTable({
+    applicationId: v.id("applications"),
+    candidateId: v.id("candidates"),
+    schoolId: v.id("schools"),
+    primaryRoleId: v.optional(v.id("jobPostings")),
+    primaryMatchScore: v.number(),
+    primaryMatchReasons: v.array(v.string()),
+    crossRoleMatches: v.array(v.object({
+      roleId: v.id("jobPostings"),
+      score: v.number(),
+      reasons: v.array(v.string()),
+    })),
+    outcome: v.union(
+      v.literal("auto_shortlisted"),
+      v.literal("auto_rejected"),
+      v.literal("human_review"),
+      v.literal("cross_role_suggested"),
+    ),
+    outcomeReasoning: v.string(),
+    outreachDraftId: v.optional(v.id("outreachMessages")),
+    humanOverride: v.optional(v.object({
+      overriddenAt: v.number(),
+      overriddenBy: v.string(),
+      fromOutcome: v.string(),
+      toOutcome: v.string(),
+      note: v.optional(v.string()),
+    })),
+    hybridWeights: v.object({
+      w_struct: v.number(),
+      w_sem: v.number(),
+      w_rules: v.number(),
+      w_graph: v.optional(v.number()),
+      facetWeights: v.object({
+        overall: v.number(),
+        experience: v.number(),
+        pedagogy: v.number(),
+        achievements: v.number(),
+        leadership: v.number(),
+      }),
+    }),
+    createdAt: v.number(),
+    triagePromptVersion: v.string(),
+  })
+    .index("by_applicationId", ["applicationId"])
+    .index("by_schoolId_outcome", ["schoolId", "outcome"])
+    .index("by_candidateId", ["candidateId"]),
 });
