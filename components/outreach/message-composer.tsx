@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { useAction, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import type { Id } from "@/convex/_generated/dataModel";
 
 interface Props {
@@ -143,7 +145,7 @@ export function MessageComposer({
             type="button"
             onClick={() => setType(t.value)}
             className={cn(
-              "text-xs px-2.5 py-1 rounded-full whitespace-nowrap transition-colors",
+              "text-caption px-2.5 py-1 rounded-full whitespace-nowrap transition-colors duration-fast",
               type === t.value
                 ? "bg-accent text-white"
                 : "bg-surface-canvas text-ink-secondary hover:bg-hairline"
@@ -154,21 +156,14 @@ export function MessageComposer({
         ))}
       </div>
 
-      <div className="flex items-center gap-2 text-xs text-ink-secondary">
+      <div className="flex items-center gap-2 text-caption text-ink-secondary">
         <span>Via:</span>
         {channelInfo.channel ? (
-          <span className={cn(
-            "px-2 py-0.5 rounded-full text-xs font-medium",
-            channelInfo.fallback
-              ? "bg-warning/10 text-warning"
-              : "bg-success/10 text-success"
-          )}>
+          <Badge variant={channelInfo.fallback ? "warning" : "success"}>
             {channelInfo.reason}
-          </span>
+          </Badge>
         ) : (
-          <span className="px-2 py-0.5 rounded-full bg-danger/10 text-danger text-xs">
-            {channelInfo.reason}
-          </span>
+          <Badge variant="danger">{channelInfo.reason}</Badge>
         )}
         {channelInfo.channel === "whatsapp" && candidatePhone && (
           <span className="text-ink-tertiary">{candidatePhone}</span>
@@ -199,28 +194,31 @@ export function MessageComposer({
         onChange={(e) => setBody(e.target.value)}
         rows={4}
         placeholder={`Message for ${candidateName}...`}
-        className="w-full px-4 py-2.5 rounded-apple bg-surface border border-hairline text-sm text-ink placeholder:text-ink-tertiary focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent resize-none"
+        className="w-full rounded-sm bg-surface border border-hairline-strong px-3 py-2 text-body-s text-ink placeholder:text-ink-tertiary outline-none transition-all duration-fast focus:border-accent focus:ring-2 focus:ring-accent-soft resize-none"
       />
 
       {result === "success" && (
-        <div className="px-3 py-2 rounded-apple bg-green-50 text-sm text-success">
+        <div className="px-3 py-2 rounded-sm bg-[color-mix(in_srgb,var(--success)_8%,transparent)] text-body-s text-success">
           Message sent successfully.
         </div>
       )}
       {result === "error" && (
-        <div className="px-3 py-2 rounded-apple bg-red-50 text-sm text-danger">
+        <div className="px-3 py-2 rounded-sm bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] text-body-s text-danger">
           Failed to send message. Please check the configuration and try again.
         </div>
       )}
 
-      <button
+      <Button
         type="button"
+        variant="primary"
+        size="lg"
         onClick={handleSend}
-        disabled={sending || !body.trim() || !channelInfo.channel}
-        className="w-full py-2.5 rounded-apple bg-accent text-white text-sm font-medium hover:bg-accent-hover active:bg-accent-pressed disabled:opacity-50 transition-colors"
+        disabled={!body.trim() || !channelInfo.channel}
+        loading={sending}
+        className="w-full"
       >
         {sending ? "Sending..." : "Send Message"}
-      </button>
+      </Button>
     </div>
   );
 }

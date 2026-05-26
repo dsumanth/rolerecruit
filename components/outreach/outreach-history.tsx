@@ -2,7 +2,10 @@
 
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+
+type BadgeVariant = "neutral" | "info" | "success" | "warning" | "danger";
 
 const TYPE_LABELS: Record<string, string> = {
   shortlist: "Shortlist",
@@ -13,13 +16,13 @@ const TYPE_LABELS: Record<string, string> = {
   custom: "Custom",
 };
 
-const TYPE_COLORS: Record<string, string> = {
-  shortlist: "bg-surface-canvas text-ink",
-  demo_schedule: "bg-green-50 text-success",
-  feedback_request: "bg-accent/10 text-accent",
-  offer: "bg-green-50 text-success",
-  rejection: "bg-red-50 text-danger",
-  custom: "bg-surface-canvas text-ink-secondary",
+const TYPE_VARIANTS: Record<string, BadgeVariant> = {
+  shortlist: "neutral",
+  demo_schedule: "success",
+  feedback_request: "info",
+  offer: "success",
+  rejection: "danger",
+  custom: "neutral",
 };
 
 export function OutreachHistory({ jobId }: { jobId: string }) {
@@ -29,45 +32,42 @@ export function OutreachHistory({ jobId }: { jobId: string }) {
 
   if (!groups) {
     return (
-      <div className="rounded-apple bg-surface border border-hairline p-8 text-center">
-        <p className="text-sm text-ink-secondary">Loading outreach history...</p>
-      </div>
+      <Card padding="lg" elevation={1} className="text-center">
+        <p className="text-body-s text-ink-secondary">Loading outreach history...</p>
+      </Card>
     );
   }
 
   if (groups.length === 0) {
     return (
-      <div className="rounded-apple bg-surface border border-hairline p-8 text-center">
-        <p className="text-sm text-ink-secondary">
+      <Card padding="lg" elevation={1} className="text-center">
+        <p className="text-body-s text-ink-secondary">
           No messages sent yet. Open a candidate from the pipeline to send outreach.
         </p>
-      </div>
+      </Card>
     );
   }
 
   return (
     <div className="space-y-4">
       {groups.map((group: any) => (
-        <div
+        <Card
           key={group.applicationId}
-          className="rounded-apple bg-surface border border-hairline overflow-hidden"
+          padding="none"
+          elevation={1}
+          className="overflow-hidden"
         >
           <div className="px-5 py-3 bg-surface-canvas border-b border-hairline">
-            <p className="text-sm font-medium text-ink">{group.candidateName}</p>
+            <p className="text-body-s font-medium text-ink">{group.candidateName}</p>
           </div>
-          <div className="divide-y divide-[#e8e8ed]">
+          <div className="divide-y divide-hairline">
             {group.messages.map((msg: any) => (
               <div key={msg._id} className="px-5 py-3">
                 <div className="flex items-center justify-between mb-1">
-                  <span
-                    className={cn(
-                      "text-xs px-2 py-0.5 rounded-full",
-                      TYPE_COLORS[msg.type] ?? "bg-surface-canvas text-ink-secondary"
-                    )}
-                  >
+                  <Badge variant={TYPE_VARIANTS[msg.type] ?? "neutral"}>
                     {TYPE_LABELS[msg.type] ?? msg.type}
-                  </span>
-                  <span className="text-xs text-ink-tertiary">
+                  </Badge>
+                  <span className="text-caption text-ink-tertiary">
                     {new Date(msg.sentAt).toLocaleDateString("en-IN", {
                       day: "numeric",
                       month: "short",
@@ -79,11 +79,11 @@ export function OutreachHistory({ jobId }: { jobId: string }) {
                     )}
                   </span>
                 </div>
-                <p className="text-sm text-ink whitespace-pre-wrap">{msg.body}</p>
+                <p className="text-body-s text-ink whitespace-pre-wrap">{msg.body}</p>
               </div>
             ))}
           </div>
-        </div>
+        </Card>
       ))}
     </div>
   );

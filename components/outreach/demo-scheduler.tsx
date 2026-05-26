@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useMutation, useAction, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 interface Props {
   applicationId: string;
@@ -82,81 +84,79 @@ export function DemoScheduler({
   return (
     <div className="space-y-4">
       {alreadyScheduled && (
-        <div className="px-3 py-2 rounded-apple bg-blue-50 text-sm text-accent">
+        <div className="px-3 py-2 rounded-sm bg-[color-mix(in_srgb,var(--accent)_8%,transparent)] text-body-s text-accent">
           Stage already set to Demo Scheduled. Fill in the details below and send the notification.
         </div>
       )}
 
       <div>
-        <label className="block text-xs text-ink-secondary mb-1">Date</label>
-        <input
+        <label className="block text-caption text-ink-secondary mb-1">Date</label>
+        <Input
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="w-full px-4 py-2.5 rounded-apple bg-surface border border-hairline text-sm text-ink focus:outline-none focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
         />
       </div>
 
       <div>
-        <label className="block text-xs text-ink-secondary mb-1">Time</label>
-        <input
+        <label className="block text-caption text-ink-secondary mb-1">Time</label>
+        <Input
           type="time"
           value={time}
           onChange={(e) => setTime(e.target.value)}
-          className="w-full px-4 py-2.5 rounded-apple bg-surface border border-hairline text-sm text-ink focus:outline-none focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
         />
       </div>
 
       <div>
-        <label className="block text-xs text-ink-secondary mb-1">Class Level</label>
-        <input
+        <label className="block text-caption text-ink-secondary mb-1">Class Level</label>
+        <Input
           type="text"
           value={classLevel}
           onChange={(e) => setClassLevel(e.target.value)}
           placeholder="e.g. Class 11"
-          className="w-full px-4 py-2.5 rounded-apple bg-surface border border-hairline text-sm text-ink placeholder:text-ink-tertiary focus:outline-none focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
         />
       </div>
 
       <div>
-        <label className="block text-xs text-ink-secondary mb-1">Topic</label>
-        <input
+        <label className="block text-caption text-ink-secondary mb-1">Topic</label>
+        <Input
           type="text"
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
           placeholder="e.g. Newton's Laws of Motion"
-          className="w-full px-4 py-2.5 rounded-apple bg-surface border border-hairline text-sm text-ink placeholder:text-ink-tertiary focus:outline-none focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
         />
       </div>
 
       <div>
-        <label className="block text-xs text-ink-secondary mb-1">Address</label>
-        <input
+        <label className="block text-caption text-ink-secondary mb-1">Address</label>
+        <Input
           type="text"
           value={address}
           onChange={(e) => setAddress(e.target.value)}
           placeholder="School campus address"
-          className="w-full px-4 py-2.5 rounded-apple bg-surface border border-hairline text-sm text-ink placeholder:text-ink-tertiary focus:outline-none focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
         />
       </div>
 
       {error && (
-        <div className="px-3 py-2 rounded-apple bg-red-50 text-sm text-danger">{error}</div>
+        <div className="px-3 py-2 rounded-sm bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] text-body-s text-danger">{error}</div>
       )}
       {result === "success" && (
-        <div className="px-3 py-2 rounded-apple bg-green-50 text-sm text-success">
+        <div className="px-3 py-2 rounded-sm bg-[color-mix(in_srgb,var(--success)_8%,transparent)] text-body-s text-success">
           Demo scheduled and candidate notified.
         </div>
       )}
 
-      <button
+      <Button
         type="button"
+        variant="primary"
+        size="lg"
         onClick={handleSchedule}
-        disabled={scheduling || !date || !time}
-        className="w-full py-2.5 rounded-apple bg-accent text-white text-sm font-medium hover:bg-accent-hover active:bg-accent-pressed disabled:opacity-50 transition-colors"
+        disabled={!date || !time}
+        loading={scheduling}
+        className="w-full"
       >
         {scheduling ? "Scheduling..." : alreadyScheduled ? "Send Demo Details" : "Schedule Demo & Notify"}
-      </button>
+      </Button>
     </div>
   );
 }

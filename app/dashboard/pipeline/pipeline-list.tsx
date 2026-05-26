@@ -7,6 +7,7 @@ import { StatusTabs } from "@/components/pipeline/status-tabs";
 import { JobSidebar } from "@/components/pipeline/job-sidebar";
 import { PipelineControls } from "@/components/pipeline/pipeline-controls";
 import { ApplicationTable } from "@/components/pipeline/application-table";
+import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { SortMode } from "@/components/pipeline/pipeline-controls";
 import type { JobStatus } from "@/components/pipeline/status-tabs";
@@ -132,9 +133,9 @@ export function PipelineList({ schoolId }: { schoolId: any }) {
               description="Choose a job from the sidebar to see all applications and manage your hiring pipeline."
             />
           ) : !pipeline ? (
-            <div className="rounded-apple bg-surface shadow-elevation-low p-10 text-center">
-              <p className="text-sm text-ink-secondary">Loading pipeline...</p>
-            </div>
+            <Card padding="lg" elevation={1} className="text-center">
+              <p className="text-body-s text-ink-secondary">Loading pipeline...</p>
+            </Card>
           ) : (
             <div className="space-y-4">
               <div>
