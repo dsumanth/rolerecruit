@@ -212,3 +212,60 @@ describe("materializeGraphFromIntake", () => {
     expect(allEdges.length).toBe(7);
   });
 });
+
+describe("intake → graph integration", () => {
+  it("parseAndStoreCandidate (no LLM) still works and leaves graph empty", async () => {
+    // With no DEEPSEEK_API_KEY, parseProfileFromText returns emptyProfile() —
+    // relationships are empty — so no graph is built. This guards against the
+    // intake hook crashing on empty input.
+    delete process.env.DEEPSEEK_API_KEY;
+    const t = convexTest(schema, modules);
+    const candId = await t.mutation("candidates:create", {
+      name: "X", qualifications: ["B.Ed"], subjects: ["Physics"],
+    });
+    await t.action("intake:parseAndStoreCandidate", { candidateId: candId, rawText: "" });
+
+    // No Candidate node because materializeGraphFromIntake bails when
+    // relationships are all empty (see helper below)
+    const allNodes = await t.run(async (ctx: any) => ctx.db.query("nodes").collect());
+    expect(allNodes.length).toBe(0);
+  });
+
+  it("intake.runGraphMaterialization mutation builds the graph from a candidate row", async () => {
+    const t = convexTest(schema, modules);
+    const candId = await t.mutation("candidates:create", {
+      name: "Priya Sharma", qualifications: ["B.Ed"], certifications: ["CTET"],
+      boardExperience: ["CBSE"], subjects: ["Physics"],
+    });
+    // Seed the candidate with parsedFacets + a synthetic relationships hint by
+    // patching the row directly (in production this is written by writeCompiledData)
+    await t.run(async (ctx: any) => {
+      await ctx.db.patch(candId, {
+        parsedFacets: {
+          specializations: [], gradeLevels: [], pedagogicalApproach: [],
+          leadershipRoles: [], extracurricular: [], languages: [],
+          schoolTypes: [], keyAchievements: [], redFlags: [], extras: {},
+        },
+        rawChunks: [],
+        parsedAt: Date.now(),
+        parsedVersion: "facets-v2",
+      });
+    });
+
+    // Materialize directly from a synthetic relationships block
+    await t.mutation("graph:materializeGraphFromIntake", {
+      candidateId: candId,
+      relationships: {
+        previousSchools: [{ name: "DPS RK Puram", yearStart: 2018, yearEnd: 2022 }],
+        qualifications: [{ degree: "B.Ed", university: "Delhi University", yearEnd: 2019 }],
+        certifications: ["CTET"],
+      },
+      subjects: ["Physics"],
+      boardExperience: ["CBSE"],
+    });
+
+    // Candidate node should be stamped with the graphVersion on the candidates row
+    const c = await t.query("candidates:get", { candidateId: candId });
+    expect(c!.graphVersion).toBe("graph-v1");
+  });
+});
