@@ -3,6 +3,7 @@
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { BookingView } from "./booking-view";
+import { Card } from "@/components/ui";
 
 interface Props {
   token: string;
@@ -13,25 +14,25 @@ export function BookingPageContent({ token }: Props) {
 
   if (!bookingData) {
     return (
-      <div className="max-w-md mx-auto py-16 text-center">
-        <p className="text-sm text-ink-secondary">Loading...</p>
-      </div>
+      <Card padding="lg" elevation={1} className="max-w-md mx-auto text-center">
+        <p className="text-body-s text-ink-secondary">Loading...</p>
+      </Card>
     );
   }
 
   if (!bookingData.valid) {
     return (
-      <div className="max-w-md mx-auto py-16 text-center">
-        <h2 className="text-lg font-semibold text-ink mb-2">
-          {bookingData.reason === "expired" ? "Booking Link Expired" :
-           bookingData.reason === "used" ? "Already Booked" : "Invalid Link"}
+      <Card padding="lg" elevation={1} className="max-w-md mx-auto text-center">
+        <h2 className="text-title-m text-ink mb-2">
+          {bookingData.reason === "expired" ? "Booking link expired" :
+           bookingData.reason === "used" ? "Already booked" : "Invalid link"}
         </h2>
-        <p className="text-sm text-ink-secondary">
+        <p className="text-body-s text-ink-secondary">
           {bookingData.reason === "expired" && "This booking link has expired. Please contact the school for a new link."}
           {bookingData.reason === "used" && "You've already booked a slot using this link."}
           {bookingData.reason === "not_found" && "This booking link is invalid."}
         </p>
-      </div>
+      </Card>
     );
   }
 

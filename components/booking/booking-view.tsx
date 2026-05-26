@@ -4,6 +4,9 @@ import { useState } from "react";
 import { useAction, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { Card, Button } from "@/components/ui";
+import { nameInitial } from "@/components/ui/avatar";
+import { cn } from "@/lib/utils";
 
 interface Slot {
   start: string;
@@ -57,11 +60,7 @@ export function BookingView({ token, schoolId, jobTitle, schoolName }: Props) {
     setLoading(true);
     setError(null);
     try {
-      await confirmBooking({
-        token,
-        startMs: selectedSlot.startMs,
-        endMs: selectedSlot.endMs,
-      });
+      await confirmBooking({ token, startMs: selectedSlot.startMs, endMs: selectedSlot.endMs });
       setConfirmed(true);
     } catch (e: any) {
       setError(e.message ?? "Booking failed. Please try again.");
@@ -72,31 +71,40 @@ export function BookingView({ token, schoolId, jobTitle, schoolName }: Props) {
 
   if (confirmed) {
     return (
-      <div className="max-w-md mx-auto text-center py-12">
-        <h2 className="text-lg font-semibold text-ink mb-2">Booking Confirmed!</h2>
-        <p className="text-sm text-ink-secondary mb-4">
-          Your demo lesson at {schoolName} has been scheduled for{" "}
-          {selectedDate} at {selectedSlot?.start}.
+      <Card padding="lg" elevation={1} className="max-w-[480px] mx-auto text-center">
+        <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--success)_15%,transparent)] text-success mb-4 text-2xl">✓</div>
+        <h2 className="text-title-l text-ink mb-2">Booking confirmed</h2>
+        <p className="text-body-s text-ink-secondary mb-1">
+          Demo lesson at <span className="text-ink font-medium">{schoolName}</span>
         </p>
-        <p className="text-xs text-ink-tertiary">
+        <p className="text-body-s text-ink-secondary">
+          {selectedDate} · {selectedSlot?.start}
+        </p>
+        <p className="text-caption text-ink-tertiary mt-4">
           You will receive a calendar invitation shortly.
         </p>
-      </div>
+      </Card>
     );
   }
 
   return (
-    <div className="max-w-md mx-auto py-8">
-      <div className="text-center mb-8">
-        <h2 className="text-lg font-semibold text-ink">Book Your Demo Lesson</h2>
-        <p className="text-sm text-ink-secondary mt-1">
-          {schoolName} — {jobTitle}
-        </p>
+    <Card padding="lg" elevation={1} className="max-w-[480px] mx-auto">
+      <div className="flex items-center gap-2.5 pb-5 mb-5 border-b border-hairline">
+        <div className="h-8 w-8 rounded-sm bg-gradient-to-br from-[#1d1d1f] to-[#4a4a52] text-white text-body-s font-bold flex items-center justify-center">
+          {nameInitial(schoolName, "·")}
+        </div>
+        <div className="min-w-0">
+          <p className="text-body-s font-medium text-ink truncate">{schoolName}</p>
+          <p className="text-caption text-ink-secondary truncate">{jobTitle}</p>
+        </div>
       </div>
 
+      <h2 className="text-display-s text-ink mb-1">Book your demo lesson</h2>
+      <p className="text-body-s text-ink-secondary mb-6">Pick a date and time that works for you.</p>
+
       <div className="mb-6">
-        <p className="text-xs font-semibold text-ink mb-2">Select a Date</p>
-        <div className="flex gap-2 overflow-x-auto pb-2">
+        <p className="text-micro text-ink-secondary uppercase tracking-[0.06em] mb-3">Select a date</p>
+        <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
           {dates.map((d) => {
             const dateStr = d.toISOString().split("T")[0];
             const isSelected = dateStr === selectedDate;
@@ -104,18 +112,20 @@ export function BookingView({ token, schoolId, jobTitle, schoolName }: Props) {
             return (
               <button
                 key={dateStr}
+                type="button"
                 onClick={() => handleDateSelect(dateStr)}
                 disabled={isWeekend}
-                className={`flex-shrink-0 px-3 py-2 rounded-apple text-center min-w-[64px] transition-colors ${
+                className={cn(
+                  "flex-shrink-0 rounded-md text-center min-w-[64px] py-2 transition-colors duration-fast",
                   isSelected
-                    ? "bg-accent text-white"
+                    ? "bg-accent-soft border border-accent/30 text-accent"
                     : isWeekend
-                    ? "bg-surface-canvas text-ink-tertiary opacity-40 cursor-not-allowed"
-                    : "bg-surface-canvas text-ink hover:bg-hairline"
-                }`}
+                      ? "bg-surface-canvas text-ink-tertiary opacity-40 cursor-not-allowed border border-hairline"
+                      : "bg-surface border border-hairline text-ink hover:bg-accent-soft",
+                )}
               >
-                <div className="text-xs">{d.toLocaleDateString("en", { weekday: "short" })}</div>
-                <div className="text-lg font-semibold">{d.getDate()}</div>
+                <div className="text-caption">{d.toLocaleDateString("en", { weekday: "short" })}</div>
+                <div className="text-title-m font-semibold tabular-nums">{d.getDate()}</div>
               </button>
             );
           })}
@@ -124,22 +134,24 @@ export function BookingView({ token, schoolId, jobTitle, schoolName }: Props) {
 
       {selectedDate && (
         <div className="mb-6">
-          <p className="text-xs font-semibold text-ink mb-2">Available Times</p>
+          <p className="text-micro text-ink-secondary uppercase tracking-[0.06em] mb-3">Available times</p>
           {loading ? (
-            <p className="text-sm text-ink-secondary">Loading slots...</p>
+            <p className="text-body-s text-ink-secondary">Loading slots...</p>
           ) : slots.length === 0 ? (
-            <p className="text-sm text-ink-secondary">No available slots for this date.</p>
+            <p className="text-body-s text-ink-secondary">No available slots for this date.</p>
           ) : (
             <div className="flex flex-wrap gap-2">
               {slots.map((slot, i) => (
                 <button
                   key={i}
+                  type="button"
                   onClick={() => setSelectedSlot(slot)}
-                  className={`px-4 py-2 rounded-apple text-sm font-medium transition-colors ${
+                  className={cn(
+                    "px-4 py-2 rounded-md text-body-s font-medium transition-colors duration-fast border",
                     selectedSlot?.startMs === slot.startMs
-                      ? "bg-accent text-white"
-                      : "bg-surface border border-hairline text-ink hover:border-accent"
-                  }`}
+                      ? "bg-accent-soft border-accent/30 text-accent"
+                      : "bg-surface border-hairline text-ink hover:border-accent",
+                  )}
                 >
                   {slot.start}
                 </button>
@@ -150,16 +162,21 @@ export function BookingView({ token, schoolId, jobTitle, schoolName }: Props) {
       )}
 
       {error && (
-        <p className="text-sm text-danger mb-4">{error}</p>
+        <div className="rounded-md bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] border border-[color-mix(in_srgb,var(--danger)_25%,transparent)] px-4 py-3 text-body-s text-danger mb-4">
+          {error}
+        </div>
       )}
 
-      <button
+      <Button
+        variant="gradient"
+        size="lg"
+        loading={loading}
+        disabled={!selectedSlot}
         onClick={handleConfirm}
-        disabled={!selectedSlot || loading}
-        className="w-full py-2.5 rounded-apple bg-accent text-white text-sm font-medium hover:bg-accent-hover disabled:opacity-50 transition-colors"
+        className="w-full"
       >
-        {loading ? "Processing..." : "Confirm Booking"}
-      </button>
-    </div>
+        Confirm booking
+      </Button>
+    </Card>
   );
 }
