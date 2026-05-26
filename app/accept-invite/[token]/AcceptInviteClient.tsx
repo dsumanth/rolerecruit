@@ -6,6 +6,9 @@ import { useAuth, useUser } from "@clerk/nextjs";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { ConvexClientProvider } from "@/components/ConvexClientProvider";
+import { Card, Button } from "@/components/ui";
+import { nameInitial } from "@/components/ui/avatar";
+import Link from "next/link";
 
 type InviteData = {
   token: string;
@@ -17,7 +20,7 @@ type InviteData = {
 };
 
 const ROLE_LABELS: Record<string, string> = {
-  hr_admin: "HR Admin",
+  hr_admin: "HR admin",
   principal: "Principal",
   hod: "HOD",
   viewer: "Viewer",
@@ -27,13 +30,7 @@ function roleLabel(role: string) {
   return ROLE_LABELS[role] ?? role;
 }
 
-function AcceptInviteInner({
-  invite,
-  token,
-}: {
-  invite: InviteData;
-  token: string;
-}) {
+function AcceptInviteInner({ invite, token }: { invite: InviteData; token: string }) {
   const router = useRouter();
   const { isSignedIn, isLoaded: authLoaded } = useAuth();
   const { user } = useUser();
@@ -54,60 +51,58 @@ function AcceptInviteInner({
             : "This invitation is no longer valid.";
 
     return (
-      <div className="max-w-md w-full mx-auto text-center">
-        <div className="text-4xl mb-4">📧</div>
-        <h1 className="text-xl font-semibold text-ink mb-2">
-          Invitation No Longer Available
-        </h1>
-        <p className="text-ink-secondary text-sm">{reason}</p>
-      </div>
+      <Card padding="lg" elevation={1} className="max-w-[480px] mx-auto text-center">
+        <h1 className="text-title-l text-ink mb-2">Invitation no longer available</h1>
+        <p className="text-body-s text-ink-secondary">{reason}</p>
+      </Card>
     );
   }
 
   if (!authLoaded) {
-    return <div className="text-sm text-ink-secondary">Loading...</div>;
+    return (
+      <Card padding="lg" elevation={1} className="max-w-[480px] mx-auto text-center">
+        <p className="text-body-s text-ink-secondary">Loading...</p>
+      </Card>
+    );
   }
 
   if (!isSignedIn) {
     const returnUrl = `/accept-invite/${token}`;
     return (
-      <div className="max-w-md w-full mx-auto text-center">
-        <div className="text-4xl mb-4">👋</div>
-        <h1 className="text-xl font-semibold text-ink mb-2">
-          You're Invited!
-        </h1>
-        <p className="text-ink-secondary text-sm mb-6">
-          You've been invited to join <strong className="text-ink">{invite.schoolName}</strong> as{" "}
-          <strong className="text-ink">{roleLabel(invite.role)}</strong>. Sign in or create an account to accept.
-        </p>
-        <div className="flex gap-3 justify-center">
-          <a
-            href={`/sign-in?redirect_url=${encodeURIComponent(returnUrl)}`}
-            className="inline-flex items-center px-5 py-2.5 rounded-apple bg-surface-canvas text-ink text-sm font-medium hover:bg-[#e8e8ed] transition-colors"
-          >
-            Sign In
-          </a>
-          <a
-            href={`/sign-up?redirect_url=${encodeURIComponent(returnUrl)}`}
-            className="inline-flex items-center px-5 py-2.5 rounded-apple bg-[#0071e3] text-white text-sm font-medium hover:bg-[#0077ed] transition-colors"
-          >
-            Sign Up
-          </a>
+      <Card padding="lg" elevation={1} className="max-w-[480px] mx-auto">
+        <div className="flex items-center gap-2.5 pb-5 mb-5 border-b border-hairline">
+          <div className="h-8 w-8 rounded-sm bg-gradient-to-br from-[#1d1d1f] to-[#4a4a52] text-white text-body-s font-bold flex items-center justify-center">
+            {nameInitial(invite.schoolName, "·")}
+          </div>
+          <div className="min-w-0">
+            <p className="text-body-s font-medium text-ink truncate">{invite.schoolName}</p>
+            <p className="text-caption text-ink-secondary truncate">{roleLabel(invite.role)} invitation</p>
+          </div>
         </div>
-      </div>
+        <h1 className="text-display-s text-ink mb-2">You're invited</h1>
+        <p className="text-body-s text-ink-secondary mb-6">
+          Sign in or create an account to accept this invitation.
+        </p>
+        <div className="flex gap-3">
+          <Link href={`/sign-in?redirect_url=${encodeURIComponent(returnUrl)}`} className="flex-1">
+            <Button variant="secondary" size="lg" className="w-full">Sign in</Button>
+          </Link>
+          <Link href={`/sign-up?redirect_url=${encodeURIComponent(returnUrl)}`} className="flex-1">
+            <Button variant="primary" size="lg" className="w-full">Sign up</Button>
+          </Link>
+        </div>
+      </Card>
     );
   }
 
   const emailMismatch =
     user?.primaryEmailAddress?.emailAddress &&
-    user.primaryEmailAddress.emailAddress.toLowerCase() !==
-      invite.email.toLowerCase();
+    user.primaryEmailAddress.emailAddress.toLowerCase() !== invite.email.toLowerCase();
 
   const handleAccept = async () => {
     if (!user) return;
     setError("");
     setAccepting(true);
-
     try {
       await acceptInvite({
         token,
@@ -123,52 +118,46 @@ function AcceptInviteInner({
   };
 
   return (
-    <div className="max-w-md w-full mx-auto text-center">
-      <div className="text-4xl mb-4">🎉</div>
-      <h1 className="text-xl font-semibold text-ink mb-2">
-        Accept Invitation
-      </h1>
-      <p className="text-ink-secondary text-sm mb-1">
-        Join <strong className="text-ink">{invite.schoolName}</strong>
-      </p>
-      <p className="text-ink-secondary text-sm mb-6">
-        as <strong className="text-ink">{roleLabel(invite.role)}</strong>
+    <Card padding="lg" elevation={1} className="max-w-[480px] mx-auto">
+      <div className="flex items-center gap-2.5 pb-5 mb-5 border-b border-hairline">
+        <div className="h-8 w-8 rounded-sm bg-gradient-to-br from-[#1d1d1f] to-[#4a4a52] text-white text-body-s font-bold flex items-center justify-center">
+          {nameInitial(invite.schoolName, "·")}
+        </div>
+        <div className="min-w-0">
+          <p className="text-body-s font-medium text-ink truncate">{invite.schoolName}</p>
+          <p className="text-caption text-ink-secondary truncate">{roleLabel(invite.role)} invitation</p>
+        </div>
+      </div>
+
+      <h1 className="text-display-s text-ink mb-1">Accept invitation</h1>
+      <p className="text-body-s text-ink-secondary mb-6">
+        Joining as <span className="text-ink font-medium">{roleLabel(invite.role)}</span> at{" "}
+        <span className="text-ink font-medium">{invite.schoolName}</span>.
       </p>
 
       {emailMismatch ? (
-        <div className="px-4 py-3 rounded-apple bg-[#fff9f0] text-sm text-[#ff9500] mb-4">
-          This invitation was sent to <strong>{invite.email}</strong>. You are
-          signed in as{" "}
-          <strong>{user?.primaryEmailAddress?.emailAddress}</strong>. Please sign
-          in with the invited email address.
+        <div className="rounded-md bg-[color-mix(in_srgb,var(--warning)_8%,transparent)] border border-[color-mix(in_srgb,var(--warning)_25%,transparent)] px-4 py-3 text-body-s text-warning">
+          This invitation was sent to <span className="font-medium">{invite.email}</span>.
+          You're signed in as <span className="font-medium">{user?.primaryEmailAddress?.emailAddress}</span>.
+          Please sign in with the invited email address.
         </div>
       ) : (
         <>
           {error && (
-            <div className="px-4 py-3 rounded-apple bg-[#fff2f0] text-sm text-[#ff3b30] mb-4">
+            <div className="rounded-md bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] border border-[color-mix(in_srgb,var(--danger)_25%,transparent)] px-4 py-3 text-body-s text-danger mb-4">
               {error}
             </div>
           )}
-          <button
-            onClick={handleAccept}
-            disabled={accepting}
-            className="inline-flex items-center px-6 py-2.5 rounded-apple bg-[#0071e3] text-white text-sm font-medium hover:bg-[#0077ed] disabled:opacity-50 transition-colors"
-          >
-            {accepting ? "Accepting..." : "Accept Invitation"}
-          </button>
+          <Button onClick={handleAccept} variant="primary" size="lg" loading={accepting} className="w-full">
+            Accept invitation
+          </Button>
         </>
       )}
-    </div>
+    </Card>
   );
 }
 
-export function AcceptInviteClient({
-  invite,
-  token,
-}: {
-  invite: InviteData;
-  token: string;
-}) {
+export function AcceptInviteClient({ invite, token }: { invite: InviteData; token: string }) {
   return (
     <div className="min-h-screen bg-surface-canvas flex items-center justify-center p-6">
       <ConvexClientProvider>
