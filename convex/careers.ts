@@ -109,8 +109,14 @@ export const submitApplication = mutation({
       schoolId: args.schoolId,
       stage: "sourced",
       trackingToken,
+      source: "careers_site",
+      matchedAt: Date.now(),
       createdAt: Date.now(),
     });
+
+    // Kick off triage for the new application. Phase 1: runs hybrid match across
+    // all open roles at the school, then writes a triageDecisions row.
+    await ctx.scheduler.runAfter(0, api.triage.runTriage, { applicationId: appId });
 
     const school = await ctx.db.get(args.schoolId);
     const jobTitle = args.jobId ? (await ctx.db.get(args.jobId))?.title : undefined;
@@ -187,8 +193,13 @@ export const submitApplicationForIngestion = internalMutation({
       schoolId: args.schoolId,
       stage: "sourced",
       trackingToken,
+      source: "careers_site",
+      matchedAt: Date.now(),
       createdAt: Date.now(),
     });
+
+    // Trigger triage for the new application (Phase 1 intake-then-triage chain)
+    await ctx.scheduler.runAfter(0, api.triage.runTriage, { applicationId: appId });
 
     return { candidateId, applicationId: appId, trackingToken };
   },
