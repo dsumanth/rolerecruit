@@ -161,6 +161,49 @@ describe("facetPromotion", () => {
     }
   });
 
+  it("trackExtrasFrequency + backfillPromotion paginate through candidates beyond one page", async () => {
+    vi.useFakeTimers();
+    try {
+      const t = convexTest(schema, modules);
+
+      // Seed 5 candidates carrying the same extras key. With pageSize=2 the
+      // table is split across 3 pages (2 + 2 + 1), forcing both the tracker
+      // and the backfill action to traverse multiple cursors.
+      const ids: any[] = [];
+      for (let i = 0; i < 5; i++) {
+        ids.push(await seedCandidateWithExtras(t, "pagination_key", `evidence ${i}`));
+      }
+
+      // trackExtrasFrequency must aggregate across all 5 candidates even when
+      // they don't all fit in one page.
+      await t.action("facetPromotion:trackExtrasFrequency", { pageSize: 2 });
+      const row = await t.query("facetPromotion:getByKey", { key: "pagination_key" });
+      expect(row!.occurrenceCount).toBe(5);
+
+      // Mark the row as promoted directly so we can invoke backfillPromotion
+      // ourselves with a small page size — bypassing the public promote()
+      // mutation that schedules with default pageSize.
+      await t.run(async (ctx: any) => {
+        await ctx.db.patch(row!._id, { status: "promoted", promotedAt: Date.now() });
+      });
+
+      const result = await t.action("facetPromotion:backfillPromotion", {
+        key: "pagination_key",
+        pageSize: 2,
+      });
+      expect(result.processed).toBe(5);
+
+      // All 5 candidates should have their key moved under the __promoted__ prefix.
+      for (const id of ids) {
+        const c = await t.query("candidates:get", { candidateId: id });
+        expect(c!.parsedFacets!.extras).toHaveProperty("__promoted__pagination_key");
+        expect(c!.parsedFacets!.extras).not.toHaveProperty("pagination_key");
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("demote moves __promoted__<key> values back to extras[key]", async () => {
     vi.useFakeTimers();
     try {
