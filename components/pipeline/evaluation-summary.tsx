@@ -14,7 +14,7 @@ export function EvaluationSummary({ applicationId }: Props) {
 
   if (!evaluations) return null;
 
-  const submitted = evaluations.filter((e) => e.submitted);
+  const submitted = evaluations.filter((e: (typeof evaluations)[number]) => e.submitted);
   if (submitted.length === 0) {
     return (
       <p className="text-caption text-ink-secondary mt-1">
@@ -24,7 +24,7 @@ export function EvaluationSummary({ applicationId }: Props) {
   }
 
   const avg =
-    submitted.reduce((sum, e) => {
+    submitted.reduce((sum: number, e: (typeof submitted)[number]) => {
       const scores = [
         e.subjectKnowledge ?? 0,
         e.classroomManagement ?? 0,
@@ -34,7 +34,7 @@ export function EvaluationSummary({ applicationId }: Props) {
       return sum + scores.reduce((a, b) => a + b, 0) / scores.length;
     }, 0) / submitted.length;
 
-  const recommendations = submitted.filter((e) => e.recommendation === "hire").length;
+  const recommendations = submitted.filter((e: (typeof submitted)[number]) => e.recommendation === "hire").length;
 
   return (
     <div className="flex items-center gap-2 mt-1.5">

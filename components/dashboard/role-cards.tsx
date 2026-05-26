@@ -72,7 +72,7 @@ export function RoleCards({ schoolId }: Props) {
 
   return (
     <div className="space-y-3">
-      {jobs.map((job) => {
+      {jobs.map((job: (typeof jobs)[number]) => {
         const apps = pipeline[job._id] ?? [];
         const total = apps.length;
 

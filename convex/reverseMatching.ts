@@ -30,6 +30,15 @@ interface MatchResult {
   hybridWeights: HybridWeights;
 }
 
+interface ScoredCandidate {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  candidate: any;
+  structuredScore: number;
+  semanticSimilarity: number;
+  ruleScore: number;
+  combined: number;
+}
+
 export const findCandidatesForJob = action({
   args: {
     jobId: v.id("jobPostings"),
@@ -99,14 +108,14 @@ export const findCandidatesForJob = action({
         combined,
       };
     });
-    scored.sort((a, b) => b.combined - a.combined);
-    const top10 = scored.slice(0, 10);
+    (scored as ScoredCandidate[]).sort((a: ScoredCandidate, b: ScoredCandidate) => b.combined - a.combined);
+    const top10: ScoredCandidate[] = scored.slice(0, 10);
 
     // ----- Stage 3: LLM rerank on top 10 -----
     if (useLlmRerank) {
       const client = getClient();
       if (client) {
-        const profiles = top10.map((s, i) => {
+        const profiles = top10.map((s: ScoredCandidate, i: number) => {
           const c = s.candidate;
           return `[${i}] ${c.candidateSummary || `${c.name}: ${c.qualifications.join(", ")}, ${c.subjects.join(", ")}, ${c.yearsExperience ?? "?"}y`}`;
         }).join("\n");
@@ -149,7 +158,7 @@ export const findCandidatesForJob = action({
     }
 
     // No LLM rerank — hybrid-only with synthesized reasons
-    return top10.slice(0, limit).map((s) => ({
+    return top10.slice(0, limit).map((s: ScoredCandidate) => ({
       candidateId: s.candidate._id,
       score: Math.round(s.combined),
       reasons: [
@@ -168,7 +177,7 @@ export const findCandidatesForJob = action({
 // Deprecated stub — delegates to the new flow
 export const reverseMatchJob = action({
   args: { jobId: v.id("jobPostings") },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<MatchResult[]> => {
     return await ctx.runAction(api.reverseMatching.findCandidatesForJob, { jobId: args.jobId });
   },
 });

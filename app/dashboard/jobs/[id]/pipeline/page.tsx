@@ -8,6 +8,13 @@ import { PageHeader, Badge, Button } from "@/components/ui";
 import { ApplicationTable } from "@/components/pipeline/application-table";
 import { ApplicationDrawer } from "@/components/pipeline/application-drawer";
 
+interface Application {
+  _id: string;
+  candidateId: string;
+  stage: string;
+  [key: string]: unknown;
+}
+
 function jobBadge(status: string) {
   if (status === "active") return <Badge dot variant="success">Active</Badge>;
   if (status === "draft") return <Badge dot variant="neutral">Draft</Badge>;
@@ -22,7 +29,7 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
   const moveStage = useMutation(api.applications.moveStage);
   const [selectedApp, setSelectedApp] = useState<any>(null);
 
-  const allApps = pipeline ? Object.values(pipeline).flat() : [];
+  const allApps = pipeline ? (Object.values(pipeline).flat() as Application[]) : [];
 
   return (
     <div>
