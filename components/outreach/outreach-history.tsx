@@ -68,12 +68,12 @@ export function OutreachHistory({ jobId }: { jobId: string }) {
                     {TYPE_LABELS[msg.type] ?? msg.type}
                   </Badge>
                   <span className="text-caption text-ink-tertiary">
-                    {new Date(msg.sentAt).toLocaleDateString("en-IN", {
+                    {msg.sentAt ? new Date(msg.sentAt).toLocaleDateString("en-IN", {
                       day: "numeric",
                       month: "short",
                       hour: "2-digit",
                       minute: "2-digit",
-                    })}
+                    }) : "Draft"}
                     {msg.status === "failed" && (
                       <span className="ml-2 text-danger">Failed</span>
                     )}

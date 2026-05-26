@@ -92,8 +92,8 @@ export const getOutreachHistoryForJob = query({
     }
 
     groups.sort((a, b) => {
-      const aLatest = Math.max(...a.messages.map((m: any) => m.sentAt));
-      const bLatest = Math.max(...b.messages.map((m: any) => m.sentAt));
+      const aLatest = Math.max(0, ...a.messages.filter((m: any) => typeof m.sentAt === "number").map((m: any) => m.sentAt));
+      const bLatest = Math.max(0, ...b.messages.filter((m: any) => typeof m.sentAt === "number").map((m: any) => m.sentAt));
       return bLatest - aLatest;
     });
 
