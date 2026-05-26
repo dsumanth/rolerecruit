@@ -1,23 +1,22 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { nameInitial } from "@/components/ui/avatar";
+import { SchoolLogo } from "@/components/careers/SchoolLogo";
 
 interface MarketingTopbarProps {
   schoolName: string;
   schoolSlug: string;
+  logoUrl?: string | null;
   className?: string;
 }
 
-export function MarketingTopbar({ schoolName, schoolSlug, className }: MarketingTopbarProps) {
+export function MarketingTopbar({ schoolName, schoolSlug, logoUrl, className }: MarketingTopbarProps) {
   return (
     <header className={cn(
       "sticky top-0 z-30 flex items-center justify-between px-9 py-4 bg-surface-chrome backdrop-blur-20 border-b border-hairline",
       className,
     )}>
       <Link href={`/careers/${schoolSlug}`} className="flex items-center gap-2.5">
-        <div className="h-7 w-7 rounded-sm bg-gradient-to-br from-[#1d1d1f] to-[#4a4a52] text-white text-[14px] font-bold flex items-center justify-center tracking-tight">
-          {nameInitial(schoolName, "·")}
-        </div>
+        <SchoolLogo name={schoolName} logoUrl={logoUrl} size="chip" />
         <span className="text-title-m text-ink">{schoolName}</span>
       </Link>
       <nav className="flex items-center gap-4">

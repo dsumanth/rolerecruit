@@ -5,6 +5,7 @@ import { api } from "@/convex/_generated/api";
 import { useParams } from "next/navigation";
 import { MarketingHero } from "@/components/careers/MarketingHero";
 import { JobListings } from "@/components/careers/JobListings";
+import { SchoolLogo } from "@/components/careers/SchoolLogo";
 
 export default function JobsListingPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -18,6 +19,7 @@ export default function JobsListingPage() {
   return (
     <div>
       <MarketingHero
+        logo={<SchoolLogo name={school.name} logoUrl={school.logoUrl} size="hero" />}
         size="compact"
         eyebrow={school.name}
         title="Open positions"

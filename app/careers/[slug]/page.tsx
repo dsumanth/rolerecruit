@@ -5,6 +5,7 @@ import { api } from "@/convex/_generated/api";
 import { useParams } from "next/navigation";
 import { MarketingHero } from "@/components/careers/MarketingHero";
 import { JobListings } from "@/components/careers/JobListings";
+import { SchoolLogo } from "@/components/careers/SchoolLogo";
 import { Card, Button } from "@/components/ui";
 import Link from "next/link";
 
@@ -24,6 +25,7 @@ export default function CareersPage() {
   return (
     <div>
       <MarketingHero
+        logo={<SchoolLogo name={school.name} logoUrl={school.logoUrl} size="hero" />}
         eyebrow={`${school.board} · ${school.city}`}
         title={`Teach at ${school.name}`}
         body="Join a school that invests in great teachers. Browse open roles below or submit a general application."

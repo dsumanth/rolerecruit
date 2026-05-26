@@ -5,6 +5,7 @@ import { api } from "@/convex/_generated/api";
 import { useParams } from "next/navigation";
 import { ApplicationForm } from "@/components/careers/ApplicationForm";
 import { MarketingHero } from "@/components/careers/MarketingHero";
+import { SchoolLogo } from "@/components/careers/SchoolLogo";
 import { Card } from "@/components/ui";
 
 export default function ApplyPage() {
@@ -21,6 +22,7 @@ export default function ApplyPage() {
   return (
     <div>
       <MarketingHero
+        logo={<SchoolLogo name={school.name} logoUrl={school.logoUrl} size="hero" />}
         size="compact"
         eyebrow={school.name}
         title="General application"

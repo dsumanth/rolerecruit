@@ -1,15 +1,17 @@
 import { cn } from "@/lib/utils";
+import type { ReactNode } from "react";
 
 interface MarketingHeroProps {
   eyebrow?: string;
   title: string;
   body?: string;
   cta?: React.ReactNode;
+  logo?: ReactNode;
   className?: string;
   size?: "default" | "compact";
 }
 
-export function MarketingHero({ eyebrow, title, body, cta, className, size = "default" }: MarketingHeroProps) {
+export function MarketingHero({ eyebrow, title, body, cta, logo, className, size = "default" }: MarketingHeroProps) {
   return (
     <section className={cn("relative overflow-hidden", className)}>
       <div aria-hidden className="absolute inset-0 pointer-events-none">
@@ -22,6 +24,11 @@ export function MarketingHero({ eyebrow, title, body, cta, className, size = "de
         "relative max-w-[880px] mx-auto px-6 text-center",
         size === "compact" ? "py-14" : "py-24",
       )}>
+        {logo && (
+          <div className="flex items-center justify-center mb-5">
+            {logo}
+          </div>
+        )}
         {eyebrow && (
           <p className="text-micro text-ink-secondary mb-4 uppercase tracking-[0.06em]">{eyebrow}</p>
         )}

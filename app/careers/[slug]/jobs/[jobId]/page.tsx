@@ -5,6 +5,7 @@ import { api } from "@/convex/_generated/api";
 import { useParams } from "next/navigation";
 import { ApplicationForm } from "@/components/careers/ApplicationForm";
 import { MarketingHero } from "@/components/careers/MarketingHero";
+import { SchoolLogo } from "@/components/careers/SchoolLogo";
 import { Card, Badge, Icon } from "@/components/ui";
 import Link from "next/link";
 
@@ -23,6 +24,7 @@ export default function JobDetailPage() {
   return (
     <div>
       <MarketingHero
+        logo={<SchoolLogo name={school.name} logoUrl={school.logoUrl} size="hero" />}
         size="compact"
         eyebrow={school.name}
         title={job.title}

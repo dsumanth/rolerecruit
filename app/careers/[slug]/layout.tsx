@@ -17,7 +17,7 @@ export default async function SchoolLayout({
 
   return (
     <>
-      <MarketingTopbar schoolName={school.name} schoolSlug={params.slug} />
+      <MarketingTopbar schoolName={school.name} schoolSlug={params.slug} logoUrl={school.logoUrl} />
       {children}
     </>
   );
