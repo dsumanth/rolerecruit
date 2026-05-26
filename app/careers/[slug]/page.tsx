@@ -3,8 +3,9 @@
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useParams } from "next/navigation";
-import { SchoolHeader } from "@/components/careers/SchoolHeader";
+import { MarketingHero } from "@/components/careers/MarketingHero";
 import { JobListings } from "@/components/careers/JobListings";
+import { Card, Button } from "@/components/ui";
 import Link from "next/link";
 
 export default function CareersPage() {
@@ -12,27 +13,46 @@ export default function CareersPage() {
   const school = useQuery(api.careers.getSchoolBySlug, { slug });
   const jobs = useQuery(api.careers.getOpenJobs, school ? { schoolId: school._id } : "skip");
 
-  if (!school) return <div className="max-w-4xl mx-auto px-6 py-20 text-center"><p className="text-ink-secondary">School not found</p></div>;
+  if (school === undefined) {
+    return <div className="max-w-4xl mx-auto px-6 py-20 text-center"><p className="text-body-s text-ink-secondary">Loading...</p></div>;
+  }
+
+  if (!school) {
+    return <div className="max-w-4xl mx-auto px-6 py-20 text-center"><p className="text-body-s text-ink-secondary">School not found</p></div>;
+  }
 
   return (
     <div>
-      <SchoolHeader name={school.name} board={school.board} city={school.city} />
-      <div className="max-w-4xl mx-auto px-6 py-10">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold text-ink">Open Positions</h2>
+      <MarketingHero
+        eyebrow={`${school.board} · ${school.city}`}
+        title={`Teach at ${school.name}`}
+        body="Join a school that invests in great teachers. Browse open roles below or submit a general application."
+        cta={
+          <Link href={`/careers/${slug}/apply`}>
+            <Button variant="gradient" size="lg" iconRight="ArrowRight">Submit a general application</Button>
+          </Link>
+        }
+      />
+
+      <section className="max-w-4xl mx-auto px-6 py-16">
+        <div className="flex items-baseline justify-between mb-6">
+          <h2 className="text-title-l text-ink">Open positions</h2>
+          {jobs && jobs.length > 0 && (
+            <span className="text-body-s text-ink-secondary tabular-nums">{jobs.length} {jobs.length === 1 ? "role" : "roles"}</span>
+          )}
         </div>
         <JobListings jobs={jobs ?? []} slug={slug} />
-        <div className="mt-8 p-6 rounded-apple bg-surface border border-hairline text-center">
-          <p className="text-ink font-medium mb-1">Don't see the right role?</p>
-          <p className="text-sm text-ink-secondary mb-4">Submit a general application and we'll contact you when a matching position opens.</p>
-          <Link
-            href={`/careers/${slug}/apply`}
-            className="inline-block py-2.5 px-5 rounded-apple bg-[#0071e3] text-white text-sm font-medium hover:bg-[#0077ed] transition-colors"
-          >
-            General Application
+
+        <Card padding="lg" elevation={1} className="mt-10 text-center">
+          <h3 className="text-title-m text-ink">Don't see the right role?</h3>
+          <p className="text-body-s text-ink-secondary mt-1 mb-5 max-w-md mx-auto">
+            Submit a general application and we'll contact you when a matching position opens.
+          </p>
+          <Link href={`/careers/${slug}/apply`} className="inline-block">
+            <Button variant="ink" iconRight="ArrowRight">General application</Button>
           </Link>
-        </div>
-      </div>
+        </Card>
+      </section>
     </div>
   );
 }
