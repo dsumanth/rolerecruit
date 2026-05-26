@@ -17,9 +17,15 @@ export default defineConfig({
       ? { storageState: process.env.CLERK_E2E_STORAGE_STATE }
       : {}),
   },
-  webServer: {
-    command: "bun run dev",
-    url: "http://localhost:3000",
-    reuseExistingServer: !process.env.CI,
-  },
+  // Skip Playwright's webServer entirely when E2E_USE_EXTERNAL_SERVER is set —
+  // useful when you already have `bun run dev` running in another terminal and
+  // Playwright's auto-start can race with it.
+  webServer: process.env.E2E_USE_EXTERNAL_SERVER
+    ? undefined
+    : {
+        command: "bun run dev",
+        url: "http://localhost:3000",
+        reuseExistingServer: !process.env.CI,
+        timeout: 120_000,
+      },
 });
