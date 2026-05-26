@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { Card, Button } from "@/components/ui";
+import { nameInitial } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -10,10 +12,10 @@ interface Props {
 }
 
 const DIMENSIONS = [
-  { key: "subjectKnowledge", label: "Subject Knowledge" },
-  { key: "classroomManagement", label: "Classroom Management" },
+  { key: "subjectKnowledge", label: "Subject knowledge" },
+  { key: "classroomManagement", label: "Classroom management" },
   { key: "communication", label: "Communication" },
-  { key: "overallFit", label: "Overall Fit" },
+  { key: "overallFit", label: "Overall fit" },
 ] as const;
 
 const RECOMMENDATIONS = [
@@ -31,8 +33,8 @@ function StarRating({ value, onChange }: { value: number; onChange: (v: number) 
           type="button"
           onClick={() => onChange(star)}
           className={cn(
-            "text-xl transition-colors",
-            star <= value ? "text-warning" : "text-hairline"
+            "text-2xl transition-colors duration-fast",
+            star <= value ? "text-warning" : "text-hairline hover:text-ink-tertiary",
           )}
         >
           ★
@@ -55,36 +57,28 @@ export function FeedbackForm({ token }: Props) {
 
   if (!submission) {
     return (
-      <div className="rounded-apple bg-surface border border-hairline p-8 text-center max-w-md mx-auto">
-        <p className="text-sm text-ink-secondary">Loading...</p>
-      </div>
+      <Card padding="lg" elevation={1} className="max-w-[480px] mx-auto text-center">
+        <p className="text-body-s text-ink-secondary">Loading...</p>
+      </Card>
     );
   }
 
   if (!submission._id) {
     return (
-      <div className="rounded-apple bg-surface border border-hairline p-8 text-center max-w-md mx-auto">
-        <h1 className="text-lg font-semibold text-ink mb-2">
-          Invalid Link
-        </h1>
-        <p className="text-sm text-ink-secondary">
-          This feedback link is invalid or has expired.
-        </p>
-      </div>
+      <Card padding="lg" elevation={1} className="max-w-[480px] mx-auto text-center">
+        <h1 className="text-title-l text-ink mb-2">Invalid link</h1>
+        <p className="text-body-s text-ink-secondary">This feedback link is invalid or has expired.</p>
+      </Card>
     );
   }
 
   if (submission.submitted || done) {
     return (
-      <div className="rounded-apple bg-surface border border-hairline p-8 text-center max-w-md mx-auto">
-        <div className="text-3xl mb-3">✓</div>
-        <h1 className="text-lg font-semibold text-ink mb-2">
-          Feedback Submitted
-        </h1>
-        <p className="text-sm text-ink-secondary">
-          Thank you! Your evaluation has been recorded.
-        </p>
-      </div>
+      <Card padding="lg" elevation={1} className="max-w-[480px] mx-auto text-center">
+        <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--success)_15%,transparent)] text-success mb-4 text-2xl">✓</div>
+        <h1 className="text-title-l text-ink mb-2">Feedback submitted</h1>
+        <p className="text-body-s text-ink-secondary">Thank you. Your evaluation has been recorded.</p>
+      </Card>
     );
   }
 
@@ -117,88 +111,84 @@ export function FeedbackForm({ token }: Props) {
     }
   };
 
+  const candidateName = submission.candidate?.name ?? "Candidate";
+
   return (
-    <div className="max-w-md mx-auto">
-      <div className="rounded-apple bg-surface border border-hairline p-6">
-        <h1 className="text-lg font-semibold text-ink mb-1">
-          Demo Lesson Feedback
-        </h1>
-        {submission.candidate && (
-          <p className="text-sm text-ink-secondary mb-6">
-            Candidate: {submission.candidate.name}
-            {submission.candidate.subjects.length > 0 &&
-              ` · ${submission.candidate.subjects.join(", ")}`}
-          </p>
-        )}
+    <Card padding="lg" elevation={1} className="max-w-[480px] mx-auto">
+      <div className="flex items-center gap-2.5 pb-5 mb-5 border-b border-hairline">
+        <div className="h-8 w-8 rounded-sm bg-gradient-to-br from-[#1d1d1f] to-[#4a4a52] text-white text-body-s font-bold flex items-center justify-center">
+          {nameInitial(candidateName, "·")}
+        </div>
+        <div className="min-w-0">
+          <p className="text-body-s font-medium text-ink truncate">{candidateName}</p>
+          {submission.candidate?.subjects?.length ? (
+            <p className="text-caption text-ink-secondary truncate">{submission.candidate.subjects.join(", ")}</p>
+          ) : null}
+        </div>
+      </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {DIMENSIONS.map((dim) => (
-            <div key={dim.key}>
-              <label className="block text-sm font-medium text-ink mb-1.5">
-                {dim.label}
-              </label>
-              <StarRating
-                value={ratings[dim.key] ?? 0}
-                onChange={(v) => setRatings((prev) => ({ ...prev, [dim.key]: v }))}
-              />
-            </div>
-          ))}
+      <h1 className="text-display-s text-ink mb-1">Demo lesson feedback</h1>
+      <p className="text-body-s text-ink-secondary mb-6">Rate each dimension and share your overall recommendation.</p>
 
-          <div>
-            <label className="block text-sm font-medium text-ink mb-1.5">
-              Comments
-            </label>
-            <textarea
-              value={comments}
-              onChange={(e) => setComments(e.target.value)}
-              rows={3}
-              className="w-full px-4 py-2.5 rounded-apple bg-surface border border-hairline text-sm text-ink placeholder:text-ink-tertiary focus:outline-none focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent resize-none"
-              placeholder="Any additional notes about the candidate..."
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {DIMENSIONS.map((dim) => (
+          <div key={dim.key} className="flex items-center justify-between">
+            <label className="text-body-s font-medium text-ink">{dim.label}</label>
+            <StarRating
+              value={ratings[dim.key] ?? 0}
+              onChange={(v) => setRatings((prev) => ({ ...prev, [dim.key]: v }))}
             />
           </div>
+        ))}
 
-          <div>
-            <label className="block text-sm font-medium text-ink mb-2">
-              Recommendation
-            </label>
-            <div className="flex gap-3">
-              {RECOMMENDATIONS.map((r) => (
+        <div>
+          <label className="block text-body-s font-medium text-ink mb-1.5">Comments</label>
+          <textarea
+            value={comments}
+            onChange={(e) => setComments(e.target.value)}
+            rows={3}
+            className="w-full rounded-sm bg-surface border border-hairline-strong px-3 py-2 text-body-s text-ink placeholder:text-ink-tertiary outline-none transition-all duration-fast focus:border-accent focus:ring-2 focus:ring-accent-soft resize-none"
+            placeholder="Any additional notes about the candidate..."
+          />
+        </div>
+
+        <div>
+          <label className="block text-body-s font-medium text-ink mb-2">Recommendation</label>
+          <div className="grid grid-cols-3 gap-2">
+            {RECOMMENDATIONS.map((r) => {
+              const active = recommendation === r.value;
+              const activeClasses = r.value === "hire"
+                ? "bg-[color-mix(in_srgb,var(--success)_12%,transparent)] border-[color-mix(in_srgb,var(--success)_45%,transparent)] text-success"
+                : r.value === "reject"
+                  ? "bg-[color-mix(in_srgb,var(--danger)_12%,transparent)] border-[color-mix(in_srgb,var(--danger)_45%,transparent)] text-danger"
+                  : "bg-[color-mix(in_srgb,var(--warning)_12%,transparent)] border-[color-mix(in_srgb,var(--warning)_45%,transparent)] text-warning";
+              return (
                 <button
                   key={r.value}
                   type="button"
                   onClick={() => setRecommendation(r.value)}
                   className={cn(
-                    "py-2 px-4 rounded-apple text-sm font-medium transition-colors border",
-                    recommendation === r.value
-                      ? r.value === "hire"
-                        ? "bg-green-50 text-success border-[#34c759]"
-                        : r.value === "reject"
-                          ? "bg-red-50 text-danger border-[#ff3b30]"
-                          : "bg-amber-50 text-warning border-[#ff9f0a]"
-                      : "bg-surface-canvas text-ink-secondary border-hairline hover:bg-hairline"
+                    "py-2 rounded-md text-body-s font-medium transition-colors duration-fast border",
+                    active ? activeClasses : "bg-surface text-ink-secondary border-hairline hover:text-ink",
                   )}
                 >
                   {r.label}
                 </button>
-              ))}
-            </div>
+              );
+            })}
           </div>
+        </div>
 
-          {error && (
-            <div className="px-4 py-3 rounded-apple bg-red-50 text-sm text-danger">
-              {error}
-            </div>
-          )}
+        {error && (
+          <div className="rounded-md bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] border border-[color-mix(in_srgb,var(--danger)_25%,transparent)] px-4 py-3 text-body-s text-danger">
+            {error}
+          </div>
+        )}
 
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full py-2.5 rounded-apple bg-accent text-white text-sm font-medium hover:bg-accent-hover active:bg-accent-pressed disabled:opacity-50 transition-colors"
-          >
-            {submitting ? "Submitting..." : "Submit Feedback"}
-          </button>
-        </form>
-      </div>
-    </div>
+        <Button type="submit" variant="ink" size="lg" loading={submitting} className="w-full">
+          Submit feedback
+        </Button>
+      </form>
+    </Card>
   );
 }
