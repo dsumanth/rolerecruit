@@ -1,5 +1,6 @@
-import { mutation, query, internalMutation } from "./_generated/server";
+import { mutation, query, internalMutation, action } from "./_generated/server";
 import { v } from "convex/values";
+import { api } from "./_generated/api";
 
 export const create = mutation({
   args: {
@@ -75,7 +76,8 @@ export const listBySchool = query({
 export const publish = mutation({
   args: { jobId: v.id("jobPostings") },
   handler: async (ctx, args) => {
-    return await ctx.db.patch(args.jobId, { status: "active" });
+    await ctx.db.patch(args.jobId, { status: "active" });
+    await ctx.scheduler.runAfter(0, api.jobs_ai.computeRoleEmbeddings, { jobId: args.jobId });
   },
 });
 
@@ -136,5 +138,58 @@ export const saveScoringRules = mutation({
     return await ctx.db.patch(args.jobId, {
       scoringRules: args.scoringRules,
     });
+  },
+});
+
+export const setRoleEmbeddings = mutation({
+  args: {
+    jobId: v.id("jobPostings"),
+    roleEmbeddings: v.object({
+      overall: v.array(v.float64()),
+      experience: v.array(v.float64()),
+      pedagogy: v.array(v.float64()),
+      achievements: v.array(v.float64()),
+      leadership: v.array(v.float64()),
+    }),
+    version: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.jobId, {
+      roleEmbeddings: args.roleEmbeddings,
+      roleEmbeddingVersion: args.version,
+    });
+  },
+});
+
+export const listOpenForSchool = query({
+  args: { schoolId: v.id("schools") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("jobPostings")
+      .withIndex("by_schoolId", (q) => q.eq("schoolId", args.schoolId))
+      .filter((q) => q.eq(q.field("status"), "active"))
+      .collect();
+  },
+});
+
+export const listAllActive = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("jobPostings").filter((q) => q.eq(q.field("status"), "active")).collect();
+  },
+});
+
+export const backfillRoleEmbeddings = action({
+  args: {},
+  handler: async (ctx): Promise<{ processed: number }> => {
+    const all = await ctx.runQuery(api.jobs.listAllActive, {});
+    let processed = 0;
+    for (const job of all) {
+      if (!job.roleEmbeddings) {
+        await ctx.runAction(api.jobs_ai.computeRoleEmbeddings, { jobId: job._id });
+        processed++;
+      }
+    }
+    return { processed };
   },
 });
