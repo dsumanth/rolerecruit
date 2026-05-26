@@ -5,3 +5,4 @@ node_modules
 convex/_generated
 .superpowers
 .claude
+tsconfig.tsbuildinfo
