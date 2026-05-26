@@ -538,4 +538,29 @@ export default defineSchema({
     .index("by_applicationId", ["applicationId"])
     .index("by_schoolId_outcome", ["schoolId", "outcome"])
     .index("by_candidateId", ["candidateId"]),
+
+  facetPromotionCandidates: defineTable({
+    key: v.string(),                 // snake_case extras key, e.g. "AI_curriculum_design"
+    occurrenceCount: v.number(),     // candidates carrying this key
+    firstSeenAt: v.number(),
+    lastSeenAt: v.number(),
+    sampleEvidence: v.array(v.object({
+      candidateId: v.id("candidates"),
+      quote: v.string(),
+      offset: v.number(),
+      context: v.string(),
+    })),                              // up to 5 distinct samples
+    status: v.union(
+      v.literal("pending"),
+      v.literal("promoted"),
+      v.literal("dismissed"),
+      v.literal("demoted"),
+    ),
+    promotedAt: v.optional(v.number()),
+    dismissedAt: v.optional(v.number()),
+    demotedAt: v.optional(v.number()),
+  })
+    .index("by_key", ["key"])
+    .index("by_status", ["status"])
+    .index("by_status_occurrenceCount", ["status", "occurrenceCount"]),
 });
