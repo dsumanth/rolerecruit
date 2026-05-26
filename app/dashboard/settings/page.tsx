@@ -5,12 +5,16 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useUser } from "@clerk/nextjs";
 import { Button, Card, Input, Toggle } from "@/components/ui";
+import { SchoolLogo } from "@/components/careers/SchoolLogo";
 
 export default function SettingsPage() {
   const { user } = useUser();
   const profile = useQuery(api.users.getByClerkId, user?.id ? { userId: user.id } : "skip");
   const school = useQuery(api.schools.get, profile?.schoolId ? { schoolId: profile.schoolId } : "skip");
   const updateSettings = useMutation(api.schools.updateSettings);
+  const generateLogoUploadUrl = useMutation(api.schools.generateLogoUploadUrl);
+  const setLogo = useMutation(api.schools.setLogo);
+  const clearLogo = useMutation(api.schools.clearLogo);
 
   const [slug, setSlug] = useState("");
   const [whatsappEnabled, setWhatsappEnabled] = useState(false);
@@ -18,6 +22,8 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [logoError, setLogoError] = useState<string | null>(null);
 
   if (school && !loaded) {
     setSlug(school.slug ?? "");
@@ -44,6 +50,47 @@ export default function SettingsPage() {
     }
   };
 
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !profile?.schoolId) return;
+    if (!file.type.startsWith("image/")) {
+      setLogoError("Please upload an image file.");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setLogoError("Logo must be under 2 MB.");
+      return;
+    }
+    setLogoError(null);
+    setUploading(true);
+    try {
+      const uploadUrl = await generateLogoUploadUrl({});
+      const result = await fetch(uploadUrl, {
+        method: "POST",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      if (!result.ok) throw new Error("Upload failed");
+      const { storageId } = await result.json();
+      await setLogo({ schoolId: profile.schoolId, storageId });
+    } catch (err: any) {
+      setLogoError(err.message ?? "Upload failed");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleLogoClear = async () => {
+    if (!profile?.schoolId) return;
+    setLogoError(null);
+    try {
+      await clearLogo({ schoolId: profile.schoolId });
+    } catch (err: any) {
+      setLogoError(err.message ?? "Failed to remove logo");
+    }
+  };
+
   if (!school || !profile) {
     return <div className="text-ink-secondary text-body-s">Loading...</div>;
   }
@@ -63,6 +110,36 @@ export default function SettingsPage() {
           {error}
         </div>
       )}
+
+      {/* School Logo */}
+      <Card padding="md" elevation={1}>
+        <h2 className="text-title-m text-ink mb-1">School logo</h2>
+        <p className="text-body-s text-ink-secondary mb-4">Shown on your public careers portal.</p>
+        <div className="flex items-center gap-5">
+          <SchoolLogo name={school.name} logoUrl={school.logoUrl} size="hero" />
+          <div className="flex items-center gap-2">
+            <label className="inline-flex items-center justify-center rounded-full bg-ink text-surface-canvas px-3.5 py-1.5 text-body-s font-medium hover:opacity-90 transition-opacity cursor-pointer">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleLogoUpload}
+                disabled={uploading}
+                className="sr-only"
+              />
+              {uploading ? "Uploading..." : school.logoUrl ? "Replace" : "Upload logo"}
+            </label>
+            {school.logoUrl && (
+              <Button variant="ghost" size="sm" onClick={handleLogoClear}>Remove</Button>
+            )}
+          </div>
+        </div>
+        {logoError && (
+          <div className="mt-4 rounded-md bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] border border-[color-mix(in_srgb,var(--danger)_25%,transparent)] px-4 py-3 text-body-s text-danger">
+            {logoError}
+          </div>
+        )}
+        <p className="text-caption text-ink-tertiary mt-3">PNG or SVG recommended · max 2 MB</p>
+      </Card>
 
       {/* Careers Portal */}
       <Card padding="md" elevation={1}>
