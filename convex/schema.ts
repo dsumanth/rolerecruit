@@ -1,6 +1,19 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
+const evidenceValidator = v.object({
+  quote: v.string(),
+  offset: v.number(),
+  context: v.string(),
+});
+
+const facetValueValidator = v.object({
+  value: v.string(),
+  evidence: evidenceValidator,
+});
+
+const facetArrayValidator = v.array(facetValueValidator);
+
 export default defineSchema({
   schools: defineTable({
     name: v.string(),
@@ -136,6 +149,7 @@ export default defineSchema({
     .index("by_status", ["status"]),
 
   candidates: defineTable({
+    // existing fields
     name: v.string(),
     phone: v.optional(v.string()),
     email: v.optional(v.string()),
@@ -153,7 +167,92 @@ export default defineSchema({
     ),
     talentBankFlag: v.boolean(),
     poolIds: v.optional(v.array(v.id("pools"))),
-  }),
+
+    // NEW: provenance (orthogonal to sourceChannel)
+    origin: v.optional(v.union(
+      v.literal("fresh_application"),
+      v.literal("talent_pool"),
+      v.literal("agent_sourced"),
+      v.literal("referral"),
+      v.literal("manual_import"),
+    )),
+
+    // NEW: facets with evidence spans
+    parsedFacets: v.optional(v.object({
+      specializations: facetArrayValidator,
+      gradeLevels: facetArrayValidator,
+      pedagogicalApproach: facetArrayValidator,
+      leadershipRoles: facetArrayValidator,
+      extracurricular: facetArrayValidator,
+      languages: facetArrayValidator,
+      schoolTypes: facetArrayValidator,
+      keyAchievements: facetArrayValidator,
+      redFlags: facetArrayValidator,
+      extras: v.record(v.string(), facetArrayValidator),
+    })),
+
+    // NEW: 1-paragraph job-agnostic summary
+    candidateSummary: v.optional(v.string()),
+
+    // NEW: raw chunks — source of truth for evidence validation + future re-extraction
+    rawChunks: v.optional(v.array(v.object({
+      text: v.string(),
+      section: v.union(
+        v.literal("header"),
+        v.literal("experience"),
+        v.literal("pedagogy"),
+        v.literal("achievements"),
+        v.literal("leadership"),
+        v.literal("other"),
+      ),
+      offset: v.number(),
+    }))),
+
+    // NEW: five facet embeddings (1536 dims each)
+    facetEmbeddings: v.optional(v.object({
+      overall: v.array(v.float64()),
+      experience: v.array(v.float64()),
+      pedagogy: v.array(v.float64()),
+      achievements: v.array(v.float64()),
+      leadership: v.array(v.float64()),
+    })),
+
+    // NEW: version stamps
+    parsedVersion: v.optional(v.string()),
+    embeddingVersion: v.optional(v.string()),
+    parsedAt: v.optional(v.number()),
+
+    // NEW: parsing notes — flags when evidence validation didn't fully pass on retry
+    parsingNotes: v.optional(v.string()),
+  })
+    .index("by_origin", ["origin"])
+    .index("by_parsedVersion", ["parsedVersion"])
+    .index("by_embeddingVersion", ["embeddingVersion"])
+    .vectorIndex("by_overall_embedding", {
+      vectorField: "facetEmbeddings.overall",
+      dimensions: 1536,
+      filterFields: ["subjects", "origin"],
+    })
+    .vectorIndex("by_experience_embedding", {
+      vectorField: "facetEmbeddings.experience",
+      dimensions: 1536,
+      filterFields: ["subjects", "origin"],
+    })
+    .vectorIndex("by_pedagogy_embedding", {
+      vectorField: "facetEmbeddings.pedagogy",
+      dimensions: 1536,
+      filterFields: ["subjects", "origin"],
+    })
+    .vectorIndex("by_achievements_embedding", {
+      vectorField: "facetEmbeddings.achievements",
+      dimensions: 1536,
+      filterFields: ["subjects", "origin"],
+    })
+    .vectorIndex("by_leadership_embedding", {
+      vectorField: "facetEmbeddings.leadership",
+      dimensions: 1536,
+      filterFields: ["subjects", "origin"],
+    }),
 
   applications: defineTable({
     candidateId: v.id("candidates"),
