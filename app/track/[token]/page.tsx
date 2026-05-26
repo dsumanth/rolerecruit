@@ -4,29 +4,35 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useParams } from "next/navigation";
 import { ApplicationStatus } from "@/components/tracking/ApplicationStatus";
+import { Card } from "@/components/ui";
 
 export default function TrackPage() {
   const { token } = useParams<{ token: string }>();
   const app = useQuery(api.tracking.getByToken, token ? { token } : "skip");
 
   if (app === undefined) {
-    return <div className="max-w-lg mx-auto px-6 py-20"><p className="text-ink-secondary text-center">Loading...</p></div>;
+    return (
+      <div className="min-h-screen bg-surface-canvas flex items-center justify-center p-6">
+        <Card padding="lg" elevation={1} className="max-w-[480px] text-center">
+          <p className="text-body-s text-ink-secondary">Loading...</p>
+        </Card>
+      </div>
+    );
   }
 
   if (!app) {
     return (
-      <div className="max-w-lg mx-auto px-6 py-20">
-        <div className="rounded-apple bg-surface border border-hairline p-8 text-center">
-          <div className="text-4xl mb-4">🔍</div>
-          <h2 className="text-xl font-bold text-ink">Application Not Found</h2>
-          <p className="text-sm text-ink-secondary mt-2">This tracking link is invalid or has expired.</p>
-        </div>
+      <div className="min-h-screen bg-surface-canvas flex items-center justify-center p-6">
+        <Card padding="lg" elevation={1} className="max-w-[480px] text-center">
+          <h2 className="text-title-l text-ink mb-2">Application not found</h2>
+          <p className="text-body-s text-ink-secondary">This tracking link is invalid or has expired.</p>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-surface-canvas py-20 px-6">
+    <div className="min-h-screen bg-surface-canvas flex items-center justify-center p-6">
       <ApplicationStatus
         stage={app.stage}
         jobTitle={app.job?.title}
