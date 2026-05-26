@@ -113,3 +113,170 @@ export const addEdge = mutation({
     });
   },
 });
+
+// ============================================================================
+// materializeGraphFromIntake — called from intake.ts after writeCompiledData.
+// Takes the LLM-extracted relationship hints plus the structured fields the
+// candidate already carries (subjects, boards) and writes nodes + edges.
+// Idempotent: re-calling on the same candidate produces no duplicate edges
+// (because both upsertNode and addEdge dedupe).
+// ============================================================================
+
+const previousSchoolValidator = v.object({
+  name: v.string(),
+  role: v.optional(v.string()),
+  subjects: v.optional(v.array(v.string())),
+  yearStart: v.optional(v.number()),
+  yearEnd: v.optional(v.number()),
+  endReason: v.optional(v.string()),
+});
+
+const qualificationHintValidator = v.object({
+  degree: v.string(),
+  university: v.optional(v.string()),
+  yearStart: v.optional(v.number()),
+  yearEnd: v.optional(v.number()),
+});
+
+const relationshipsValidator = v.object({
+  previousSchools: v.array(previousSchoolValidator),
+  qualifications: v.array(qualificationHintValidator),
+  certifications: v.array(v.string()),
+  referredBy: v.optional(v.string()),
+  region: v.optional(v.string()),
+});
+
+export const materializeGraphFromIntake = mutation({
+  args: {
+    candidateId: v.id("candidates"),
+    relationships: relationshipsValidator,
+    subjects: v.array(v.string()),
+    boardExperience: v.array(v.string()),
+  },
+  handler: async (ctx, args): Promise<{ nodesUpserted: number; edgesUpserted: number }> => {
+    const candidate = await ctx.db.get(args.candidateId);
+    if (!candidate) throw new Error(`Candidate ${args.candidateId} not found`);
+
+    let nodesUpserted = 0;
+    let edgesUpserted = 0;
+
+    const upsertNodeInline = async (
+      type: GraphNodeType,
+      externalId: string,
+      displayName: string,
+      attributes?: any,
+    ): Promise<Id<"nodes">> => {
+      const existing = await ctx.db
+        .query("nodes")
+        .withIndex("by_type_externalId", (q) => q.eq("type", type).eq("externalId", externalId))
+        .first();
+      if (existing) return existing._id;
+      nodesUpserted++;
+      return await ctx.db.insert("nodes", {
+        type, externalId, displayName, attributes, createdAt: Date.now(),
+      });
+    };
+
+    const addEdgeInline = async (
+      fromId: Id<"nodes">,
+      toId: Id<"nodes">,
+      type: GraphEdgeType,
+      attributes?: any,
+    ): Promise<void> => {
+      const existing = await ctx.db
+        .query("edges")
+        .withIndex("by_from_type", (q) => q.eq("fromId", fromId).eq("type", type))
+        .collect();
+      const dup = existing.find((e) => String(e.toId) === String(toId));
+      if (dup) {
+        if (attributes) {
+          await ctx.db.patch(dup._id, { attributes: { ...(dup.attributes ?? {}), ...attributes } });
+        }
+        return;
+      }
+      await ctx.db.insert("edges", {
+        fromId, toId, type, attributes, createdAt: Date.now(),
+      });
+      edgesUpserted++;
+    };
+
+    // 1. Candidate node
+    const candNodeId = await upsertNodeInline(
+      "Candidate",
+      String(args.candidateId),
+      candidate.name,
+      { candidateId: String(args.candidateId) },
+    );
+
+    // 2. TAUGHT_AT — for each previous school
+    for (const ps of args.relationships.previousSchools) {
+      if (!ps.name?.trim()) continue;
+      const schoolId = await upsertNodeInline("School", canonicalize(ps.name), ps.name);
+      await addEdgeInline(candNodeId, schoolId, "TAUGHT_AT", {
+        role: ps.role, subjects: ps.subjects, yearStart: ps.yearStart, yearEnd: ps.yearEnd, endReason: ps.endReason,
+      });
+    }
+
+    // 3. HOLDS + FROM — for each qualification; cohort membership when university+endYear known
+    for (const q of args.relationships.qualifications) {
+      if (!q.degree?.trim()) continue;
+      const qualId = await upsertNodeInline("Qualification", canonicalize(q.degree), q.degree);
+      await addEdgeInline(candNodeId, qualId, "HOLDS", { yearStart: q.yearStart, yearEnd: q.yearEnd });
+      if (q.university?.trim()) {
+        const uniId = await upsertNodeInline("University", canonicalize(q.university), q.university);
+        await addEdgeInline(qualId, uniId, "FROM");
+
+        if (q.yearEnd) {
+          const cohortExternalId = cohortKey(q.university, q.degree, q.yearEnd);
+          const cohortDisplay = `${q.university} ${q.degree} ${q.yearEnd}`;
+          const cohortId = await upsertNodeInline("Cohort", cohortExternalId, cohortDisplay, {
+            university: q.university, program: q.degree, endYear: q.yearEnd,
+          });
+          await addEdgeInline(candNodeId, cohortId, "BELONGS_TO");
+        }
+      }
+    }
+
+    // 4. CERTIFIED_IN
+    for (const cert of args.relationships.certifications) {
+      if (!cert?.trim()) continue;
+      const certId = await upsertNodeInline("Certification", canonicalize(cert), cert);
+      await addEdgeInline(candNodeId, certId, "CERTIFIED_IN");
+    }
+
+    // 5. SPECIALIZES_IN — from the structured subjects array on the candidate
+    for (const subj of args.subjects) {
+      if (!subj?.trim()) continue;
+      const subjId = await upsertNodeInline("Subject", canonicalize(subj), subj);
+      await addEdgeInline(candNodeId, subjId, "SPECIALIZES_IN");
+    }
+
+    // 6. BELONGS_TO (Board) — from candidate.boardExperience
+    for (const board of args.boardExperience) {
+      if (!board?.trim()) continue;
+      const boardId = await upsertNodeInline("Board", canonicalize(board), board);
+      await addEdgeInline(candNodeId, boardId, "BELONGS_TO");
+    }
+
+    // 7. LOCATED_IN — region
+    if (args.relationships.region?.trim()) {
+      const regionId = await upsertNodeInline("Region", canonicalize(args.relationships.region), args.relationships.region);
+      await addEdgeInline(candNodeId, regionId, "LOCATED_IN");
+    }
+
+    // 8. REFERRED_BY — only if referrer name is provided (Phase 3a stops at name-only; matching to existing candidates/users is Phase 3c)
+    if (args.relationships.referredBy?.trim()) {
+      // Park referrer as a free-text attribute on the candidate node for now.
+      const existing = await ctx.db.get(candNodeId);
+      await ctx.db.patch(candNodeId, {
+        attributes: { ...(existing?.attributes ?? {}), referredByName: args.relationships.referredBy },
+      });
+    }
+
+    // Stamp the candidate row so backfill knows the graph was built
+    const { GRAPH_VERSION } = await import("./versions");
+    await ctx.db.patch(args.candidateId, { graphVersion: GRAPH_VERSION });
+
+    return { nodesUpserted, edgesUpserted };
+  },
+});
