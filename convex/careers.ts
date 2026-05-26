@@ -1,6 +1,6 @@
 import { query, mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 
 export const getSchoolBySlug = query({
   args: { slug: v.string() },
@@ -80,6 +80,27 @@ export const submitApplication = mutation({
       talentBankFlag: false,
     });
 
+    const profileText = [
+      `Name: ${args.name}`,
+      args.email ? `Email: ${args.email}` : null,
+      args.phone ? `Phone: ${args.phone}` : null,
+      args.qualifications.length ? `Qualifications: ${args.qualifications.join(", ")}` : null,
+      (args.certifications ?? []).length ? `Certifications: ${(args.certifications ?? []).join(", ")}` : null,
+      (args.boardExperience ?? []).length ? `Board Experience: ${(args.boardExperience ?? []).join(", ")}` : null,
+      args.subjects.length ? `Subjects: ${args.subjects.join(", ")}` : null,
+      args.yearsExperience != null ? `Years of Experience: ${args.yearsExperience}` : null,
+      args.currentSchool ? `Current School: ${args.currentSchool}` : null,
+    ].filter(Boolean).join("\n");
+
+    await ctx.runMutation(internal.candidates.setOrigin, {
+      candidateId,
+      origin: "fresh_application",
+    });
+    await ctx.scheduler.runAfter(0, api.intake.parseAndStoreCandidate, {
+      candidateId,
+      rawText: profileText,
+    });
+
     const trackingToken = generateTrackingToken();
 
     const appId = await ctx.db.insert("applications", {
@@ -136,6 +157,27 @@ export const submitApplicationForIngestion = internalMutation({
       currentSchool: args.currentSchool,
       sourceChannel: "email_parsed",
       talentBankFlag: false,
+    });
+
+    const ingestionProfileText = [
+      `Name: ${args.name}`,
+      args.email ? `Email: ${args.email}` : null,
+      args.phone ? `Phone: ${args.phone}` : null,
+      args.qualifications.length ? `Qualifications: ${args.qualifications.join(", ")}` : null,
+      (args.certifications ?? []).length ? `Certifications: ${(args.certifications ?? []).join(", ")}` : null,
+      (args.boardExperience ?? []).length ? `Board Experience: ${(args.boardExperience ?? []).join(", ")}` : null,
+      args.subjects.length ? `Subjects: ${args.subjects.join(", ")}` : null,
+      args.yearsExperience != null ? `Years of Experience: ${args.yearsExperience}` : null,
+      args.currentSchool ? `Current School: ${args.currentSchool}` : null,
+    ].filter(Boolean).join("\n");
+
+    await ctx.runMutation(internal.candidates.setOrigin, {
+      candidateId,
+      origin: "fresh_application",
+    });
+    await ctx.scheduler.runAfter(0, api.intake.parseAndStoreCandidate, {
+      candidateId,
+      rawText: ingestionProfileText,
     });
 
     const trackingToken = generateTrackingToken();

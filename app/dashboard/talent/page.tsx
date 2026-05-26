@@ -11,6 +11,7 @@ import { PoolSelector } from "@/components/talent/pool-selector";
 import { GlobalCriteriaPanel } from "@/components/talent/global-criteria-panel";
 import { ApplicationTable } from "@/components/pipeline/application-table";
 import type { Application } from "@/components/pipeline/application-table";
+import { NlSearchBar } from "@/components/talent/nl-search-bar";
 
 export default function TalentBankPage() {
   const { user } = useUser();
@@ -24,6 +25,8 @@ export default function TalentBankPage() {
   const [showPoolManager, setShowPoolManager] = useState(false);
   const [showCriteriaPanel, setShowCriteriaPanel] = useState(false);
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [nlResults, setNlResults] = useState<any[] | null>(null);
+  const [nlIntent, setNlIntent] = useState("");
 
   const handleSearchChange = (query: string) => {
     setSearchQuery(query);
@@ -165,6 +168,14 @@ export default function TalentBankPage() {
           schoolId={schoolId}
           onClose={() => setShowCriteriaPanel(false)}
         />
+      )}
+
+      <NlSearchBar onResults={(c, intent) => { setNlResults(c); setNlIntent(intent); }} />
+      {nlResults && (
+        <div className="mb-4 text-sm text-gray-600">
+          {nlIntent ? `Showing results for: ${nlIntent}` : null} ({nlResults.length} candidates)
+          <button className="ml-2 text-blue-600 underline" onClick={() => setNlResults(null)}>Clear</button>
+        </div>
       )}
 
       <TalentControls

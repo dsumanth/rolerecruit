@@ -10,6 +10,7 @@ import { Tabs } from "@/components/ui/tabs";
 import { Select } from "@/components/ui/select";
 import { MessageComposer } from "@/components/outreach/message-composer";
 import { DemoScheduler } from "@/components/outreach/demo-scheduler";
+import { PoolOriginBadge } from "@/components/shared/pool-origin-badge";
 
 interface TabItem {
   value: string;
@@ -78,9 +79,12 @@ export function ApplicationDrawer({ app, schoolName, onClose }: Props) {
       <div className="fixed inset-y-0 right-0 w-96 bg-surface backdrop-blur-20 border-l border-chrome z-50 overflow-y-auto shadow-elev-3">
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-title-m text-ink">
-              {candidateName}
-            </h2>
+            <div>
+              <h2 className="text-title-m text-ink">
+                {candidateName}
+              </h2>
+              <PoolOriginBadge source={(app as any).source} poolName={undefined} />
+            </div>
             <Button variant="ghost" size="sm" onClick={onClose}>
               <span className="text-xl leading-none">&times;</span>
             </Button>
