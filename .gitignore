@@ -4,3 +4,4 @@ node_modules
 .env*.local
 convex/_generated
 .superpowers
+.claude

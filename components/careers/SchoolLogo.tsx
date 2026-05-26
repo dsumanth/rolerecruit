@@ -8,35 +8,33 @@ interface SchoolLogoProps {
   className?: string;
 }
 
-const SIZE_CLASSES: Record<NonNullable<SchoolLogoProps["size"]>, { box: string; text: string; img: string }> = {
-  chip: { box: "h-7 w-7",   text: "text-[14px]", img: "p-0.5" },
-  hero: { box: "h-16 w-16", text: "text-[24px]", img: "p-2" },
+const FALLBACK_CLASSES: Record<NonNullable<SchoolLogoProps["size"]>, { box: string; text: string }> = {
+  chip: { box: "h-7 w-7",   text: "text-[14px]" },
+  hero: { box: "h-16 w-16", text: "text-[24px]" },
+};
+
+const LOGO_CLASSES: Record<NonNullable<SchoolLogoProps["size"]>, string> = {
+  chip: "h-7 max-w-[160px]",
+  hero: "h-20 max-w-[360px]",
 };
 
 export function SchoolLogo({ name, logoUrl, size = "chip", className }: SchoolLogoProps) {
-  const sz = SIZE_CLASSES[size];
-
   if (logoUrl) {
     return (
-      <div className={cn(
-        "rounded-sm bg-surface border border-hairline overflow-hidden flex items-center justify-center",
-        sz.box,
-        className,
-      )}>
-        <img
-          src={logoUrl}
-          alt={`${name} logo`}
-          className={cn("h-full w-full object-contain", sz.img)}
-        />
-      </div>
+      <img
+        src={logoUrl}
+        alt={`${name} logo`}
+        className={cn("w-auto object-contain", LOGO_CLASSES[size], className)}
+      />
     );
   }
 
+  const fb = FALLBACK_CLASSES[size];
   return (
     <div className={cn(
       "rounded-sm bg-gradient-to-br from-[#1d1d1f] to-[#4a4a52] text-white font-bold flex items-center justify-center tracking-tight",
-      sz.box,
-      sz.text,
+      fb.box,
+      fb.text,
       className,
     )}>
       {nameInitial(name, "·")}
