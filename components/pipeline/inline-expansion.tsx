@@ -265,14 +265,14 @@ function EvaluateTabContent({ applicationId }: { applicationId: string }) {
       </div>
 
       {result === "success" && (
-        <div className="px-3 py-2 rounded-apple bg-green-50 text-sm text-success">
+        <div className="px-3 py-2 rounded-md bg-green-50 text-sm text-success">
           Evaluation request created. Share this link:
           <br />
           <code className="text-xs text-ink break-all">{feedbackUrl}</code>
         </div>
       )}
       {result === "error" && (
-        <div className="px-3 py-2 rounded-apple bg-red-50 text-sm text-danger">
+        <div className="px-3 py-2 rounded-md bg-red-50 text-sm text-danger">
           Failed to create evaluation request.
         </div>
       )}

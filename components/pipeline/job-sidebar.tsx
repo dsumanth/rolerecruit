@@ -52,7 +52,7 @@ export function JobSidebar({
         )}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="text-ink-tertiary hover:text-ink transition-colors duration-normal p-1 rounded-apple hover:bg-surface-canvas"
+          className="text-ink-tertiary hover:text-ink transition-colors duration-normal p-1 rounded-md hover:bg-surface-canvas"
         >
           {collapsed ? (
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
