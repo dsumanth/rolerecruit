@@ -38,11 +38,31 @@ RAW CHUNKS: Also split the resume into sections labeled header|experience|pedago
 
 CANDIDATE SUMMARY: A 1-paragraph (~80 words) job-agnostic third-person description of the candidate. No bullets. No subjective claims.
 
-OUTPUT — return ONLY a JSON object (no markdown, no explanation) matching the same schema as before, with the additional promoted facets appearing as top-level keys in parsedFacets when applicable.`;
+RELATIONSHIPS (Phase 3a — drives the knowledge graph): Emit a "relationships" object with this exact shape:
+
+{
+  "previousSchools": [
+    { "name": "DPS R.K. Puram", "role": "PGT Physics", "subjects": ["Physics"], "yearStart": 2018, "yearEnd": 2022, "endReason": null }
+  ],
+  "qualifications": [
+    { "degree": "B.Ed", "university": "Delhi University", "yearStart": 2017, "yearEnd": 2019 }
+  ],
+  "certifications": ["CTET", "NET"],
+  "referredBy": null,
+  "region": "Delhi NCR"
+}
+
+Rules for relationships:
+- previousSchools: every prior employer the resume mentions. Use the exact school name from the resume (do not abbreviate "DPS" to "Delhi Public School" or vice versa — use what's printed).
+- qualifications: every degree. "university" is the awarding institution. "yearEnd" is critical — drives cohort grouping.
+- certifications: array of strings (CTET, State TET, NET, UGC-NET, etc.).
+- referredBy: name of the referrer if explicitly mentioned, else null.
+- region: normalized form — one of "Delhi NCR", "Mumbai", "Bangalore", "Hyderabad", "Pune", "Chennai", "Kolkata", "Other".
+
+OUTPUT — return ONLY a JSON object (no markdown, no explanation) with these top-level keys: name, email, phone, location, qualifications, certifications, boardExperience, subjects, yearsExperience, currentSchool, parsedFacets, candidateSummary, rawChunks, relationships.`;
 }
 
 // Preserved for compatibility — same as buildFacetExtractionPrompt([])
-// DO NOT REMOVE until all callers migrate to buildFacetExtractionPrompt
 export const FACET_EXTRACTION_SYSTEM = buildFacetExtractionPrompt([]);
 
 export const EMPTY_PARSED_FACETS = {

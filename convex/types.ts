@@ -43,6 +43,7 @@ export interface ParsedProfile {
   parsedFacets: ParsedFacets;
   candidateSummary: string;
   rawChunks: RawChunk[];
+  relationships: RelationshipsHint;
 }
 
 export interface FacetEmbeddings {
@@ -82,4 +83,61 @@ export const DEFAULT_HYBRID_WEIGHTS: HybridWeights = {
     achievements: 0.2,
     leadership: 0.2,
   },
+};
+
+// ============================================================================
+// Phase 3a — Knowledge Graph types
+// ============================================================================
+
+export type GraphNodeType =
+  | "Candidate"
+  | "School"
+  | "University"
+  | "Subject"
+  | "Board"
+  | "Certification"
+  | "Qualification"
+  | "Region"
+  | "Cohort";
+
+export type GraphEdgeType =
+  | "TAUGHT_AT"
+  | "HOLDS"
+  | "FROM"
+  | "CERTIFIED_IN"
+  | "SPECIALIZES_IN"
+  | "REFERRED_BY"
+  | "TEACHES"
+  | "BELONGS_TO"
+  | "LOCATED_IN"
+  | "APPLIED_TO";
+
+export interface PreviousSchoolHint {
+  name: string;
+  role?: string;
+  subjects?: string[];
+  yearStart?: number;
+  yearEnd?: number;
+  endReason?: string;
+}
+
+export interface QualificationHint {
+  degree: string;
+  university?: string;
+  yearStart?: number;
+  yearEnd?: number;
+}
+
+export interface RelationshipsHint {
+  previousSchools: PreviousSchoolHint[];
+  qualifications: QualificationHint[];
+  certifications: string[];
+  referredBy?: string;
+  region?: string;
+}
+
+export const EMPTY_RELATIONSHIPS: RelationshipsHint = {
+  previousSchools: [],
+  qualifications: [],
+  certifications: [],
 };
