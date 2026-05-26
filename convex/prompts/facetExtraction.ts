@@ -25,7 +25,7 @@ FACET VOCABULARY (use these when applicable; coin new ones for novelty):
 
 EXTRAS BAG: Anything that doesn't fit a typed facet but seems important (e.g., "AI_curriculum_design", "STEM_lab_setup") goes into "extras" — an open-vocabulary record. Use snake_case keys. The system tracks frequency and graduates popular extras to typed facets later — so be liberal.
 
-RAW CHUNKS: Also split the resume into sections labeled overall|experience|pedagogy|achievements|leadership|other. These are the source-of-truth for evidence validation and future re-extraction.
+RAW CHUNKS: Also split the resume into sections labeled header|experience|pedagogy|achievements|leadership|other. These are the source-of-truth for evidence validation and future re-extraction. "header" is for top-of-resume identity/qualifications; never use "overall".
 
 CANDIDATE SUMMARY: A 1-paragraph (~80 words) job-agnostic third-person description of the candidate. No bullets. No subjective claims.
 
