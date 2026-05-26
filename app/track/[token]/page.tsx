@@ -4,9 +4,18 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useParams } from "next/navigation";
 import { ApplicationStatus } from "@/components/tracking/ApplicationStatus";
+import { ConvexClientProvider } from "@/components/ConvexClientProvider";
 import { Card } from "@/components/ui";
 
 export default function TrackPage() {
+  return (
+    <ConvexClientProvider>
+      <TrackPageInner />
+    </ConvexClientProvider>
+  );
+}
+
+function TrackPageInner() {
   const { token } = useParams<{ token: string }>();
   const app = useQuery(api.tracking.getByToken, token ? { token } : "skip");
 
