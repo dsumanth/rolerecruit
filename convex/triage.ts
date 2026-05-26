@@ -224,6 +224,32 @@ export const queueForSchool = query({
   },
 });
 
+/**
+ * Map a triage outcome to its canonical pipeline stage.
+ *
+ *   auto_shortlisted → screened (move it forward in the funnel)
+ *   auto_rejected    → rejected (terminal)
+ *   human_review     → null      (stay where you are; this is the inbox state)
+ *   cross_role_suggested → null  (stay; recruiter still needs to decide)
+ *
+ * We only advance/revert the pipeline stage from `sourced`. Once the recruiter
+ * (or a manual pipeline move) takes the candidate past `sourced`, the triage
+ * decision is just history — overriding it later doesn't yank the candidate
+ * out of demo_scheduled or wherever they got to.
+ */
+function stageForOutcome(outcome: string): string | null {
+  switch (outcome) {
+    case "auto_shortlisted":
+      return "screened";
+    case "auto_rejected":
+      return "rejected";
+    case "human_review":
+    case "cross_role_suggested":
+    default:
+      return null;
+  }
+}
+
 export const approveDraft = mutation({
   args: { decisionId: v.id("triageDecisions"), overriddenBy: v.string() },
   handler: async (ctx, args) => {
@@ -236,6 +262,14 @@ export const approveDraft = mutation({
         status: "scheduled",
         scheduledSendAt: Date.now() + 5000,
       });
+    }
+    // Approving the agent's decision is also a signal to advance the pipeline
+    // stage. Only do it if we're still at the starting stage — don't trample
+    // manual recruiter moves.
+    const app = await ctx.db.get(decision.applicationId);
+    if (app && app.stage === "sourced") {
+      const next = stageForOutcome(decision.outcome);
+      if (next) await ctx.db.patch(decision.applicationId, { stage: next });
     }
   },
 });
@@ -255,6 +289,7 @@ export const overrideOutcome = mutation({
   handler: async (ctx, args) => {
     const decision = await ctx.db.get(args.decisionId);
     if (!decision) return;
+    if (decision.outcome === args.toOutcome) return; // no-op
     await ctx.db.patch(args.decisionId, {
       humanOverride: {
         overriddenAt: Date.now(),
@@ -265,5 +300,14 @@ export const overrideOutcome = mutation({
       },
     });
     await ctx.db.patch(decision.applicationId, { triageOutcome: args.toOutcome });
+
+    // Sync the pipeline stage to the new outcome — but only from sourced, to
+    // avoid yanking the candidate back if the recruiter already moved them
+    // forward in the Pipeline UI.
+    const app = await ctx.db.get(decision.applicationId);
+    if (app && app.stage === "sourced") {
+      const next = stageForOutcome(args.toOutcome);
+      if (next) await ctx.db.patch(decision.applicationId, { stage: next });
+    }
   },
 });
