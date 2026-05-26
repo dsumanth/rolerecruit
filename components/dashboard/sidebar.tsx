@@ -20,6 +20,7 @@ const PRIMARY_NAV: NavLinkItem[] = [
   { href: "/dashboard",          label: "Dashboard",   icon: "Home" },
   { href: "/dashboard/jobs",     label: "Jobs",        icon: "Briefcase" },
   { href: "/dashboard/pipeline", label: "Pipeline",    icon: "Kanban" },
+  { href: "/dashboard/triage",   label: "Triage",      icon: "ClipboardList" },
   { href: "/dashboard/talent",   label: "Talent Bank", icon: "Users" },
 ];
 
