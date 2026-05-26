@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { JobCard } from "./JobCard";
+import { Input, EmptyState } from "@/components/ui";
 
 interface Job {
   _id: string;
@@ -27,18 +28,26 @@ export function JobListings({ jobs, slug }: Props) {
   );
 
   return (
-    <div className="space-y-4">
-      <input
+    <div className="space-y-5">
+      <Input
         type="text"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="Search by title or subject..."
-        className="w-full max-w-md px-4 py-2.5 rounded-apple bg-surface border border-hairline text-sm text-ink placeholder:text-ink-tertiary focus:outline-none focus:ring-2 focus:ring-accent/20"
+        iconLeft="Search"
+        className="max-w-md"
       />
       {filtered.length === 0 ? (
-        <p className="text-ink-secondary text-sm py-8 text-center">No open positions {search ? "matching your search" : "at this time"}.</p>
+        jobs.length === 0 ? (
+          <EmptyState
+            title="No open positions yet"
+            description="Check back soon — new roles are posted regularly."
+          />
+        ) : (
+          <p className="text-body-s text-ink-secondary py-8 text-center">No positions matching your search.</p>
+        )
       ) : (
-        <div className="grid gap-3">
+        <div className="grid gap-3 md:grid-cols-2">
           {filtered.map((job) => (
             <JobCard key={job._id} jobId={job._id} slug={slug} {...job} />
           ))}
