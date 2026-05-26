@@ -129,6 +129,33 @@ export default function TalentBankPage() {
     },
   }));
 
+  const nlTableApplications: Application[] | null = nlResults
+    ? nlResults.map((c: any) => ({
+        _id: c.applicationId ?? c._id,
+        candidateId: c._id,
+        stage: c.stage,
+        aiMatchScore: c.aiMatchScore,
+        globalScore: c.globalScore,
+        poolNames: c.poolNames,
+        candidate: {
+          _id: c._id,
+          name: c.name,
+          phone: c.phone,
+          email: c.email,
+          location: c.location,
+          qualifications: c.qualifications,
+          certifications: c.certifications,
+          boardExperience: c.boardExperience,
+          subjects: c.subjects,
+          yearsExperience: c.yearsExperience,
+          currentSchool: c.currentSchool,
+          resumeUrl: c.resumeUrl,
+        },
+      }))
+    : null;
+
+  const displayApplications = nlTableApplications ?? tableApplications;
+
   const isLoading = candidates === undefined;
   const total = candidates.length;
 
@@ -201,7 +228,7 @@ export default function TalentBankPage() {
         <Card padding="lg" className="mt-4 text-center">
           <p className="text-sm text-ink-secondary">Loading candidates...</p>
         </Card>
-      ) : tableApplications.length === 0 ? (
+      ) : displayApplications.length === 0 ? (
         <div className="mt-4">
           <EmptyState
             icon={
@@ -211,16 +238,18 @@ export default function TalentBankPage() {
             }
             title="No candidates found"
             description={
-              searchQuery || selectedPoolId !== "all" || selectedStages.length > 0
-                ? "Try adjusting your search or filters."
-                : "Candidates will appear here when you source them from jobs, email ingestion, or the careers portal."
+              nlResults
+                ? "No candidates matched your search. Try different keywords."
+                : searchQuery || selectedPoolId !== "all" || selectedStages.length > 0
+                  ? "Try adjusting your search or filters."
+                  : "Candidates will appear here when you source them from jobs, email ingestion, or the careers portal."
             }
           />
         </div>
       ) : (
         <Card padding="none" elevation={1} className="mt-4 overflow-hidden">
           <ApplicationTable
-            applications={tableApplications}
+            applications={displayApplications}
             sortBy={sortBy}
             onSortChange={setSortBy}
             showScoreAs="global"
