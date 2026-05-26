@@ -6,3 +6,8 @@ convex/_generated
 .superpowers
 .claude
 tsconfig.tsbuildinfo
+# Playwright E2E — generated auth state and seed fixtures
+tests/e2e/.auth/
+tests/e2e/.fixtures/
+playwright-report/
+test-results/
