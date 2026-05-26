@@ -1,8 +1,8 @@
 import OpenAI from "openai";
 import { action } from "./_generated/server";
 import { v } from "convex/values";
-import { internal } from "./_generated/api";
-import { FACET_EXTRACTION_SYSTEM, EMPTY_PARSED_FACETS } from "./prompts/facetExtraction";
+import { api, internal } from "./_generated/api";
+import { buildFacetExtractionPrompt, EMPTY_PARSED_FACETS } from "./prompts/facetExtraction";
 import type { ParsedProfile } from "./types";
 
 const INDIAN_EDUCATION_TAXONOMY = `
@@ -173,16 +173,26 @@ function emptyProfile(): ParsedProfile {
 
 export const parseProfileFromText = action({
   args: { text: v.string() },
-  handler: async (_ctx, args): Promise<ParsedProfile> => {
+  handler: async (ctx, args): Promise<ParsedProfile> => {
     const client = getClient();
     if (!client) return emptyProfile();
+
+    // Phase 2: read promoted keys at runtime so the LLM extracts them as typed
+    let promotedKeys: string[] = [];
+    try {
+      promotedKeys = await ctx.runQuery(api.facetPromotion.listPromotedKeys, {});
+    } catch {
+      promotedKeys = [];
+    }
+
+    const systemPrompt = buildFacetExtractionPrompt(promotedKeys);
 
     const response = await client.chat.completions.create({
       model: "deepseek-v4-flash",
       max_tokens: 4096,
       temperature: 0,
       messages: [
-        { role: "system", content: FACET_EXTRACTION_SYSTEM },
+        { role: "system", content: systemPrompt },
         { role: "user", content: args.text.substring(0, 12000) },
       ],
     });
@@ -192,10 +202,22 @@ export const parseProfileFromText = action({
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) throw new Error("No JSON");
       const parsed = JSON.parse(jsonMatch[0]);
+
+      // Merge LLM-emitted top-level promoted keys into parsedFacets.extras under __promoted__<key>
+      const parsedFacets = { ...EMPTY_PARSED_FACETS, ...(parsed.parsedFacets ?? {}) };
+      const extras = { ...((parsedFacets as any).extras ?? {}) };
+      for (const k of promotedKeys) {
+        if (parsed.parsedFacets?.[k]) {
+          extras[`__promoted__${k}`] = parsed.parsedFacets[k];
+          delete (parsedFacets as any)[k]; // remove from top-level — only typed/extras shape allowed
+        }
+      }
+      (parsedFacets as any).extras = extras;
+
       return {
         ...emptyProfile(),
         ...parsed,
-        parsedFacets: { ...EMPTY_PARSED_FACETS, ...(parsed.parsedFacets ?? {}) },
+        parsedFacets: parsedFacets as any,
         rawChunks: Array.isArray(parsed.rawChunks) ? parsed.rawChunks : [],
         candidateSummary: typeof parsed.candidateSummary === "string" ? parsed.candidateSummary : "",
       };
