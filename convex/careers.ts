@@ -5,10 +5,15 @@ import { internal } from "./_generated/api";
 export const getSchoolBySlug = query({
   args: { slug: v.string() },
   handler: async (ctx, args) => {
-    return await ctx.db
+    const school = await ctx.db
       .query("schools")
       .withIndex("by_slug", (q) => q.eq("slug", args.slug))
       .first();
+    if (!school) return null;
+    const logoUrl = school.logoStorageId
+      ? await ctx.storage.getUrl(school.logoStorageId)
+      : null;
+    return { ...school, logoUrl };
   },
 });
 

@@ -86,7 +86,12 @@ export const create = mutation({
 export const get = query({
   args: { schoolId: v.id("schools") },
   handler: async (ctx, args) => {
-    return await ctx.db.get(args.schoolId);
+    const school = await ctx.db.get(args.schoolId);
+    if (!school) return null;
+    const logoUrl = school.logoStorageId
+      ? await ctx.storage.getUrl(school.logoStorageId)
+      : null;
+    return { ...school, logoUrl };
   },
 });
 
@@ -94,6 +99,40 @@ export const getInternal = internalQuery({
   args: { schoolId: v.id("schools") },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.schoolId);
+  },
+});
+
+export const generateLogoUploadUrl = mutation({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.storage.generateUploadUrl();
+  },
+});
+
+export const setLogo = mutation({
+  args: {
+    schoolId: v.id("schools"),
+    storageId: v.id("_storage"),
+  },
+  handler: async (ctx, args) => {
+    const school = await ctx.db.get(args.schoolId);
+    if (!school) throw new Error("School not found");
+    if (school.logoStorageId) {
+      await ctx.storage.delete(school.logoStorageId);
+    }
+    await ctx.db.patch(args.schoolId, { logoStorageId: args.storageId });
+  },
+});
+
+export const clearLogo = mutation({
+  args: { schoolId: v.id("schools") },
+  handler: async (ctx, args) => {
+    const school = await ctx.db.get(args.schoolId);
+    if (!school) throw new Error("School not found");
+    if (school.logoStorageId) {
+      await ctx.storage.delete(school.logoStorageId);
+    }
+    await ctx.db.patch(args.schoolId, { logoStorageId: undefined });
   },
 });
 

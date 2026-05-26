@@ -17,6 +17,7 @@ export default defineSchema({
     planTier: v.union(v.literal("free"), v.literal("pro"), v.literal("trust")),
     slug: v.optional(v.string()),
     customDomain: v.optional(v.string()),
+    logoStorageId: v.optional(v.id("_storage")),
     whatsappEnabled: v.optional(v.boolean()),
     googleCalendarConnected: v.optional(v.boolean()),
     messageChannelPrefs: v.optional(v.object({
