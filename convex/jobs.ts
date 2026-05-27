@@ -469,7 +469,7 @@ export const bulkSetStatus = mutation({
       const j = await ctx.db.get(id as any) as any;
       if (!j) continue;
       previousStatuses.push({ id, previousStatus: j.status });
-      await ctx.db.patch(id as any, { status: a.status });
+      await ctx.db.patch(id as any, { status: a.status as any });
     }
     return { batchId, previousStatuses };
   },
