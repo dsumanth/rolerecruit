@@ -187,6 +187,8 @@ export default defineSchema({
       leadership: v.array(v.float64()),
     })),
     roleEmbeddingVersion: v.optional(v.string()),
+    pendingDeleteAt: v.optional(v.number()),
+    pendingDeleteBatchId: v.optional(v.string()),
   })
     .index("by_schoolId", ["schoolId"])
     .index("by_status", ["status"]),
@@ -287,6 +289,8 @@ export default defineSchema({
       v.literal("failed"),
     )),
     parseError: v.optional(v.string()),
+    pendingDeleteAt: v.optional(v.number()),
+    pendingDeleteBatchId: v.optional(v.string()),
   })
     .index("by_origin", ["origin"])
     .index("by_parsedVersion", ["parsedVersion"])
@@ -352,6 +356,8 @@ export default defineSchema({
     )),
     triageDecisionId: v.optional(v.id("triageDecisions")),
     matchReasons: v.optional(v.array(v.string())),
+    pendingDeleteAt: v.optional(v.number()),
+    pendingDeleteBatchId: v.optional(v.string()),
   })
     .index("by_jobPostingId", ["jobPostingId"])
     .index("by_candidateId", ["candidateId"])
