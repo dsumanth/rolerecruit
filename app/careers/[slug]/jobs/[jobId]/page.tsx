@@ -4,8 +4,6 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useParams } from "next/navigation";
 import { ApplicationForm } from "@/components/careers/ApplicationForm";
-import { MarketingHero } from "@/components/careers/MarketingHero";
-import { SchoolLogo } from "@/components/careers/SchoolLogo";
 import { Card, Badge, Icon } from "@/components/ui";
 import Link from "next/link";
 
@@ -15,7 +13,7 @@ export default function JobDetailPage() {
   const job = useQuery(api.careers.getJob, jobId ? { jobId: jobId as any } : "skip");
 
   if (school === undefined || job === undefined) {
-    return <div className="max-w-4xl mx-auto px-6 py-20 text-center"><p className="text-body-s text-ink-secondary">Loading...</p></div>;
+    return <div className="max-w-4xl mx-auto px-6 py-20 text-center"><p className="text-body-s text-ink-secondary">Loading…</p></div>;
   }
   if (!school || !job) {
     return <div className="max-w-4xl mx-auto px-6 py-20 text-center"><p className="text-body-s text-ink-secondary">Not found</p></div>;
@@ -23,21 +21,20 @@ export default function JobDetailPage() {
 
   return (
     <div>
-      <MarketingHero
-        logo={<SchoolLogo name={school.name} logoUrl={school.logoUrl} size="hero" />}
-        size="compact"
-        eyebrow={school.name}
-        title={job.title}
-        body={[job.subject, job.level, job.board].filter(Boolean).join(" · ")}
-      />
-
-      <div className="max-w-5xl mx-auto px-6 pb-20">
+      <section className="max-w-5xl mx-auto px-6 pt-14 pb-6">
         <Link
           href={`/careers/${slug}`}
           className="inline-flex items-center gap-1 text-body-s text-accent hover:underline mb-6"
         >
           <Icon name="ChevronLeft" size={14} /> All positions
         </Link>
+        <p className="text-micro text-ink-tertiary mb-2.5">
+          {[job.subject, job.level, job.board].filter(Boolean).join(" · ")}
+        </p>
+        <h1 className="text-display-m text-ink tracking-tight">{job.title}</h1>
+      </section>
+
+      <div className="max-w-5xl mx-auto px-6 pb-20">
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-10 items-start">
           <main className="min-w-0">

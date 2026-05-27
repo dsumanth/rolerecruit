@@ -16,6 +16,7 @@
     "@clerk/nextjs": "^6.0.0",
     "@hello-pangea/dnd": "^17.0.0",
     "@tanstack/react-virtual": "^3.13.25",
+    "@vercel/edge-config": "^1.4.3",
     "convex": "^1.17.0",
     "convex-helpers": "^0.1.118",
     "lucide-react": "^1.16.0",

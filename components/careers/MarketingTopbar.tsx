@@ -20,10 +20,10 @@ export function MarketingTopbar({ schoolName, schoolSlug, logoUrl, className }: 
         <span className="text-title-m text-ink">{schoolName}</span>
       </Link>
       <nav className="flex items-center gap-4">
-        <Link href={`/careers/${schoolSlug}`} className="text-body-s font-medium text-ink-secondary hover:text-ink transition-colors">
+        <Link href={`/careers/${schoolSlug}#about`} className="text-body-s font-medium text-ink-secondary hover:text-ink transition-colors">
           About
         </Link>
-        <Link href={`/careers/${schoolSlug}/jobs`} className="text-body-s font-medium text-ink-secondary hover:text-ink transition-colors">
+        <Link href={`/careers/${schoolSlug}#open-positions`} className="text-body-s font-medium text-ink-secondary hover:text-ink transition-colors">
           Open roles
         </Link>
         <Link

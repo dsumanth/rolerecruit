@@ -13,7 +13,29 @@ export const getSchoolBySlug = query({
     const logoUrl = school.logoStorageId
       ? await ctx.storage.getUrl(school.logoStorageId)
       : null;
-    return { ...school, logoUrl };
+    const heroImageUrl = school.heroImageStorageId
+      ? await ctx.storage.getUrl(school.heroImageStorageId)
+      : null;
+    return { ...school, logoUrl, heroImageUrl };
+  },
+});
+
+export const getSchoolByCustomDomain = query({
+  args: { domain: v.string() },
+  handler: async (ctx, args) => {
+    const school = await ctx.db
+      .query("schools")
+      .withIndex("by_customDomain", (q) => q.eq("customDomain", args.domain))
+      .first();
+    if (!school) return null;
+    if (school.customDomainStatus !== "verified") return null;
+    const logoUrl = school.logoStorageId
+      ? await ctx.storage.getUrl(school.logoStorageId)
+      : null;
+    const heroImageUrl = school.heroImageStorageId
+      ? await ctx.storage.getUrl(school.heroImageStorageId)
+      : null;
+    return { ...school, logoUrl, heroImageUrl };
   },
 });
 

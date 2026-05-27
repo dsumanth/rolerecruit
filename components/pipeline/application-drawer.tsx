@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
@@ -66,11 +66,51 @@ const DRAWER_TABS: TabItem[] = [
   { value: "evaluate", label: "Evaluate" },
 ];
 
-export function ApplicationDrawer({ app, schoolName, onClose }: Props) {
+type Phase = "stable" | "exiting" | "pre-enter" | "entering";
+
+export function ApplicationDrawer({ app: incomingApp, schoolName, onClose }: Props) {
   const [tab, setTab] = useState("info");
-  const candidate = useQuery(api.candidates.get, {
+  const [displayedApp, setDisplayedApp] = useState(incomingApp);
+  const [phase, setPhase] = useState<Phase>("stable");
+  const displayedIdRef = useRef<string>(incomingApp._id);
+
+  useEffect(() => {
+    if (incomingApp._id === displayedIdRef.current) return;
+
+    let cancelled = false;
+    setPhase("exiting");
+
+    const exitTimer = setTimeout(() => {
+      if (cancelled) return;
+      setDisplayedApp(incomingApp);
+      displayedIdRef.current = incomingApp._id;
+      setPhase("pre-enter");
+
+      requestAnimationFrame(() => {
+        if (cancelled) return;
+        requestAnimationFrame(() => {
+          if (cancelled) return;
+          setPhase("entering");
+
+          setTimeout(() => {
+            if (cancelled) return;
+            setPhase("stable");
+          }, 220);
+        });
+      });
+    }, 200);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(exitTimer);
+    };
+  }, [incomingApp]);
+
+  const app = displayedApp;
+  const candidateFromQuery = useQuery(api.candidates.get, {
     candidateId: app.candidateId as any,
   });
+  const candidate = candidateFromQuery ?? (app.candidate as Candidate | null | undefined);
   const triageDecision = useQuery(
     api.triage.getByApplicationId,
     app._id ? { applicationId: app._id as any } : "skip",
@@ -83,11 +123,19 @@ export function ApplicationDrawer({ app, schoolName, onClose }: Props) {
   const candidateName = candidate?.name ?? "Candidate";
   const candidatePhone = candidate?.phone ?? "";
 
+  const phaseClass =
+    phase === "exiting"
+      ? "transition-all duration-200 ease-out -translate-x-6 opacity-0"
+      : phase === "pre-enter"
+        ? "translate-x-6 opacity-0"
+        : phase === "entering"
+          ? "transition-all duration-200 ease-out translate-x-0 opacity-100"
+          : "";
+
   return (
     <>
-      <div className="fixed inset-0 bg-black/20 z-40" onClick={onClose} />
       <div className="fixed inset-y-0 right-0 w-96 bg-surface backdrop-blur-20 border-l border-chrome z-50 overflow-y-auto shadow-elev-3">
-        <div className="p-6">
+        <div className={cn("p-6", phaseClass)}>
           <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="text-title-m text-ink">

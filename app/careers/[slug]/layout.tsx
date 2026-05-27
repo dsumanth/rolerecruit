@@ -1,6 +1,7 @@
 import { fetchQuery } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
 import { MarketingTopbar } from "@/components/careers/MarketingTopbar";
+import { MarketingPageFooter } from "@/components/careers/MarketingPageFooter";
 
 export default async function SchoolLayout({
   children,
@@ -19,6 +20,7 @@ export default async function SchoolLayout({
     <>
       <MarketingTopbar schoolName={school.name} schoolSlug={params.slug} logoUrl={school.logoUrl} />
       {children}
+      <MarketingPageFooter schoolName={school.name} board={school.board} city={school.city} />
     </>
   );
 }
