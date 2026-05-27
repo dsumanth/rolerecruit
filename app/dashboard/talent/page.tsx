@@ -22,6 +22,7 @@ import { ApplicationTable } from "@/components/pipeline/application-table";
 import { ApplicationDrawer } from "@/components/pipeline/application-drawer";
 import type { Application } from "@/components/pipeline/application-table";
 import { NlSearchBar } from "@/components/talent/nl-search-bar";
+import { rowsToCsv, downloadCsv } from "@/lib/csv-export";
 
 export default function TalentBankPage() {
   const { data: session } = authClient.useSession();
@@ -335,7 +336,22 @@ export default function TalentBankPage() {
           {sel.mode.kind === "ids" && (
             <button
               className="bg-surface text-ink px-3 py-1.5 rounded text-body-s border border-hairline"
-              onClick={() => { /* CSV export in Phase 12 */ }}
+              onClick={() => {
+                const selectedRows = sel.mode.kind === "ids"
+                  ? results.filter((r: any) => sel.isSelected(r.applicationId))
+                  : [];
+                if (selectedRows.length === 0) return;
+                const csv = rowsToCsv(selectedRows, [
+                  { key: "name", label: "Name" },
+                  { key: "email", label: "Email" },
+                  { key: "phone", label: "Phone" },
+                  { key: "yearsExperience", label: "Years Experience" },
+                  { key: "subjects", label: "Subjects" },
+                  { key: "createdAt", label: "Created At" },
+                ]);
+                const today = new Date().toISOString().slice(0, 10);
+                downloadCsv(`talent-${today}.csv`, csv);
+              }}
             >
               Export CSV
             </button>
