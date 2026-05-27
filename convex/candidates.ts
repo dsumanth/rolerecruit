@@ -528,10 +528,52 @@ export const undoBatchDelete = mutation({
   },
 });
 
-// Stub — full cascade implemented in Task 6.2 below.
+// Shared cascade helper (also used by applications.finalizeBatchDelete in Task 7.1).
+export async function deleteApplicationChildren(ctx: any, applicationId: any) {
+  for (const table of ["evaluations", "outreachMessages", "calendarEvents", "triageDecisions", "bookingTokens"] as const) {
+    const rows = await ctx.db
+      .query(table)
+      .withIndex("by_applicationId", (q: any) => q.eq("applicationId", applicationId))
+      .collect();
+    for (const r of rows) await ctx.db.delete(r._id);
+  }
+}
+
 export const finalizeBatchDelete = internalMutation({
   args: { batchId: v.string() },
-  handler: async (_ctx, _args) => {
-    // Implemented in Task 6.2
+  handler: async (ctx, args) => {
+    const cands = await ctx.db
+      .query("candidates")
+      .filter((q) => q.eq(q.field("pendingDeleteBatchId"), args.batchId))
+      .collect();
+
+    for (const cand of cands) {
+      if (cand.pendingDeleteAt == null) continue;
+
+      // 1. Walk applications
+      const apps = await ctx.db
+        .query("applications")
+        .withIndex("by_candidateId", (q) => q.eq("candidateId", cand._id))
+        .collect();
+      for (const app of apps) {
+        await deleteApplicationChildren(ctx, app._id);
+        await ctx.db.delete(app._id);
+      }
+
+      // 2. candidatePools (by_candidateId)
+      const pools = await ctx.db
+        .query("candidatePools")
+        .withIndex("by_candidateId", (q) => q.eq("candidateId", cand._id))
+        .collect();
+      for (const p of pools) await ctx.db.delete(p._id);
+
+      // 3. Resume file (idempotent)
+      if (cand.resumeStorageId) {
+        try { await ctx.storage.delete(cand.resumeStorageId as any); } catch {}
+      }
+
+      // 4. The candidate itself
+      await ctx.db.delete(cand._id);
+    }
   },
 });

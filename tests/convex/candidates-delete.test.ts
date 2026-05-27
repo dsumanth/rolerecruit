@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { convexTest } from "convex-test";
 import schema from "../../convex/schema";
 
@@ -65,5 +65,65 @@ describe("candidates.removeMany", () => {
     const r = await t.mutation("candidates:remove", { candidateId: c });
     expect(r.count).toBe(1);
     expect(typeof r.batchId).toBe("string");
+  });
+
+  it("finalize cascades: applications, evaluations, outreach, calendar, triage, booking, pools, resume, candidate", async () => {
+    const t = convexTest(schema, modules);
+    const schoolId = await t.mutation("schools:create", {
+      name: "S", board: "CBSE", city: "M", state: "MH",
+    });
+
+    const candidateId = await t.mutation("candidates:create", {
+      name: "A", email: "a@x.com", qualifications: [], subjects: [],
+    });
+    const appId = await t.mutation("applications:create", {
+      candidateId, schoolId, skipTriage: true,
+    });
+
+    await t.run(async (ctx: any) => {
+      await ctx.db.insert("evaluations", {
+        applicationId: appId, evaluatorUserId: "u1", evaluatorRole: "principal",
+        token: "tok", submitted: false,
+      });
+      // candidatePools entry — use any pool id since we're just testing the cascade walks the index
+      const poolId = await ctx.db.insert("pools", {
+        schoolId, name: "P", createdBy: "ai", tags: [], createdAt: Date.now(),
+      });
+      await ctx.db.insert("candidatePools", {
+        candidateId, poolId, confidence: 0.5, createdAt: Date.now(),
+      });
+    });
+
+    vi.useFakeTimers();
+    await t.mutation("candidates:removeMany", { ids: [candidateId] });
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    vi.useRealTimers();
+
+    const candAfter = await t.run(async (ctx: any) => ctx.db.get(candidateId));
+    expect(candAfter).toBeNull();
+    const appAfter = await t.run(async (ctx: any) => ctx.db.get(appId));
+    expect(appAfter).toBeNull();
+    const evals = await t.run(async (ctx: any) =>
+      ctx.db.query("evaluations").withIndex("by_applicationId", (q: any) => q.eq("applicationId", appId)).collect()
+    );
+    expect(evals.length).toBe(0);
+    const pools = await t.run(async (ctx: any) =>
+      ctx.db.query("candidatePools").withIndex("by_candidateId", (q: any) => q.eq("candidateId", candidateId)).collect()
+    );
+    expect(pools.length).toBe(0);
+  });
+
+  it("undo before finalize prevents deletion", async () => {
+    const t = convexTest(schema, modules);
+    const candidateId = await t.mutation("candidates:create", {
+      name: "A", email: "a@x.com", qualifications: [], subjects: [],
+    });
+    vi.useFakeTimers();
+    const { batchId } = await t.mutation("candidates:removeMany", { ids: [candidateId] });
+    await t.mutation("candidates:undoBatchDelete", { batchId });
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    vi.useRealTimers();
+    const after = await t.run(async (ctx: any) => ctx.db.get(candidateId));
+    expect(after).not.toBeNull();
   });
 });
