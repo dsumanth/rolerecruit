@@ -40,6 +40,7 @@ export function useTableSelection<Id extends string, F>(): UseTableSelectionResu
         if (a >= 0 && b >= 0) {
           const [lo, hi] = a < b ? [a, b] : [b, a];
           for (let i = lo; i <= hi; i++) base.add(all[i]);
+          lastToggledRef.current = id;
           return { kind: "ids", selected: base };
         }
       }

@@ -55,6 +55,19 @@ describe("useTableSelection", () => {
     expect(result.current.mode.kind).toBe("ids");
   });
 
+  it("shift-click range advances the anchor for subsequent shift-clicks", () => {
+    const { result } = renderHook(() => useTableSelection<string, {}>());
+    act(() => { result.current.setLoadedIds(["a", "b", "c", "d", "e"]); });
+    act(() => { result.current.toggle("a"); });               // anchor = a
+    act(() => { result.current.toggle("c", true); });         // range a..c
+    act(() => { result.current.toggle("e", true); });         // range c..e (anchor was advanced to c)
+    expect(result.current.isSelected("a")).toBe(true);
+    expect(result.current.isSelected("b")).toBe(true);
+    expect(result.current.isSelected("c")).toBe(true);
+    expect(result.current.isSelected("d")).toBe(true);
+    expect(result.current.isSelected("e")).toBe(true);
+  });
+
   it("clear returns to empty ids mode", () => {
     const { result } = renderHook(() => useTableSelection<string, {}>());
     act(() => { result.current.selectAllMatching({}); });
