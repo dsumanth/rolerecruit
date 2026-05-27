@@ -54,7 +54,10 @@ export const seedE2E = internalAction({
 
     // ── 2. Jobs ────────────────────────────────────────────────────────────────
     // Fetch existing active jobs for this school to be idempotent
-    const existingJobs = await ctx.runQuery(api.jobs.listBySchool, { schoolId });
+    const { page: existingJobs } = await ctx.runQuery(api.jobs.listBySchool, {
+      schoolId,
+      paginationOpts: { numItems: 1000, cursor: null },
+    });
 
     const existingPgt = existingJobs.find(
       (j) => j.title === "PGT Physics" && j.subject === "Physics"

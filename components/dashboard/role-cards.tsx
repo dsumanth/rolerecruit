@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "convex/react";
+import { useQuery, usePaginatedQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
 import { Badge, Card, EmptyState, Button } from "@/components/ui";
@@ -37,10 +37,14 @@ function jobStatusBadge(status: string) {
 }
 
 export function RoleCards({ schoolId }: Props) {
-  const jobs = useQuery(api.jobs.listBySchool, { schoolId: schoolId as any });
+  const { results: jobs, status: jobsStatus } = usePaginatedQuery(
+    api.jobs.listBySchool,
+    { schoolId: schoolId as any },
+    { initialNumItems: 50 },
+  );
   const pipeline = useQuery(api.dashboard.getPipelineBreakdown, { schoolId: schoolId as any });
 
-  if (!jobs || !pipeline) {
+  if (jobsStatus === "LoadingFirstPage" || !pipeline) {
     return (
       <div className="space-y-3">
         {[1, 2, 3].map((i) => (
