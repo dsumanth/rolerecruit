@@ -20,6 +20,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import type { SortMode } from "@/components/pipeline/pipeline-controls";
 import type { JobStatus } from "@/components/pipeline/status-tabs";
 import type { Application } from "@/components/pipeline/application-table";
+import { rowsToCsv, downloadCsv } from "@/lib/csv-export";
 
 const FALLBACK_STAGES = [
   { id: "sourced", name: "Sourced" },
@@ -303,7 +304,21 @@ export function PipelineList({ schoolId }: { schoolId: any }) {
             <button
               className="bg-surface text-ink px-3 py-1.5 rounded text-body-s border border-hairline"
               onClick={() => {
-                /* CSV export in Phase 12 */
+                const selectedRows = sel.mode.kind === "ids"
+                  ? pipelineResults.filter((r: any) => sel.isSelected(r.applicationId))
+                  : [];
+                if (selectedRows.length === 0) return;
+                const csv = rowsToCsv(selectedRows, [
+                  { key: "name", label: "Name" },
+                  { key: "email", label: "Email" },
+                  { key: "phone", label: "Phone" },
+                  { key: "aiMatchScore", label: "Score" },
+                  { key: "stage", label: "Stage" },
+                  { key: "subjects", label: "Subjects" },
+                  { key: "createdAt", label: "Applied At" },
+                ]);
+                const today = new Date().toISOString().slice(0, 10);
+                downloadCsv(`pipeline-${today}.csv`, csv);
               }}
             >
               Export CSV
