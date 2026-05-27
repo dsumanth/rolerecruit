@@ -16,6 +16,7 @@ import { SelectAllMatchingBanner } from "@/components/ui/select-all-matching-ban
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { UndoToast } from "@/components/ui/undo-toast";
 import type { Application } from "@/components/pipeline/application-table";
+import { rowsToCsv, downloadCsv } from "@/lib/csv-export";
 
 function jobBadge(status: string) {
   if (status === "active") return <Badge dot variant="success">Active</Badge>;
@@ -202,7 +203,21 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
             <button
               className="bg-surface text-ink px-3 py-1.5 rounded text-body-s border border-hairline"
               onClick={() => {
-                /* CSV export in Phase 12 */
+                const selectedRows = sel.mode.kind === "ids"
+                  ? results.filter((r: any) => sel.isSelected(r.applicationId))
+                  : [];
+                if (selectedRows.length === 0) return;
+                const csv = rowsToCsv(selectedRows, [
+                  { key: "name", label: "Name" },
+                  { key: "email", label: "Email" },
+                  { key: "phone", label: "Phone" },
+                  { key: "aiMatchScore", label: "Score" },
+                  { key: "stage", label: "Stage" },
+                  { key: "subjects", label: "Subjects" },
+                  { key: "createdAt", label: "Applied At" },
+                ]);
+                const today = new Date().toISOString().slice(0, 10);
+                downloadCsv(`pipeline-${(job?.title ?? "pipeline").replace(/\s+/g, "-")}-${today}.csv`, csv);
               }}
             >
               Export CSV
