@@ -1,13 +1,7 @@
 import { mutation, query, action, internalAction } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
-import OpenAI from "openai";
-
-function getClient(): OpenAI | null {
-  const apiKey = process.env.DEEPSEEK_API_KEY;
-  if (!apiKey) return null;
-  return new OpenAI({ apiKey, baseURL: "https://api.deepseek.com" });
-}
+import { getLlmClient, LLM_MODEL } from "./lib/llmClient";
 
 export const create = mutation({
   args: {
@@ -145,7 +139,7 @@ export const unassignFromPool = mutation({
 export const suggest = action({
   args: { schoolId: v.id("schools") },
   handler: async (ctx, args): Promise<{ name: string; tags: string[]; sampleCandidateIds: number[] }[]> => {
-    const client = getClient();
+    const client = getLlmClient();
     if (!client) return [];
 
     const apps: any[] = await ctx.runQuery(api.applications.getUnmatchedForSchool as any, {
@@ -164,7 +158,7 @@ export const suggest = action({
 
     try {
       const response: any = await client.chat.completions.create({
-        model: "deepseek-v4-flash",
+        model: LLM_MODEL,
         max_tokens: 1024,
         temperature: 0,
         messages: [
@@ -193,7 +187,7 @@ export const autoTagCandidate = internalAction({
     schoolId: v.id("schools"),
   },
   handler: async (ctx, args) => {
-    const client = getClient();
+    const client = getLlmClient();
     if (!client) return;
 
     const candidate = await ctx.runQuery(api.candidates.get as any, {
@@ -214,7 +208,7 @@ export const autoTagCandidate = internalAction({
 
     try {
       const response = await client.chat.completions.create({
-        model: "deepseek-v4-flash",
+        model: LLM_MODEL,
         max_tokens: 512,
         temperature: 0,
         messages: [

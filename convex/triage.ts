@@ -5,13 +5,7 @@ import { api, internal } from "./_generated/api";
 import { TRIAGE_PROMPT_VERSION } from "./versions";
 import { OUTREACH_DRAFT_SYSTEM } from "./prompts/outreachDraft";
 import { DEFAULT_HYBRID_WEIGHTS } from "./types";
-import OpenAI from "openai";
-
-function getClient(): OpenAI | null {
-  const apiKey = process.env.DEEPSEEK_API_KEY;
-  if (!apiKey) return null;
-  return new OpenAI({ apiKey, baseURL: "https://api.deepseek.com" });
-}
+import { getLlmClient, LLM_MODEL } from "./lib/llmClient";
 
 export const writeTriageDecision = internalMutation({
   args: {
@@ -162,10 +156,10 @@ export const runTriage = action({
 });
 
 async function draftOutreach(ctx: any, args: { candidate: any; school: any; role: any; outcome: string; primaryReasons: string[] }): Promise<string | null> {
-  const client = getClient();
+  const client = getLlmClient();
   if (!client) return null;
   const res = await client.chat.completions.create({
-    model: "deepseek-v4-flash",
+    model: LLM_MODEL,
     max_tokens: 512,
     temperature: 0.4,
     messages: [

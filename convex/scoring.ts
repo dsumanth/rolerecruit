@@ -1,13 +1,7 @@
 import { action, internalAction } from "./_generated/server";
 import { v } from "convex/values";
 import { internal, api } from "./_generated/api";
-import OpenAI from "openai";
-
-function getClient(): OpenAI | null {
-  const apiKey = process.env.DEEPSEEK_API_KEY;
-  if (!apiKey) return null;
-  return new OpenAI({ apiKey, baseURL: "https://api.deepseek.com" });
-}
+import { getLlmClient, LLM_MODEL } from "./lib/llmClient";
 
 export interface ScoringRules {
   dimensions: Array<{ name: string; weight: number; config: any }>;
@@ -139,11 +133,11 @@ export const generateScoringRules = internalAction({
     nlCriteria: v.string(),
   },
   handler: async (ctx, args) => {
-    const client = getClient();
-    if (!client) throw new Error("DEEPSEEK_API_KEY not configured");
+    const client = getLlmClient();
+    if (!client) throw new Error("GOOGLE_API_KEY not configured");
 
     const response = await client.chat.completions.create({
-      model: "deepseek-v4-flash",
+      model: LLM_MODEL,
       max_tokens: 1024,
       temperature: 0,
       messages: [
@@ -177,14 +171,14 @@ export const generateScoringRules = internalAction({
 export const suggestCriteria = action({
   args: { jobId: v.id("jobPostings") },
   handler: async (ctx, args) => {
-    const client = getClient();
-    if (!client) throw new Error("DEEPSEEK_API_KEY not configured");
+    const client = getLlmClient();
+    if (!client) throw new Error("GOOGLE_API_KEY not configured");
 
     const job = await ctx.runQuery(api.jobs.get as any, { jobId: args.jobId });
     if (!job) throw new Error("Job not found");
 
     const response = await client.chat.completions.create({
-      model: "deepseek-v4-flash",
+      model: LLM_MODEL,
       max_tokens: 1024,
       temperature: 0,
       messages: [

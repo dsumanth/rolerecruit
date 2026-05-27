@@ -5,13 +5,7 @@ import { api } from "./_generated/api";
 import { scoreDimension, type ScoringRules } from "./scoring";
 import { structuredMatchScore, weightedSemanticSimilarity, combinedScore } from "./hybridScoring";
 import { DEFAULT_HYBRID_WEIGHTS, type HybridWeights } from "./types";
-import OpenAI from "openai";
-
-function getClient(): OpenAI | null {
-  const apiKey = process.env.DEEPSEEK_API_KEY;
-  if (!apiKey) return null;
-  return new OpenAI({ apiKey, baseURL: "https://api.deepseek.com" });
-}
+import { getLlmClient, LLM_MODEL } from "./lib/llmClient";
 
 const RERANK_SYSTEM = `You are a senior recruiter for Indian K-12 schools. Given a job and 10 pre-filtered candidates, rank them by fit and explain why with short phrases citing specific evidence.
 
@@ -113,7 +107,7 @@ export const findCandidatesForJob = action({
 
     // ----- Stage 3: LLM rerank on top 10 -----
     if (useLlmRerank) {
-      const client = getClient();
+      const client = getLlmClient();
       if (client) {
         const profiles = top10.map((s: ScoredCandidate, i: number) => {
           const c = s.candidate;
@@ -122,7 +116,7 @@ export const findCandidatesForJob = action({
 
         try {
           const res = await client.chat.completions.create({
-            model: "deepseek-v4-flash",
+            model: LLM_MODEL,
             max_tokens: 1024,
             temperature: 0,
             messages: [

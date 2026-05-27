@@ -1,9 +1,9 @@
 import { action, internalAction } from "./_generated/server";
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
-import OpenAI from "openai";
 import { JOB_EMBEDDING_VERSION } from "./versions";
 import { JOB_SECTION_SPLITTER_SYSTEM } from "./prompts/jobSectionSplitter";
+import { getLlmClient, LLM_MODEL } from "./lib/llmClient";
 
 const SYSTEM_PROMPT = `You are an AI that parses natural language job descriptions for Indian K-12 schools into structured criteria.
 
@@ -32,13 +32,11 @@ export const parseJobWithAI = action({
     const job = await ctx.runQuery(api.jobs.get as any, { jobId: args.jobId });
     if (!job) throw new Error("Job not found");
 
-    const apiKey = process.env.DEEPSEEK_API_KEY;
-    if (!apiKey) throw new Error("DEEPSEEK_API_KEY not configured");
-
-    const client = new OpenAI({ apiKey, baseURL: "https://api.deepseek.com" });
+    const client = getLlmClient();
+    if (!client) throw new Error("GOOGLE_API_KEY not configured");
 
     const response = await client.chat.completions.create({
-      model: "deepseek-v4-flash",
+      model: LLM_MODEL,
       max_tokens: 1024,
       temperature: 0,
       messages: [
@@ -80,18 +78,17 @@ export const computeRoleEmbeddings = action({
     const job = await ctx.runQuery(api.jobs.get as any, { jobId: args.jobId });
     if (!job) return;
 
-    // 1. Split JD into 5 sections via DeepSeek (or fallback to raw text)
-    const apiKey = process.env.DEEPSEEK_API_KEY;
+    // 1. Split JD into 5 sections via Gemini (or fallback to raw text)
+    const client = getLlmClient();
     let sections: { overall: string; experience: string; pedagogy: string; achievements: string; leadership: string };
     const fallback = job.naturalLanguageDescription || `${job.title} ${job.subject} ${job.board} ${job.level}`;
 
-    if (!apiKey) {
+    if (!client) {
       sections = { overall: fallback, experience: fallback, pedagogy: fallback, achievements: fallback, leadership: fallback };
     } else {
       try {
-        const client = new OpenAI({ apiKey, baseURL: "https://api.deepseek.com" });
         const res = await client.chat.completions.create({
-          model: "deepseek-v4-flash",
+          model: LLM_MODEL,
           max_tokens: 1024,
           temperature: 0,
           messages: [

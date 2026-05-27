@@ -2,13 +2,7 @@ import { mutation, query, action, internalAction } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
 import { scoreDimension, getRecommendation } from "./scoring";
-import OpenAI from "openai";
-
-function getClient(): OpenAI | null {
-  const apiKey = process.env.DEEPSEEK_API_KEY;
-  if (!apiKey) return null;
-  return new OpenAI({ apiKey, baseURL: "https://api.deepseek.com" });
-}
+import { getLlmClient, LLM_MODEL } from "./lib/llmClient";
 
 export const get = query({
   args: { schoolId: v.id("schools") },
@@ -86,14 +80,14 @@ Return ONLY a JSON object (no markdown, no explanation):
 export const suggest = action({
   args: { schoolId: v.id("schools") },
   handler: async (ctx, args) => {
-    const client = getClient();
-    if (!client) throw new Error("DEEPSEEK_API_KEY not configured");
+    const client = getLlmClient();
+    if (!client) throw new Error("GOOGLE_API_KEY not configured");
 
     const school = await ctx.runQuery(api.schools.get as any, { schoolId: args.schoolId });
     if (!school) throw new Error("School not found");
 
     const response = await client.chat.completions.create({
-      model: "deepseek-v4-flash",
+      model: LLM_MODEL,
       max_tokens: 1024,
       temperature: 0,
       messages: [
