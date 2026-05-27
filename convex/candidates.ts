@@ -469,14 +469,16 @@ const removeManyArgs = v.union(
 export const removeMany = mutation({
   args: removeManyArgs,
   handler: async (ctx, args) => {
+    const a = args as { ids?: string[]; matchAll?: { schoolId: any; filter?: any } };
     let ids: any[] = [];
-    if ("ids" in args) {
-      ids = args.ids;
-    } else {
+    if (a.ids) {
+      ids = a.ids;
+    } else if (a.matchAll) {
       // matchAll: resolve via applications under the school, collect unique candidateIds.
+      const matchAll = a.matchAll;
       const apps = await ctx.db
         .query("applications")
-        .withIndex("by_schoolId", (q) => q.eq("schoolId", args.matchAll.schoolId))
+        .withIndex("by_schoolId", (q) => q.eq("schoolId", matchAll.schoolId))
         .filter((q) => q.eq(q.field("pendingDeleteAt"), undefined))
         .collect();
       const candIds = new Set<string>();
@@ -487,9 +489,9 @@ export const removeMany = mutation({
     const batchId = makeBatchId();
     let count = 0;
     for (const id of ids) {
-      const doc = await ctx.db.get(id);
-      if (!doc || doc.pendingDeleteAt != null) continue;
-      await ctx.db.patch(id, { pendingDeleteAt: Date.now(), pendingDeleteBatchId: batchId });
+      const cand = await ctx.db.get(id as any);
+      if (!cand || (cand as any).pendingDeleteAt != null) continue;
+      await ctx.db.patch(id as any, { pendingDeleteAt: Date.now(), pendingDeleteBatchId: batchId });
       count++;
     }
     await ctx.scheduler.runAfter(10_000, internal.candidates.finalizeBatchDelete, { batchId });
