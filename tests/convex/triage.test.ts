@@ -38,7 +38,7 @@ const modules = {
 
 beforeEach(() => {
   process.env.EMBEDDING_PROVIDER = "stub";
-  delete process.env.DEEPSEEK_API_KEY;
+  delete process.env.GOOGLE_API_KEY;
 });
 
 describe("triage.runTriage", () => {

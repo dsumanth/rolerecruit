@@ -24,7 +24,7 @@ const modules = {
 
 beforeEach(() => {
   process.env.EMBEDDING_PROVIDER = "stub";
-  delete process.env.DEEPSEEK_API_KEY; // empty profile fallback; embeddings still computed
+  delete process.env.GOOGLE_API_KEY; // empty profile fallback; embeddings still computed
 });
 
 describe("intake", () => {

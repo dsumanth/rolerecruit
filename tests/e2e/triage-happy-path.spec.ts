@@ -43,7 +43,7 @@ async function queryConvex<T = any>(path: string, args: Record<string, unknown>)
 maybeTest(
   "strong-fit careers application surfaces in the Triage Queue (Convex-verified)",
   async ({ page }) => {
-    // Triage runs an LLM intake parse (DeepSeek) which can take 10-20s.
+    // Triage runs an LLM intake parse (Gemini) which can take 10-20s.
     test.setTimeout(180_000);
 
     // Step 1 — submit the careers application

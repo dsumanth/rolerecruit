@@ -41,16 +41,16 @@ const modules = {
   "jobs_ai.ts": async () => jobsAi,
 };
 
-const ORIGINAL_DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY;
+const ORIGINAL_GOOGLE_KEY = process.env.GOOGLE_API_KEY;
 
 beforeEach(() => {
   process.env.EMBEDDING_PROVIDER = "stub";
-  // Restore DEEPSEEK_API_KEY before each test — one test deletes it to exercise
+  // Restore GOOGLE_API_KEY before each test — one test deletes it to exercise
   // the no-LLM fallback path; without this restore the deletion leaks across tests.
-  if (ORIGINAL_DEEPSEEK_KEY === undefined) {
-    delete process.env.DEEPSEEK_API_KEY;
+  if (ORIGINAL_GOOGLE_KEY === undefined) {
+    delete process.env.GOOGLE_API_KEY;
   } else {
-    process.env.DEEPSEEK_API_KEY = ORIGINAL_DEEPSEEK_KEY;
+    process.env.GOOGLE_API_KEY = ORIGINAL_GOOGLE_KEY;
   }
 });
 
@@ -240,10 +240,10 @@ describe("materializeGraphFromIntake", () => {
 
 describe("intake → graph integration", () => {
   it("parseAndStoreCandidate (no LLM) still works and leaves graph empty", async () => {
-    // With no DEEPSEEK_API_KEY, parseProfileFromText returns emptyProfile() —
+    // With no GOOGLE_API_KEY, parseProfileFromText returns emptyProfile() —
     // relationships are empty — so no graph is built. This guards against the
     // intake hook crashing on empty input.
-    delete process.env.DEEPSEEK_API_KEY;
+    delete process.env.GOOGLE_API_KEY;
     const t = convexTest(schema, modules);
     const candId = await t.mutation("candidates:create", {
       name: "X", qualifications: ["B.Ed"], subjects: ["Physics"],
