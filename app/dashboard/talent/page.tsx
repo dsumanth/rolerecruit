@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useQuery } from "convex/react";
+import { usePaginatedQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { authClient } from "@/lib/auth-client";
+import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 import { Button, Card, PageHeader } from "@/components/ui";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TalentControls } from "@/components/talent/talent-controls";
@@ -21,88 +23,44 @@ export default function TalentBankPage() {
   const profile = useQuery(api.users.getByClerkId, user?.id ? { userId: user.id } : "skip");
   const schoolId = profile?.schoolId;
 
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchText, setSearchText] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedPoolId, setSelectedPoolId] = useState<string | "all">("all");
   const [selectedStages, setSelectedStages] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<"newest" | "score" | "name">("newest");
   const [showPoolManager, setShowPoolManager] = useState(false);
   const [showCriteriaPanel, setShowCriteriaPanel] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [nlResults, setNlResults] = useState<any[] | null>(null);
   const [nlIntent, setNlIntent] = useState("");
   const [selectedApp, setSelectedApp] = useState<any>(null);
 
   const handleSearchChange = (query: string) => {
-    setSearchQuery(query);
+    setSearchText(query);
     const timer = setTimeout(() => setDebouncedSearch(query), 300);
     return () => clearTimeout(timer);
   };
 
   const pools = useQuery(api.pools.listForSchool, schoolId ? { schoolId } : "skip") ?? [];
 
-  const candidates = useQuery(
+  const { results, status, loadMore } = usePaginatedQuery(
     api.candidates.listForSchool,
-    schoolId
-      ? {
-          schoolId,
-          poolId: selectedPoolId === "all" ? undefined : selectedPoolId,
-        } as any
-      : "skip"
-  ) ?? [];
+    schoolId ? {
+      schoolId,
+      filter: {
+        poolId: selectedPoolId === "all" ? undefined : (selectedPoolId as any),
+        stages: selectedStages.length > 0 ? selectedStages : undefined,
+        search: debouncedSearch || undefined,
+      },
+      sort: sortBy,
+    } : "skip",
+    { initialNumItems: 100 },
+  );
 
-  const searchFiltered = useMemo(() => {
-    if (!debouncedSearch.trim()) return candidates;
-    const q = debouncedSearch.toLowerCase();
-    return candidates.filter(
-      (c: any) =>
-        c.name?.toLowerCase().includes(q) ||
-        c.email?.toLowerCase().includes(q) ||
-        c.location?.toLowerCase().includes(q) ||
-        c.subjects?.some((s: string) => s.toLowerCase().includes(q))
-    );
-  }, [candidates, debouncedSearch]);
+  const sentinelRef = useInfiniteScroll({ status, loadMore, loadCount: 100 });
 
-  const stageFiltered = useMemo(() => {
-    if (selectedStages.length === 0) return searchFiltered;
-    return searchFiltered.filter((c: any) => selectedStages.includes(c.stage));
-  }, [searchFiltered, selectedStages]);
-
-  const sorted = useMemo(() => {
-    const apps = [...stageFiltered];
-    switch (sortBy) {
-      case "score":
-        return apps.sort((a: any, b: any) => (b.globalScore ?? 0) - (a.globalScore ?? 0));
-      case "name":
-        return apps.sort((a: any, b: any) =>
-          (a.name ?? "").localeCompare(b.name ?? "")
-        );
-      case "newest":
-      default:
-        return apps;
-    }
-  }, [stageFiltered, sortBy]);
-
-  const stageCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const c of searchFiltered) {
-      counts[c.stage] = (counts[c.stage] ?? 0) + 1;
-    }
-    return counts;
-  }, [searchFiltered]);
-
-  const poolCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const c of candidates) {
-      if (c.poolIds) {
-        for (const pid of c.poolIds) {
-          counts[pid] = (counts[pid] ?? 0) + 1;
-        }
-      }
-    }
-    return counts;
-  }, [candidates]);
-
+  const poolCounts: Record<string, number> = {};
+  // Pool counts are not available in the enriched shape; show 0 for now
   const poolsWithCounts = pools.map((p: any) => ({
     _id: p._id,
     name: p.name,
@@ -111,58 +69,65 @@ export default function TalentBankPage() {
     candidateCount: poolCounts[p._id] ?? 0,
   }));
 
-  const tableApplications: Application[] = sorted.map((c: any) => ({
-    _id: c.applicationId ?? c._id,
-    candidateId: c._id,
-    stage: c.stage,
-    aiMatchScore: c.aiMatchScore,
-    globalScore: c.globalScore,
-    poolNames: c.poolNames,
+  const stageCounts: Record<string, number> = {};
+  for (const row of results) {
+    const s = (row as any).stage;
+    if (s) stageCounts[s] = (stageCounts[s] ?? 0) + 1;
+  }
+
+  // Map enriched rows to Application shape for ApplicationTable
+  const tableApplications: Application[] = results.map((row: any) => ({
+    _id: row.applicationId,
+    candidateId: row.candidateId,
+    stage: row.stage,
+    aiMatchScore: row.aiMatchScore,
+    globalScore: undefined,
+    poolNames: undefined,
     candidate: {
-      _id: c._id,
-      name: c.name,
-      phone: c.phone,
-      email: c.email,
-      location: c.location,
-      qualifications: c.qualifications,
-      certifications: c.certifications,
-      boardExperience: c.boardExperience,
-      subjects: c.subjects,
-      yearsExperience: c.yearsExperience,
-      currentSchool: c.currentSchool,
-      resumeUrl: c.resumeUrl,
+      _id: row.candidateId,
+      name: row.name,
+      phone: row.phone,
+      email: row.email,
+      location: row.location,
+      qualifications: [],
+      certifications: [],
+      boardExperience: [],
+      subjects: row.subjects ?? [],
+      yearsExperience: row.yearsExperience,
+      currentSchool: undefined,
+      resumeUrl: undefined,
     },
   }));
 
   const nlTableApplications: Application[] | null = nlResults
-    ? nlResults.map((c: any) => ({
-        _id: c.applicationId ?? c._id,
-        candidateId: c._id,
-        stage: c.stage,
-        aiMatchScore: c.aiMatchScore,
-        globalScore: c.globalScore,
-        poolNames: c.poolNames,
+    ? nlResults.map((row: any) => ({
+        _id: row.applicationId ?? row._id,
+        candidateId: row.candidateId ?? row._id,
+        stage: row.stage,
+        aiMatchScore: row.aiMatchScore,
+        globalScore: undefined,
+        poolNames: undefined,
         candidate: {
-          _id: c._id,
-          name: c.name,
-          phone: c.phone,
-          email: c.email,
-          location: c.location,
-          qualifications: c.qualifications,
-          certifications: c.certifications,
-          boardExperience: c.boardExperience,
-          subjects: c.subjects,
-          yearsExperience: c.yearsExperience,
-          currentSchool: c.currentSchool,
-          resumeUrl: c.resumeUrl,
+          _id: row.candidateId ?? row._id,
+          name: row.name,
+          phone: row.phone,
+          email: row.email,
+          location: row.location,
+          qualifications: [],
+          certifications: [],
+          boardExperience: [],
+          subjects: row.subjects ?? [],
+          yearsExperience: row.yearsExperience,
+          currentSchool: undefined,
+          resumeUrl: undefined,
         },
       }))
     : null;
 
   const displayApplications = nlTableApplications ?? tableApplications;
 
-  const isLoading = candidates === undefined;
-  const total = candidates.length;
+  const isLoading = status === "LoadingFirstPage";
+  const total = results.length;
 
   return (
     <div className="p-6">
@@ -227,7 +192,7 @@ export default function TalentBankPage() {
       )}
 
       <TalentControls
-        searchQuery={searchQuery}
+        searchQuery={searchText}
         onSearchChange={handleSearchChange}
         selectedPoolId={selectedPoolId}
         onPoolChange={setSelectedPoolId}
@@ -241,8 +206,8 @@ export default function TalentBankPage() {
         stageCounts={stageCounts}
         sortBy={sortBy}
         onSortChange={setSortBy}
-        totalCount={candidates.length}
-        filteredCount={stageFiltered.length}
+        totalCount={total}
+        filteredCount={total}
       />
 
       {isLoading ? (
@@ -261,7 +226,7 @@ export default function TalentBankPage() {
             description={
               nlResults
                 ? "No candidates matched your search. Try different keywords."
-                : searchQuery || selectedPoolId !== "all" || selectedStages.length > 0
+                : searchText || selectedPoolId !== "all" || selectedStages.length > 0
                   ? "Try adjusting your search or filters."
                   : "Candidates will appear here when you source them from jobs, email ingestion, or the careers portal."
             }
@@ -276,6 +241,7 @@ export default function TalentBankPage() {
             showScoreAs="global"
             showPoolBadges={true}
             onRowClick={setSelectedApp}
+            loadMoreRef={sentinelRef}
           />
         </Card>
       )}

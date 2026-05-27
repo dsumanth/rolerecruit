@@ -51,6 +51,7 @@ interface ApplicationTableProps {
   showScoreAs?: "match" | "global";
   showPoolBadges?: boolean;
   onRowClick?: (app: Application) => void;
+  loadMoreRef?: (node: HTMLElement | null) => void;
 }
 
 const STAGE_LABELS: Record<string, string> = {
@@ -76,6 +77,7 @@ export function ApplicationTable({
   showScoreAs = "match",
   showPoolBadges = false,
   onRowClick,
+  loadMoreRef,
 }: ApplicationTableProps) {
   const [expandedAppId, setExpandedAppId] = useState<string | null>(null);
   const parentRef = useRef<HTMLDivElement>(null);
@@ -228,6 +230,7 @@ export function ApplicationTable({
             );
           })}
         </div>
+        {loadMoreRef && <div ref={loadMoreRef} style={{ height: 1 }} />}
       </div>
 
       {sorted.length === 0 && (
