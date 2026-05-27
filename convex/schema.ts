@@ -475,7 +475,8 @@ export default defineSchema({
     schoolId: v.id("schools"),
     expiresAt: v.number(),
     used: v.boolean(),
-  }).index("by_token", ["token"]),
+  }).index("by_token", ["token"])
+    .index("by_applicationId", ["applicationId"]),
 
   calendarEvents: defineTable({
     applicationId: v.id("applications"),
