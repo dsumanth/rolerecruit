@@ -210,6 +210,24 @@ export const getPipelineForJob = query({
         const hay = `${candidate.name ?? ""} ${candidate.email ?? ""}`.toLowerCase();
         if (!hay.includes(s)) continue;
       }
+      const otherApps = await ctx.db
+        .query("applications")
+        .withIndex("by_candidateId", (q) => q.eq("candidateId", candidate._id))
+        .filter((q) => q.and(
+          q.eq(q.field("pendingDeleteAt"), undefined),
+          q.neq(q.field("_id"), app._id),
+        ))
+        .collect();
+      let priorRejectCount = 0;
+      for (const other of otherApps) {
+        if (other.stage === "rejected") { priorRejectCount++; continue; }
+        const evals = await ctx.db
+          .query("evaluations")
+          .withIndex("by_applicationId", (q) => q.eq("applicationId", other._id))
+          .filter((q) => q.eq(q.field("recommendation"), "reject"))
+          .collect();
+        if (evals.length > 0) priorRejectCount++;
+      }
       enriched.push({
         applicationId: app._id,
         candidateId: candidate._id,
@@ -222,6 +240,7 @@ export const getPipelineForJob = query({
         yearsExperience: candidate.yearsExperience,
         location: candidate.location,
         createdAt: app._creationTime,
+        priorRejectCount,
       });
     }
 

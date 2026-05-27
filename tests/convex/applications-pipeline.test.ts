@@ -126,4 +126,27 @@ describe("applications.getPipelineForJob — paginated", () => {
     // Should see both applications, not deduped
     expect(result.page.length).toBe(2);
   });
+
+  it("returns priorRejectCount per row", async () => {
+    const t = convexTest(schema, modules);
+    const schoolId = await t.mutation("schools:create", { name: "S", board: "CBSE", city: "M", state: "MH" });
+    const cId = await t.mutation("candidates:create", {
+      name: "A", email: "a@x.com", qualifications: [], subjects: [],
+    });
+    const job1 = await t.mutation("jobs:create", {
+      schoolId, title: "J1", subject: "M", level: "PGT", board: "CBSE",
+      qualifications: [], minExperience: 0, positions: 1, naturalLanguageDescription: "x",
+    });
+    const job2 = await t.mutation("jobs:create", {
+      schoolId, title: "J2", subject: "M", level: "PGT", board: "CBSE",
+      qualifications: [], minExperience: 0, positions: 1, naturalLanguageDescription: "x",
+    });
+    await t.mutation("applications:create", { candidateId: cId, schoolId, jobPostingId: job1, stage: "rejected" });
+    await t.mutation("applications:create", { candidateId: cId, schoolId, jobPostingId: job2, stage: "applied" });
+
+    const result = await t.query("applications:getPipelineForJob", {
+      jobId: job2, paginationOpts: { cursor: null, numItems: 10 },
+    });
+    expect(result.page[0].priorRejectCount).toBe(1);
+  });
 });
