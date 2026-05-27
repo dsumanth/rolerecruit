@@ -20,15 +20,16 @@ Four gaps in the current candidate and job management UX:
 - Distinguish three semantically different destructive actions in the UI: **Reject** (stage move), **Remove from pipeline** (delete application), **Delete candidate** (cascading purge).
 - Show prior rejection history (with evaluation notes) on candidate rows when they appear in a new role's pipeline.
 - Every destructive bulk action (and the single-row delete) is **undoable for 10 seconds** via a toast. After the window expires, the data is permanently hard-deleted.
-- Selecting "all" selects every row in the current filtered set — not just the rows in the virtual viewport.
+- All three listing pages (candidates / applications / jobs) are **cursor-paginated** via Convex's native `paginate()`. Filtering, search, and sort move server-side.
+- Multi-select supports **two modes**: selection-by-IDs (the default; what you check) and selection-by-filter (the banner opt-in for "Select all 2,345 matching"). Bulk mutations accept either.
 
 ## Non-Goals
 
 - Persistent soft-delete / trash bin / "Recently deleted" view. The undo window is intentionally short (10s) — beyond that, data is genuinely gone.
-- Server-side CSV generation (client-side from loaded rows is sufficient for current volumes).
+- Server-side CSV generation (client-side from loaded rows is sufficient for current volumes; the matchAll mode is intentionally not wired to CSV — see Section 1).
 - Keyboard shortcuts beyond shift-click range select (Cmd+A, Esc to clear, etc. can be follow-ups).
 - A new evaluations subsystem — evaluations are already wired (`convex/evaluations.ts`, four UI consumers). The rejection-history feature reads existing evaluation data.
-- True server-side pagination across all listing pages. Today these queries load the full filtered set into memory, so bulk operations naturally cover everything that matches the filter. If real pagination is added later, cross-page bulk becomes a separate design question.
+- Sub-batching for very large matchAll operations (>50k matching rows). Acceptable to leave as a follow-up; flagged in Section 1 edge cases.
 
 ---
 
@@ -90,7 +91,7 @@ pendingDeleteBatchId: v.optional(v.string()),
 
 4. **Scheduled finalize** `internal.candidates.finalizeBatchDelete({ batchId })`:
    - Find all rows with `pendingDeleteBatchId === batchId` that still have `pendingDeleteAt` set (the undo cleared them otherwise).
-   - For each such row, perform the actual cascading hard delete from Section 1 (child tables → resume file → row itself).
+   - For each such row, perform the actual cascading hard delete from Section 2 (child tables → resume file → row itself).
    - Same internal action shape for `applications.finalizeBatchDelete` and `jobs.finalizeBatchDelete`.
 
 5. **Toast UI** (`components/ui/undo-toast.tsx`, new):
@@ -127,7 +128,150 @@ No schema change. The mutation returns the previous values, the toast holds them
 
 ---
 
-## Section 1 — Candidate cascading delete
+## Section 1 — Pagination & select-all-matching (cross-cutting)
+
+### Why
+
+Convex queries cap result payloads at 8 MiB and re-emit the full result on any reactive change. Without pagination, the talent bank breaks at roughly 3-8k candidates per school. Beyond the cap, full-result queries also burn memory and re-render cost on every insert. Pagination is the load-bearing fix for this.
+
+### Convex query changes
+
+Three list queries switch from full-result to cursor-paginated via Convex's native `paginate()`:
+
+```ts
+// convex/candidates.ts
+listForSchool({
+  schoolId: Id<"schools">,
+  paginationOpts: PaginationOptsValidator,
+  filter?: { poolId?: Id<"pools"> | "all", stages?: string[], search?: string },
+  sort?: "newest" | "score" | "name",
+}): { page: Application[], isDone: boolean, continueCursor: string }
+// Reminder: talent-bank rows are applications with jobPostingId = undefined.
+// listForSchool keeps that shape; the query just adds paginationOpts + server-side filter/sort.
+
+countForSchool({
+  schoolId,
+  filter?: ...,
+}): { total: number }     // separate cheap query for the banner
+
+// convex/applications.ts
+getPipelineForJob({
+  jobId, paginationOpts,
+  filter?: { stage?: string, search?: string },
+  sort?: "newest" | "score" | "name",
+})
+
+countForJob({ jobId, filter? }): { total: number }
+
+// convex/jobs.ts
+listBySchool({
+  schoolId, paginationOpts,
+  filter?: { status?: JobStatus, search?: string },
+  sort?: "newest" | "title",
+})
+
+countBySchool({ schoolId, filter? }): { total: number }
+```
+
+Notes on sort:
+
+- `newest` uses `_creationTime` (Convex provides ordering on this for free).
+- `name` / `title` require new indexes on the underlying tables: `by_schoolId_name` on candidates/applications (whichever the talent bank queries), `by_schoolId_title` on `jobPostings`.
+- `score` for applications uses `aiMatchScore`; new index `by_jobPostingId_aiMatchScore` (descending) on `applications`. For talent bank where there's no job context, "score" is a meaningful field on the application row anyway (carried over from the original triage), so the same index works.
+
+Count queries scan with the same filter but return only the count. `O(N)` server-side but zero payload — acceptable for the school sizes we expect, and only run on-demand when the banner needs to render.
+
+### Client integration
+
+Pages swap `useQuery` → `usePaginatedQuery`:
+
+```tsx
+const { results, status, loadMore } = usePaginatedQuery(
+  api.candidates.listForSchool,
+  { schoolId, filter, sort },
+  { initialNumItems: 100 },
+);
+```
+
+Infinite scroll via an intersection observer near the bottom of the virtualized list — when the user scrolls within ~10 rows of the loaded end, call `loadMore(100)`.
+
+Search/filter/sort inputs now drive query args (not client-side memoization). Changing any of them resets to a fresh paginated subscription (Convex handles this — new args, new query).
+
+### Multi-select — two modes
+
+`useTableSelection` gets a `mode` discriminator:
+
+```ts
+type SelectionMode<F> =
+  | { kind: "ids"; selected: Set<Id> }
+  | { kind: "all-matching"; filter: F };
+
+function useTableSelection<Id, F>(): {
+  mode: SelectionMode<F>;
+  isSelected: (id: Id) => boolean;          // always true in matchAll mode
+  toggle: (id: Id, shiftKey?: boolean) => void;   // moving from matchAll → ids implicitly switches mode
+  toggleAllLoaded: (loadedIds: Id[]) => void;     // header checkbox; stays in ids mode
+  selectAllMatching: (filter: F) => void;         // banner click; switches to matchAll
+  clear: () => void;
+  count: { kind: "ids"; n: number } | { kind: "all-matching"; n: number };
+}
+```
+
+UI states:
+
+1. **No selection** — action bar hidden.
+2. **Some loaded selected (ids mode)** — action bar shows count + actions.
+3. **All loaded selected (ids mode)** — action bar shows count + actions, and a banner appears above it: *"All {loadedCount} candidates on this page selected. [Select all {totalCount} matching this filter]"*. The total comes from the count query.
+4. **All matching selected (matchAll mode)** — action bar shows the total + actions + Clear. Per-row checkboxes render as always-checked but are not individually togglable in this mode (clicking one drops back to ids mode with that row deselected from the now-expanded set — implemented by expanding matchAll to ids client-side via a paginated drain). The simpler v1 behaviour: clicking any per-row checkbox in matchAll mode just calls `clear()` and re-enters ids mode with only that single row toggled. Acceptable v1 simplification.
+
+Banner is a new component `components/ui/select-all-matching-banner.tsx` rendered conditionally inside `BulkActionBar`.
+
+### Bulk mutation signature changes
+
+Every bulk mutation accepts a discriminated union:
+
+```ts
+type BulkInput<F> =
+  | { ids: Id[] }
+  | { matchAll: F };
+
+// Updated signatures:
+candidates.removeMany(args: BulkInput<{ schoolId, filter? }>)
+  : Promise<{ batchId: string; count: number }>
+
+applications.removeManyApplications(
+  args: BulkInput<{ jobId: Id<"jobPostings"> | null, filter? }>
+): Promise<{ batchId: string; count: number }>
+
+applications.bulkSetStage(
+  args: BulkInput<{ jobId, filter? }> & { stage: string }
+): Promise<{ batchId: string; previousStages: Array<{ id, previousStage }> }>
+
+jobs.removeMany(args: BulkInput<{ schoolId, filter? }>)
+  : Promise<{ batchId: string; count: number }>            // server-validates draft-only
+
+jobs.bulkSetStatus(
+  args: BulkInput<{ schoolId, filter? }> & { status: string }
+): Promise<{ batchId: string; previousStatuses: Array<{ id, previousStatus }> }>
+```
+
+Server-side handling: when `args.matchAll` is provided, the mutation runs the same query that powers the listing (same filter, no pagination — `.collect()` instead of `.paginate()`), gets the matching IDs, then runs the existing batch logic against those IDs. This means **no matchAll-specific finalize path** — once the matchAll is expanded into an ID set inside the mutation, all the existing Section 0 undo + cascade logic applies unchanged.
+
+Auth: the same school-membership check runs against the resolved filter (e.g., `schoolId` must match the caller's school).
+
+### Edge cases
+
+- **matchAll batch size**: a single mutation that expands 50k IDs and marks them stays within Convex's transaction limits. Larger than ~50k would need sub-batching (split into chunks of N, schedule sequentially); flagged as a follow-up.
+- **Filter validation**: the matchAll filter is validated against the same schema validators used by the listing query — enums (stage, status) checked, search strings length-capped. Invalid filter → mutation throws.
+- **Late arrivals**: matchAll resolves to IDs at mutation time. Rows uploaded a second later are *not* affected. Deliberate.
+- **Count drift**: the banner shows the count at the moment it renders. By the time the user clicks the action, the count may have moved. The mutation re-expands and acts on the fresh set; banner is approximate.
+- **Empty matchAll**: filter returns zero matches → mutation is a no-op, returns `{ batchId, count: 0 }`. UI suppresses the undo toast.
+- **Undo + matchAll**: undo uses the `batchId`, not the filter. `undoBatchDelete(batchId)` restores exactly the rows that were marked at expansion time — even if the filter would now match a different set.
+- **Bulk CSV export not wired to matchAll**: CSV export operates on currently-loaded rows. Exporting "all matching" would require either streaming or a server-side CSV builder; intentionally deferred. The UI hides the Export button when in matchAll mode.
+
+---
+
+## Section 2 — Candidate cascading delete
 
 This section is the body of work invoked by Section 0's Pattern A for candidates. The cascade itself is the same whether triggered by single or bulk delete — both go through the `pendingDeleteAt` → scheduled finalize flow.
 
@@ -176,12 +320,12 @@ All mutations are authorized via the existing auth helper — only school member
 
 **Bulk delete:**
 - Available on the **talent bank view** (`app/dashboard/talent/page.tsx`).
-- NOT available on job pipeline views — there the bulk action is "Remove from pipeline" (Section 4).
+- NOT available on job pipeline views — there the bulk action is "Remove from pipeline" (Section 5).
 - Same toast pattern.
 
 ---
 
-## Section 2 — Criteria UX (NL textarea + structured editor)
+## Section 3 — Criteria UX (NL textarea + structured editor)
 
 ### Page restructure
 
@@ -205,8 +349,8 @@ Rewrite `app/dashboard/jobs/[id]/criteria/page.tsx` so the page stacks two secti
 └─────────────────────────────────────────────────────────────┘
 ```
 
-- **Section 1 — NL textarea**: bound to `jobPostings.criteria` (existing string field). Autosave on blur via a new mutation `convex/jobs.ts:saveCriteriaText(jobId, text)`. Subtle "Saved" indicator on the right.
-- **Section 2 — Structured editor**: the existing `ScoringRuleEditor` component, populated from `job.scoringRules` if present, empty otherwise.
+- **Top block — NL textarea**: bound to `jobPostings.criteria` (existing string field). Autosave on blur via a new mutation `convex/jobs.ts:saveCriteriaText(jobId, text)`. Subtle "Saved" indicator on the right.
+- **Bottom block — Structured editor**: the existing `ScoringRuleEditor` component, populated from `job.scoringRules` if present, empty otherwise.
 - **Page-level "Generate with AI" button** (top-right of `PageHeader` action area): calls `api.scoring.suggestCriteria` using the NL textarea content as input (falling back to `job.naturalLanguageDescription` if textarea is empty), populates the structured editor directly. The textarea is **never** modified by AI.
 
 ### Component changes
@@ -221,29 +365,30 @@ Matching code continues to prefer `scoringRules` when present; falls back to NL 
 
 ---
 
-## Section 3 — Multi-select primitive (shared)
+## Section 4 — Multi-select primitive (shared)
 
 ### Hook
 
-New: `hooks/use-table-selection.ts`
+New: `hooks/use-table-selection.ts`. The full type and behaviour are defined in Section 1's "Multi-select — two modes" subsection (the hook is co-designed with the pagination story; it cannot be specified without it). Restated here in brief:
 
 ```ts
-function useTableSelection<Id extends string>(): {
-  selected: Set<Id>;
-  isSelected: (id: Id) => boolean;
-  toggle: (id: Id, shiftKey?: boolean) => void;  // shift-click range
-  toggleAll: (ids: Id[]) => void;                // header "select visible"
-  clear: () => void;
-  count: number;
+function useTableSelection<Id, F>(): {
+  mode:
+    | { kind: "ids"; selected: Set<Id> }
+    | { kind: "all-matching"; filter: F };
+  isSelected, toggle, toggleAllLoaded, selectAllMatching, clear, count;
 }
 ```
 
-Internals:
-- `selected` is a `Set<Id>` in component state.
-- `toggle(id, shiftKey)` tracks the last-toggled id; if `shiftKey` is true and there's a last id, all ids between them in the visible-order array are toggled. The hook receives the visible-order array via a setter the caller wires up each render: `setVisibleIds(rows.map(r => r._id))`.
-- `toggleAll(ids)` flips behaviour based on whether all `ids` are already selected: if yes, deselect them; if no, select them all (additive — doesn't clear other selections).
+Internals (ids mode):
+- `mode.selected` is a `Set<Id>` in component state.
+- `toggle(id, shiftKey)` tracks the last-toggled id; if `shiftKey` is true and there's a last id, all ids between them in the loaded-order array are toggled. The hook receives the loaded-order array via a setter the caller wires up each render: `setLoadedIds(rows.map(r => r._id))`.
+- `toggleAllLoaded(ids)` flips behaviour based on whether all `ids` are already selected: if yes, deselect them; if no, select them all (additive — doesn't clear other selections).
 
-**"All" means filtered, not viewport.** The caller passes the *full filtered+sorted dataset* to `toggleAll`, not just the rows currently rendered by the virtualizer. Since these pages load the full set into JS memory (no server-side pagination today), this is unambiguous — selecting all means every row that matches the current search/filter, even if 950 of 1000 are below the scroll. If real `paginate()` is added later, this contract needs revisiting; for now it's a single in-memory array.
+Mode transitions:
+- `selectAllMatching(filter)` flips to `{ kind: "all-matching", filter }`. Per-row checkboxes render as always-checked but are not individually togglable (clicking one — as a v1 simplification — clears and re-enters ids mode with that single row toggled).
+- `toggle()` from matchAll mode also flips back to ids mode.
+- `clear()` always returns to `{ kind: "ids", selected: empty }`.
 
 ### Bulk action bar
 
@@ -286,57 +431,65 @@ New: `components/ui/confirm-dialog.tsx` — minimal modal with title, body, `Can
 
 ---
 
-## Section 4 — Bulk actions
+## Section 5 — Bulk actions
 
 ### Candidate pipeline views (`app/dashboard/jobs/[id]/pipeline/`, `app/dashboard/pipeline/`)
 
 Rows here are **applications**, not candidates. The bulk action bar shows three actions:
 
-- **Remove from pipeline** — destructive style. Confirm modal: *"Remove {N} applications from this pipeline? The candidates remain in the system and their other applications are unaffected. You can undo within 10 seconds."* Calls `applications.removeManyApplications(applicationIds)`, which follows Pattern A from Section 0: sets `pendingDeleteAt` + a `batchId` on each application, schedules `internal.applications.finalizeBatchDelete` for 10s later. The finalize action, when it runs, deletes child rows in `evaluations`, `outreachMessages`, `calendarEvents`, `triageDecisions`, and `bookingTokens`, then the application row. The candidate is untouched. Undo toast wired via the returned `batchId`.
-- **Move to stage** — popover with the school's pipeline stages (read from `pipeline_config`). On select, calls `applications.bulkSetStage(applicationIds, stage)`, which captures previous stages per id and returns them. Toast shows "Moved {N} to {stage}. [Undo]" — undo calls the same mutation with the captured previous values (Pattern B from Section 0).
-- **Export CSV** — client-side. Build CSV from already-loaded rows: columns `Name, Email, Phone, Score, Stage, Subjects, Applied At`. Trigger download via `Blob` + `URL.createObjectURL`. No server call. No undo (non-destructive).
+- **Remove from pipeline** — destructive style. Confirm modal: *"Remove {N} applications from this pipeline? The candidates remain in the system and their other applications are unaffected. You can undo within 10 seconds."* Calls `applications.removeManyApplications` with either `{ ids }` or `{ matchAll: { jobId, filter } }` based on the current selection mode (Section 1). Follows Pattern A from Section 0: sets `pendingDeleteAt` + a `batchId` on each application, schedules `internal.applications.finalizeBatchDelete` for 10s later. The finalize action, when it runs, deletes child rows in `evaluations`, `outreachMessages`, `calendarEvents`, `triageDecisions`, and `bookingTokens`, then the application row. The candidate is untouched. Undo toast wired via the returned `batchId`.
+- **Move to stage** — popover with the school's pipeline stages (read from `pipeline_config`). On select, calls `applications.bulkSetStage` with `{ ids | matchAll, stage }` based on selection mode. The server captures previous stages per id and returns them. Toast shows "Moved {N} to {stage}. [Undo]" — undo calls `bulkSetStage` again with `{ ids: snapshot.map(s => s.id), stage: ... }` per-id (the snapshot also carries the original stages — see Pattern B from Section 0).
+- **Export CSV** — client-side. Build CSV from already-loaded rows: columns `Name, Email, Phone, Score, Stage, Subjects, Applied At`. Trigger download via `Blob` + `URL.createObjectURL`. No server call. No undo (non-destructive). Hidden in matchAll mode (see Section 1).
 
 ### Talent bank view (`app/dashboard/talent/`)
 
 Rows here are applications with `jobPostingId = undefined` — the application is just the candidate's entry point into the system. Conceptually the user is selecting *people*, so the bulk action operates on the underlying candidate. The bulk action bar shows two actions:
 
-- **Delete candidates** — destructive. The page maps selected rows → `row.candidateId`. Confirm modal: *"Delete {N} candidates? This removes their resumes, every application across roles, and all evaluations. You can undo within 10 seconds."* → `candidates.removeMany(candidateIds)` (Pattern A). Undo toast wired via the returned `batchId`.
-- **Export CSV** — client-side from loaded rows: `Name, Email, Phone, Years Experience, Subjects, Qualifications, Created At`. No undo.
+- **Delete candidates** — destructive. In ids mode, the page maps selected rows → `row.candidateId` and calls `candidates.removeMany({ ids: candidateIds })`. In matchAll mode, calls `candidates.removeMany({ matchAll: { schoolId, filter } })` — the server expands to candidateIds via the same query that powers the listing. Confirm modal: *"Delete {N} candidates? This removes their resumes, every application across roles, and all evaluations. You can undo within 10 seconds."* Pattern A. Undo toast wired via the returned `batchId`.
+- **Export CSV** — client-side from loaded rows: `Name, Email, Phone, Years Experience, Subjects, Qualifications, Created At`. No undo. Hidden in matchAll mode.
 
 ### Jobs list (`app/dashboard/jobs/`)
 
 Rows are **jobs**. The bulk action bar shows three actions:
 
-- **Delete (drafts only)** — only enabled when *every* selected job has `status === "draft"`. If any selected job is non-draft, the button is disabled with a tooltip: *"Only draft jobs can be deleted in bulk. Change status to draft first, or use the per-job actions."* On confirm → `jobs.removeMany(jobIds)` (Pattern A): server validates draft-only (throws if any selected row isn't draft when the mutation runs), marks each draft with `pendingDeleteAt` + a `batchId`, schedules `internal.jobs.finalizeBatchDelete` for 10s. Undo toast wired via the returned `batchId`.
-- **Change status** — popover with status options (`Active`, `On hold`, `Filled`, `Closed`). On select, calls `jobs.bulkSetStatus(jobIds, status)`, which captures previous statuses per id and returns them. Toast shows "Status updated for {N} jobs. [Undo]" — undo calls the same mutation with captured previous values (Pattern B).
-- **Export CSV** — client-side: `Title, Subject, Level, Board, Status, Positions, Created At`. No undo.
+- **Delete (drafts only)** — in ids mode, only enabled when *every* selected job has `status === "draft"` (client checks the loaded rows). In matchAll mode, this is enforced by always restricting the filter to `status: "draft"` before sending — the button is disabled in matchAll mode if the current view's status filter isn't `draft`. On confirm → `jobs.removeMany` with `{ ids }` or `{ matchAll: { schoolId, filter } }`. The server re-validates draft-only and throws if any matched row isn't draft (rollback). Pattern A.
+- **Change status** — popover with status options (`Active`, `On hold`, `Filled`, `Closed`). On select, calls `jobs.bulkSetStatus` with `{ ids | matchAll, status }`. The server captures previous statuses per id and returns them. Toast shows "Status updated for {N} jobs. [Undo]" — undo calls `bulkSetStatus` per-id with the captured previous statuses (Pattern B).
+- **Export CSV** — client-side: `Title, Subject, Level, Board, Status, Positions, Created At`. No undo. Hidden in matchAll mode.
 
 ### Bulk mutation signatures
 
+All bulk mutations take `BulkInput<F> = { ids: Id[] } | { matchAll: F }` — see Section 1 for the matchAll semantics. Stage/status mutations also include the new value as a separate field. Single-row helpers (`remove`) wrap the bulk shape with a fixed `ids: [id]`.
+
 ```ts
 // convex/applications.ts
-removeManyApplications(applicationIds: Id<"applications">[])
-  : Promise<{ batchId: string; count: number }>
-undoBatchDelete(batchId: string)
-  : Promise<{ restored: number }>
-bulkSetStage(applicationIds: Id<"applications">[], stage: string)
-  : Promise<{ previousStages: Array<{ id: Id<"applications">; previousStage: string }> }>
+removeManyApplications(
+  args: BulkInput<{ jobId: Id<"jobPostings"> | null; filter?: PipelineFilter }>
+): Promise<{ batchId: string; count: number }>
+
+bulkSetStage(
+  args: BulkInput<{ jobId: Id<"jobPostings"> | null; filter?: PipelineFilter }> & { stage: string }
+): Promise<{ batchId: string; previousStages: Array<{ id: Id<"applications">; previousStage: string }> }>
+
+undoBatchDelete(batchId: string): Promise<{ restored: number }>
 
 // convex/candidates.ts
 remove(candidateId: Id<"candidates">)
   : Promise<{ batchId: string; count: 1 }>
-removeMany(candidateIds: Id<"candidates">[])
-  : Promise<{ batchId: string; count: number }>
-undoBatchDelete(batchId: string)
-  : Promise<{ restored: number }>
+removeMany(
+  args: BulkInput<{ schoolId: Id<"schools">; filter?: TalentFilter }>
+): Promise<{ batchId: string; count: number }>
+undoBatchDelete(batchId: string): Promise<{ restored: number }>
 
 // convex/jobs.ts
-removeMany(jobIds: Id<"jobPostings">[])               // server-validates draft-only
-  : Promise<{ batchId: string; count: number }>
-undoBatchDelete(batchId: string)
-  : Promise<{ restored: number }>
-bulkSetStatus(jobIds: Id<"jobPostings">[], status: string)
-  : Promise<{ previousStatuses: Array<{ id: Id<"jobPostings">; previousStatus: string }> }>
+removeMany(
+  args: BulkInput<{ schoolId: Id<"schools">; filter?: JobFilter }>   // server-validates draft-only
+): Promise<{ batchId: string; count: number }>
+
+bulkSetStatus(
+  args: BulkInput<{ schoolId: Id<"schools">; filter?: JobFilter }> & { status: string }
+): Promise<{ batchId: string; previousStatuses: Array<{ id: Id<"jobPostings">; previousStatus: string }> }>
+
+undoBatchDelete(batchId: string): Promise<{ restored: number }>
 
 // Internal actions (run on the scheduler 10s after the corresponding remove mutation)
 internal.applications.finalizeBatchDelete({ batchId: string }): Promise<void>
@@ -344,11 +497,11 @@ internal.candidates.finalizeBatchDelete({ batchId: string }): Promise<void>
 internal.jobs.finalizeBatchDelete({ batchId: string }): Promise<void>
 ```
 
-All loop over ids server-side rather than client-side fan-out. Each mutation re-checks auth on every id (school membership), and any single-id failure aborts the batch with a clear error (no partial application).
+Server-side, when `args.matchAll` is provided, the mutation expands the filter to an ID set via the same query that powers the listing, then runs the same per-id batch logic as the `ids` path. Single-id failures abort the batch and Convex's transaction model rolls back any marks already set in the same call. Auth: school membership is re-checked per row.
 
 ---
 
-## Section 5 — Rejection history indicator
+## Section 6 — Rejection history indicator
 
 ### Query
 
@@ -424,32 +577,36 @@ The rejection history surfaced in a given context always excludes the *current* 
 
 | Path | Purpose |
 |---|---|
-| `hooks/use-table-selection.ts` | Generic multi-select hook (Set-based, shift-click range). |
+| `hooks/use-table-selection.ts` | Multi-select hook with `ids` and `all-matching` modes; shift-click range select within loaded rows. |
 | `hooks/use-undo-toast.ts` | Hook that owns the undo-toast queue + countdown + dismiss. |
-| `components/ui/bulk-action-bar.tsx` | Fixed-position bottom bar shown when selection > 0. |
+| `hooks/use-infinite-scroll.ts` | Intersection-observer wrapper that calls `loadMore()` near the end of the loaded set. |
+| `components/ui/bulk-action-bar.tsx` | Fixed-position bottom bar shown when selection > 0. Hosts the matchAll banner. |
+| `components/ui/select-all-matching-banner.tsx` | "All {N} on this page selected. [Select all {total} matching]" banner. |
 | `components/ui/confirm-dialog.tsx` | Reusable destructive/neutral confirmation modal. |
 | `components/ui/undo-toast.tsx` | Toast component with countdown bar + Undo button + "Restored" terminal state. |
 | `components/criteria/CriteriaNaturalLanguageEditor.tsx` | NL textarea with autosave for `job.criteria`. |
 | `components/pipeline/rejection-history-indicator.tsx` | Row badge showing "N prior rejects". |
 | `components/pipeline/previous-outcomes-section.tsx` | Drawer section listing prior rejections + eval notes. |
 | `lib/csv-export.ts` | Tiny helper: takes rows + column config, triggers browser download. |
+| `lib/bulk-input.ts` | Shared TS types for `BulkInput<F>` and per-table filter shapes (mirror of Convex validators). |
 
 ### Modified files
 
 | Path | Change |
 |---|---|
-| `convex/schema.ts` | Add `by_applicationId` index on `bookingTokens`. Add `pendingDeleteAt` + `pendingDeleteBatchId` (both `v.optional`) to `candidates`, `applications`, `jobPostings`. |
-| `convex/candidates.ts` | Add `remove`, `removeMany`, `undoBatchDelete`, `getRejectionHistory`. Add `internal.candidates.finalizeBatchDelete`. Update existing list/filter queries to exclude `pendingDeleteAt != null`. |
-| `convex/applications.ts` | Add `removeManyApplications`, `undoBatchDelete`, `bulkSetStage`. Add `internal.applications.finalizeBatchDelete`. Extend `getPipelineForJob` to include `priorRejectCount` per row and exclude `pendingDeleteAt`. |
-| `convex/jobs.ts` | Add `removeMany` (draft-only validation), `undoBatchDelete`, `bulkSetStatus`, `saveCriteriaText`. Add `internal.jobs.finalizeBatchDelete`. Update list queries to exclude `pendingDeleteAt`. |
+| `convex/schema.ts` | Add `by_applicationId` index on `bookingTokens`. Add `pendingDeleteAt` + `pendingDeleteBatchId` (both `v.optional`) to `candidates`, `applications`, `jobPostings`. Add sort indexes: `by_schoolId_creationTime` and `by_schoolId_name` on `applications` and `jobPostings`; `by_jobPostingId_aiMatchScore` on `applications`. |
+| `convex/candidates.ts` | Convert `listForSchool` to paginated; add `countForSchool`. Add `remove`, `removeMany`, `undoBatchDelete`, `getRejectionHistory`. Add `internal.candidates.finalizeBatchDelete`. Update existing list/filter queries to exclude `pendingDeleteAt != null`. |
+| `convex/applications.ts` | Convert `getPipelineForJob` to paginated; add `countForJob`. Add `removeManyApplications`, `undoBatchDelete`, `bulkSetStage`. Add `internal.applications.finalizeBatchDelete`. Extend the paginated query rows to include `priorRejectCount`. Exclude `pendingDeleteAt` from all reads. |
+| `convex/jobs.ts` | Convert `listBySchool` to paginated; add `countBySchool`. Add `removeMany` (draft-only validation), `undoBatchDelete`, `bulkSetStatus`, `saveCriteriaText`. Add `internal.jobs.finalizeBatchDelete`. Update list queries to exclude `pendingDeleteAt`. |
 | `app/dashboard/jobs/[id]/criteria/page.tsx` | Restructure: NL textarea + structured editor stacked; "Generate with AI" moves to page header. |
-| `app/dashboard/jobs/[id]/pipeline/page.tsx` | Wire up `useTableSelection` + `<BulkActionBar>`. |
-| `app/dashboard/pipeline/page.tsx` (and `pipeline-list.tsx`) | Same wiring. |
-| `app/dashboard/jobs/page.tsx` | Same wiring; draft-only validation logic for Delete button enablement. |
-| `app/dashboard/talent/page.tsx` | Same wiring; talent-bank-specific bulk actions (delete + export). |
-| `components/pipeline/application-table.tsx` | Leading checkbox column; selection highlight; prior-reject badge on row. |
+| `app/dashboard/jobs/[id]/pipeline/page.tsx` | Switch to `usePaginatedQuery`; filter/search/sort drive query args. Wire up `useTableSelection` + `<BulkActionBar>`. |
+| `app/dashboard/pipeline/page.tsx` (and `pipeline-list.tsx`) | Same — paginated query + bulk-action wiring. |
+| `app/dashboard/jobs/page.tsx` | Paginated `listBySchool`; server-side filter (status/search) + sort. Bulk-action wiring; draft-only validation logic for Delete button. |
+| `app/dashboard/talent/page.tsx` | Paginated `listForSchool`; server-side filter (pool/stage/search) + sort. Bulk-action wiring; talent-bank-specific bulk actions (delete + export). |
+| `components/talent/talent-controls.tsx` | Inputs now controlled and emit filter/sort changes to the page; no longer drives client-side memo. |
+| `components/pipeline/application-table.tsx` | Leading checkbox column; selection highlight; prior-reject badge on row; intersection observer wired to `loadMore`. |
 | `components/pipeline/application-drawer.tsx` | "Delete candidate" button (Danger zone); "Previous outcomes" section. |
-| `components/jobs/jobs-list.tsx` | Per-card checkbox; selection highlight. |
+| `components/jobs/jobs-list.tsx` | Per-card checkbox; selection highlight; intersection observer wired to `loadMore`. |
 
 ### Removed files
 
@@ -470,8 +627,13 @@ The rejection history surfaced in a given context always excludes the *current* 
 - **Undo called twice for the same batch**: second call finds nothing to clear. Return `{ restored: 0 }`. Harmless.
 - **Stage-change undo with a row that was further-modified after the bulk change**: still applies the previous-stage snapshot (last-write-wins). This is acceptable — undo means "go back to what you had right before the bulk action".
 - **CSV export with non-ASCII fields**: prefix CSV with BOM (`﻿`) so Excel opens it as UTF-8.
-- **Shift-click range select after a filter/sort change**: the visible-ids array passed to the hook updates each render, so the "range" is always relative to current display order. Correct behaviour.
+- **Shift-click range select after a filter/sort change**: the loaded-ids array passed to the hook updates each render, so the "range" is always relative to current loaded order. Correct behaviour.
 - **Empty selection clicking a bulk action**: the bar is hidden at count=0, so this isn't reachable.
+- **Shift-click range select across un-loaded rows**: the user selects row 1, scrolls down (more rows load), shift-clicks row 200. The range covers rows 1-200 in loaded order — the rows now in memory. If rows in the middle haven't loaded yet (sparse pagination), shift-click can't reach them. Acceptable v1 — the user can scroll to force them to load before shift-clicking.
+- **Selection survives a `loadMore`**: ids selection is in component state, not derived from the result. Loading more rows adds them with `isSelected = false`. The selection set is unaffected.
+- **Selection drops on filter/sort change**: when the user changes filter/sort, the underlying paginated query restarts; the selection is reset to empty (otherwise it could contain ids that are no longer in the visible result). Document this clearly in the UI ("Changing filter cleared your selection").
+- **matchAll banner shows stale count**: the count query is reactive in Convex, so it updates as the dataset changes. Brief flicker between filter change and updated count is acceptable.
+- **paginate result includes a row that another tab marked `pendingDeleteAt` mid-scroll**: Convex re-emits the affected page; the row drops from the result. The virtualized list re-renders without it. No further handling needed.
 
 ---
 
@@ -479,30 +641,34 @@ The rejection history surfaced in a given context always excludes the *current* 
 
 ### Unit
 
-- `useTableSelection`: toggle, shift-range, toggleAll behaviour, clear. Pure logic — covered by RTL hook tests.
+- `useTableSelection`: toggle, shift-range within loaded ids, toggleAllLoaded behaviour, mode transitions (ids ↔ all-matching), clear, count shape. Pure logic — covered by RTL hook tests.
+- `useInfiniteScroll`: intersection-observer fires `loadMore` near the threshold; doesn't re-fire while a load is in-flight.
 - `csv-export`: row→CSV string formatting, escaping, BOM. Pure function tests.
 
 ### Integration
 
-Each delete-pattern test should cover: (a) mutation marks rows pending without touching child rows; (b) finalize action cascades correctly; (c) undo within window restores; (d) undo after finalize is a no-op.
+Each delete-pattern test should cover: (a) mutation marks rows pending without touching child rows; (b) finalize action cascades correctly; (c) undo within window restores; (d) undo after finalize is a no-op. Each bulk mutation should also be tested in both `ids` and `matchAll` modes.
 
 - Convex mutations:
-  - `candidates.remove` / `removeMany` / `internal.candidates.finalizeBatchDelete`: applications + evaluations + outreach + calendar events + triage decisions + booking tokens + candidate pools + resume → all gone after finalize; nothing gone before finalize. Undo before finalize restores all rows. Undo after finalize returns `restored: 0`.
-  - `applications.removeManyApplications` / `internal.applications.finalizeBatchDelete`: applications + their child rows gone; candidate untouched.
-  - `applications.bulkSetStage`: all stages updated; returns correct `previousStages` snapshot. Calling it again with the snapshot restores prior state.
-  - `jobs.removeMany` / `internal.jobs.finalizeBatchDelete`: drafts deleted after finalize; non-draft mixed in throws on the initial mutation and nothing is marked.
-  - `jobs.bulkSetStatus`: status updated across batch; returns correct `previousStatuses` snapshot.
+  - `candidates.remove` / `removeMany` / `internal.candidates.finalizeBatchDelete`: applications + evaluations + outreach + calendar events + triage decisions + booking tokens + candidate pools + resume → all gone after finalize; nothing gone before finalize. Undo before finalize restores all rows. Undo after finalize returns `restored: 0`. matchAll expands filter to correct IDs and applies.
+  - `applications.removeManyApplications` / `internal.applications.finalizeBatchDelete`: applications + their child rows gone; candidate untouched. Both `ids` and `matchAll` shapes covered.
+  - `applications.bulkSetStage`: all stages updated; returns correct `previousStages` snapshot. Calling it again with the snapshot restores prior state. Both shapes covered.
+  - `jobs.removeMany` / `internal.jobs.finalizeBatchDelete`: drafts deleted after finalize; non-draft mixed in throws on the initial mutation and nothing is marked. matchAll with a non-draft filter throws server-side.
+  - `jobs.bulkSetStatus`: status updated across batch; returns correct `previousStatuses` snapshot. Both shapes covered.
   - `candidates.getRejectionHistory`: returns correct shape; `excludeApplicationId` honoured; orders by `rejectedAt` desc.
-  - List queries (`candidates.listForSchool`, `applications.getPipelineForJob`, `jobs.listBySchool`): exclude rows where `pendingDeleteAt != null`.
+  - List queries (`candidates.listForSchool`, `applications.getPipelineForJob`, `jobs.listBySchool`): exclude rows where `pendingDeleteAt != null`. Return `{ page, isDone, continueCursor }`; server-side filter/sort honoured.
+  - Count queries (`candidates.countForSchool`, `applications.countForJob`, `jobs.countBySchool`): match the totals you'd get by collecting the paginated query with the same filter.
 
 ### Manual / preview
 
-- Multi-select on the candidate table: click, shift-click range, toggle all (selects every filtered row, not just rendered), clear.
+- Pagination + infinite scroll: open talent bank with 2k+ candidates, confirm only ~100 load initially, scroll to load more, confirm no UI jank, confirm filter/sort/search changes reset to a fresh page.
+- Multi-select on the candidate table: click, shift-click range, toggle all loaded, banner appears, click banner → matchAll mode, count shows total matching, clear.
 - Multi-select on jobs grid: same.
 - Bulk action bar appears, disappears, slides without layout shift.
 - Criteria page: NL textarea autosave, structured editor coexistence, "Generate with AI" populates structured editor without touching textarea.
 - Candidate delete from drawer → confirm modal → undo toast appears → row hidden → click Undo within 10s → row returns; let it expire → row gone, refresh confirms.
-- Bulk Remove from pipeline: 5 selected → action → 5 rows hidden + undo toast → undo restores → repeat without undo, wait 10s, refresh confirms permanent deletion.
+- Bulk Remove from pipeline (ids mode): 5 selected → action → 5 rows hidden + undo toast → undo restores → repeat without undo, wait 10s, refresh confirms permanent deletion.
+- Bulk Delete candidates (matchAll mode): filter to "Math" subject (1,234 matching) → select all on page → click banner "Select all 1,234 matching" → Delete → confirm "Delete 1,234?" → undo toast → undo restores; repeat and wait → all 1,234 permanently deleted.
 - Bulk stage change: 5 selected → Move to Interview → undo toast → undo restores individual prior stages (not all to the same value).
 - Prior reject badge visible when applicable; drawer "Previous outcomes" shows evaluation notes; self-reference excluded.
 
@@ -510,4 +676,4 @@ Each delete-pattern test should cover: (a) mutation marks rows pending without t
 
 ## Open questions
 
-None at spec time. The candidate-vs-application semantics, the cascading scope, the criteria layout, the bulk action set, and the rejection history shape were all settled during brainstorming.
+None at spec time. Settled during brainstorming: candidate-vs-application semantics, cascading scope, criteria layout, bulk action set, rejection history shape, 10s undo via scheduled finalize, pagination + select-all-matching.
