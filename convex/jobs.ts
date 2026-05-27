@@ -1,7 +1,11 @@
 import { mutation, query, internalMutation, action } from "./_generated/server";
 import { v } from "convex/values";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { paginationOptsValidator } from "convex/server";
+
+function makeBatchId() {
+  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+}
 
 export const create = mutation({
   args: {
@@ -356,6 +360,86 @@ export const listAllActive = query({
   args: {},
   handler: async (ctx) => {
     return await ctx.db.query("jobPostings").filter((q) => q.eq(q.field("status"), "active")).collect();
+  },
+});
+
+const removeManyJobsArgs = v.union(
+  v.object({ ids: v.array(v.id("jobPostings")) }),
+  v.object({ matchAll: v.object({ schoolId: v.id("schools"), filter: v.optional(v.any()) }) }),
+);
+
+export const removeMany = mutation({
+  args: removeManyJobsArgs,
+  handler: async (ctx, args) => {
+    const a = args as { ids?: string[]; matchAll?: { schoolId: any; filter?: any } };
+    let ids: any[] = [];
+    if (a.ids) {
+      ids = a.ids;
+    } else if (a.matchAll) {
+      const matchAll = a.matchAll;
+      if (matchAll.filter?.status && matchAll.filter.status !== "draft") {
+        throw new Error("Bulk delete only supports draft jobs");
+      }
+      const rows = await ctx.db.query("jobPostings")
+        .withIndex("by_schoolId", (q) => q.eq("schoolId", matchAll.schoolId))
+        .filter((q) => q.and(
+          q.eq(q.field("pendingDeleteAt"), undefined),
+          q.eq(q.field("status"), "draft"),
+        ))
+        .collect();
+      ids = rows.map((r) => r._id);
+    }
+
+    // Validate draft-only BEFORE marking anything.
+    for (const id of ids) {
+      const job = await ctx.db.get(id as any) as any;
+      if (!job) continue;
+      if (job.status !== "draft") {
+        throw new Error(`Job ${id} is not a draft; bulk delete denied`);
+      }
+    }
+
+    const batchId = makeBatchId();
+    let count = 0;
+    for (const id of ids) {
+      const job = await ctx.db.get(id as any) as any;
+      if (!job || job.pendingDeleteAt != null) continue;
+      await ctx.db.patch(id as any, { pendingDeleteAt: Date.now(), pendingDeleteBatchId: batchId });
+      count++;
+    }
+    await ctx.scheduler.runAfter(10_000, internal.jobs.finalizeBatchDelete, { batchId });
+    return { batchId, count };
+  },
+});
+
+export const undoBatchDelete = mutation({
+  args: { batchId: v.string() },
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("jobPostings")
+      .filter((q) => q.eq(q.field("pendingDeleteBatchId"), args.batchId))
+      .collect();
+    let restored = 0;
+    for (const r of rows) {
+      if (r.pendingDeleteAt == null) continue;
+      await ctx.db.patch(r._id, { pendingDeleteAt: undefined, pendingDeleteBatchId: undefined });
+      restored++;
+    }
+    return { restored };
+  },
+});
+
+export const finalizeBatchDelete = internalMutation({
+  args: { batchId: v.string() },
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("jobPostings")
+      .filter((q) => q.eq(q.field("pendingDeleteBatchId"), args.batchId))
+      .collect();
+    for (const r of rows) {
+      if (r.pendingDeleteAt == null) continue;
+      await ctx.db.delete(r._id);
+    }
   },
 });
 
