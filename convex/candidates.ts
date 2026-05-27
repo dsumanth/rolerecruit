@@ -1,6 +1,6 @@
-import { mutation, query, internalMutation, internalAction } from "./_generated/server";
+import { action, mutation, query, internalMutation, internalAction } from "./_generated/server";
 import { v } from "convex/values";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { PARSED_FACETS_VERSION, EMBEDDING_VERSION } from "./versions";
 
 export const create = mutation({
@@ -161,9 +161,24 @@ export const writeCompiledData = internalMutation({
       leadership: v.array(v.float64()),
     })),
     parsingNotes: v.optional(v.string()),
+    // Top-level identity/profile fields lifted from the parsed resume. Optional
+    // because they may be empty/null when the LLM can't extract them. The
+    // existing candidate row already has its own values from initial insert;
+    // these only overwrite when truthy (see handler).
+    name: v.optional(v.union(v.string(), v.null())),
+    email: v.optional(v.union(v.string(), v.null())),
+    phone: v.optional(v.union(v.string(), v.null())),
+    location: v.optional(v.union(v.string(), v.null())),
+    currentSchool: v.optional(v.union(v.string(), v.null())),
+    qualifications: v.optional(v.array(v.string())),
+    certifications: v.optional(v.array(v.string())),
+    boardExperience: v.optional(v.array(v.string())),
+    subjects: v.optional(v.array(v.string())),
+    yearsExperience: v.optional(v.union(v.number(), v.null())),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.candidateId, {
+    const existing = await ctx.db.get(args.candidateId);
+    const patch: Record<string, unknown> = {
       parsedFacets: args.parsedFacets,
       candidateSummary: args.candidateSummary,
       rawChunks: args.rawChunks,
@@ -172,7 +187,29 @@ export const writeCompiledData = internalMutation({
       embeddingVersion: args.facetEmbeddings ? EMBEDDING_VERSION : undefined,
       parsedAt: Date.now(),
       parsingNotes: args.parsingNotes,
-    });
+    };
+
+    // The initial row from createFromUpload sets `name` to the original
+    // filename (e.g. "12345_Updated Resume.pdf") as a placeholder. Replace it
+    // with the parsed name if we have one, but don't overwrite a real
+    // user-provided name that doesn't look like a filename.
+    const looksLikeFilename = typeof existing?.name === "string"
+      && /\.(pdf|docx?|png|jpe?g)$/i.test(existing.name);
+    if (args.name && (looksLikeFilename || !existing?.name)) {
+      patch.name = args.name;
+    }
+
+    if (args.email && !existing?.email) patch.email = args.email;
+    if (args.phone) patch.phone = args.phone;
+    if (args.location) patch.location = args.location;
+    if (args.currentSchool) patch.currentSchool = args.currentSchool;
+    if (args.qualifications && args.qualifications.length > 0) patch.qualifications = args.qualifications;
+    if (args.certifications && args.certifications.length > 0) patch.certifications = args.certifications;
+    if (args.boardExperience && args.boardExperience.length > 0) patch.boardExperience = args.boardExperience;
+    if (args.subjects && args.subjects.length > 0) patch.subjects = args.subjects;
+    if (typeof args.yearsExperience === "number") patch.yearsExperience = args.yearsExperience;
+
+    await ctx.db.patch(args.candidateId, patch);
   },
 });
 
@@ -360,5 +397,28 @@ export const demoteFacetForCandidate = internalMutation({
     await ctx.db.patch(args.candidateId, {
       parsedFacets: { ...c.parsedFacets, extras },
     });
+  },
+});
+
+// Re-runs the resume extraction + parsing pipeline for an existing candidate.
+// Exposed publicly so the UI can trigger it from a (hidden) drawer action when
+// a candidate was parsed by a buggy version of the pipeline and needs a redo.
+// Idempotent: writeCompiledData uses ctx.db.patch, so existing identity fields
+// the user has manually edited are only overwritten by the new patch logic
+// (filename-looking names get replaced; user-edited names stay).
+export const reparse = action({
+  args: { candidateId: v.id("candidates") },
+  handler: async (ctx, args): Promise<{ ok: boolean; reason?: string }> => {
+    const candidate = await ctx.runQuery(api.candidates.get, { candidateId: args.candidateId });
+    if (!candidate) return { ok: false, reason: "Candidate not found" };
+    if (!candidate.resumeStorageId) {
+      return { ok: false, reason: "No resume file attached — nothing to reparse" };
+    }
+    await ctx.runAction(internal.intake_pdf.extractTextFromResume, {
+      candidateId: args.candidateId,
+      storageId: candidate.resumeStorageId,
+      originalName: candidate.resumeOriginalName,
+    });
+    return { ok: true };
   },
 });

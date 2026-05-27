@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -50,6 +50,7 @@ interface Candidate {
   yearsExperience?: number;
   currentSchool?: string;
   resumeUrl?: string;
+  resumeStorageId?: string;
   candidateSummary?: string;
   parsedFacets?: ParsedFacets;
   parseStatus?: "pending" | "done" | "failed";
@@ -265,6 +266,27 @@ function InfoTab({ app, candidate, onSwitchTab }: { app: Application; candidate:
     api.graph.profileGraphForCandidate,
     candidate?._id ? { candidateId: candidate._id as any } : "skip",
   );
+
+  const reparseCandidate = useAction(api.candidates.reparse);
+  const [reparseState, setReparseState] = useState<"idle" | "running" | "error">("idle");
+  const [reparseError, setReparseError] = useState<string | null>(null);
+  const handleReparse = async () => {
+    if (!candidate?._id) return;
+    setReparseState("running");
+    setReparseError(null);
+    try {
+      const result = await reparseCandidate({ candidateId: candidate._id as any });
+      if (!result.ok) {
+        setReparseState("error");
+        setReparseError(result.reason ?? "Reparse failed");
+        return;
+      }
+      setReparseState("idle");
+    } catch (err: any) {
+      setReparseState("error");
+      setReparseError(err?.message ?? String(err));
+    }
+  };
 
   const getStageName = (stageId: string) => {
     const found = stageList.find((s: any) => s.id === stageId);
@@ -505,6 +527,40 @@ function InfoTab({ app, candidate, onSwitchTab }: { app: Application; candidate:
             <p className="text-xs text-ink-tertiary pt-2">
               Last parsed {new Date(candidate.parsedAt).toLocaleString()}
             </p>
+          )}
+
+          {/* Reparse is intentionally hidden behind a `<details>` toggle: a
+              destructive-ish action (overwrites parsed fields) shouldn't be a
+              one-misclick away. Only rendered when the candidate has an actual
+              file on storage — text-only candidates have nothing to reparse. */}
+          {candidate.resumeStorageId && (
+            <details className="group pt-1">
+              <summary
+                aria-label="Show advanced actions"
+                className="text-xs text-ink-tertiary/40 hover:text-ink-tertiary cursor-pointer list-none select-none w-fit transition-colors"
+              >
+                <span aria-hidden="true">⋯</span>
+              </summary>
+              <div className="mt-2 flex flex-col gap-1.5">
+                <button
+                  type="button"
+                  onClick={handleReparse}
+                  disabled={reparseState === "running" || candidate.parseStatus === "pending"}
+                  data-testid="reparse-button"
+                  className="text-xs px-2 py-1 rounded bg-surface-canvas text-ink hover:bg-accent hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-fit"
+                >
+                  {reparseState === "running" || candidate.parseStatus === "pending"
+                    ? "Reparsing…"
+                    : "Reparse resume"}
+                </button>
+                {reparseError && (
+                  <p className="text-xs text-danger">{reparseError}</p>
+                )}
+                <p className="text-xs text-ink-tertiary">
+                  Re-runs extraction + LLM parsing using the stored resume file.
+                </p>
+              </div>
+            </details>
           )}
         </>
       )}

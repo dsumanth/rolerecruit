@@ -2,7 +2,7 @@
 import { action, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
-import { validateEvidence } from "./evidenceValidator";
+import { validateAndFilterFacets } from "./evidenceValidator";
 import type { ParsedProfile, RawChunk } from "./types";
 
 export const generateResumeUploadUrl = mutation({
@@ -36,16 +36,17 @@ export const parseAndStoreCandidate = action({
     // 1. Parse facets + chunks + summary + relationships
     let parsed: ParsedProfile = await ctx.runAction(api.ai.parseProfileFromText, { text: args.rawText });
 
-    // 2. Validate evidence; if validation fails, retry parse once
+    // 2. Filter out hallucinated/unsupported facets. We don't just *warn* — we
+    //    actually drop items whose evidence quote isn't in any rawChunk, or
+    //    (for schoolTypes/languages) whose value keyword isn't in the quote.
+    //    Retrying the LLM on bad data tends to produce the same hallucinations,
+    //    so we skip retry and just keep the salvageable facets.
     let parsingNotes: string | undefined = undefined;
     if (parsed.rawChunks.length > 0) {
-      const result = validateEvidence(parsed.parsedFacets, parsed.rawChunks);
-      if (!result.ok) {
-        parsed = await ctx.runAction(api.ai.parseProfileFromText, { text: args.rawText });
-        const retry = validateEvidence(parsed.parsedFacets, parsed.rawChunks);
-        if (!retry.ok) {
-          parsingNotes = `Evidence validation failed on retry: ${retry.invalidFacets.length} invalid facet(s). First: ${retry.invalidFacets[0]?.reason ?? "unknown"}`;
-        }
+      const result = validateAndFilterFacets(parsed.parsedFacets, parsed.rawChunks);
+      parsed = { ...parsed, parsedFacets: result.filtered };
+      if (result.droppedCount > 0) {
+        parsingNotes = `Dropped ${result.droppedCount} unsupported facet(s). First: ${result.firstReason ?? "unknown"}`;
       }
     }
 
@@ -65,7 +66,9 @@ export const parseAndStoreCandidate = action({
       },
     });
 
-    // 4. Persist compiled data
+    // 4. Persist compiled data — including top-level identity/profile fields
+    //    so the candidate row reflects the parsed resume, not just placeholders
+    //    from the initial upload (name=filename, qualifications=[], etc.).
     await ctx.runMutation(internal.candidates.writeCompiledData, {
       candidateId: args.candidateId,
       parsedFacets: parsed.parsedFacets,
@@ -73,6 +76,16 @@ export const parseAndStoreCandidate = action({
       rawChunks: parsed.rawChunks,
       facetEmbeddings: facetEmbeddings ?? undefined,
       parsingNotes,
+      name: parsed.name ?? undefined,
+      email: parsed.email ?? undefined,
+      phone: parsed.phone ?? undefined,
+      location: parsed.location ?? undefined,
+      currentSchool: parsed.currentSchool ?? undefined,
+      qualifications: parsed.qualifications,
+      certifications: parsed.certifications,
+      boardExperience: parsed.boardExperience,
+      subjects: parsed.subjects,
+      yearsExperience: parsed.yearsExperience ?? undefined,
     });
 
     // 5. Materialize the knowledge graph (skip if relationships are all empty —

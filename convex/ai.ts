@@ -2,9 +2,16 @@ import { action } from "./_generated/server";
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
 import { EMPTY_PARSED_FACETS, buildFacetExtractionPrompt } from "./prompts/facetExtraction";
-import type { ParsedProfile, RelationshipsHint, PreviousSchoolHint, QualificationHint } from "./types";
+import type { ParsedProfile, RelationshipsHint, PreviousSchoolHint, QualificationHint, FacetValue } from "./types";
 import { EMPTY_RELATIONSHIPS } from "./types";
 import { getLlmClient, LLM_MODEL } from "./lib/llmClient";
+import { repairJsonControlChars } from "./lib/jsonRepair";
+import { normalizeFacetArray, normalizeStringArray, normalizeOptionalString } from "./facetNormalize";
+
+const TYPED_FACET_KEYS = [
+  "specializations", "gradeLevels", "pedagogicalApproach", "leadershipRoles",
+  "extracurricular", "languages", "schoolTypes", "keyAchievements", "redFlags",
+] as const;
 
 const VALID_REGIONS = new Set([
   "Delhi NCR", "Mumbai", "Bangalore", "Hyderabad", "Pune",
@@ -190,7 +197,7 @@ export const parseProfileFromText = action({
 
     const response = await client.chat.completions.create({
       model: LLM_MODEL,
-      max_tokens: 4096,
+      max_tokens: 8192,
       temperature: 0,
       messages: [
         { role: "system", content: systemPrompt },
@@ -199,55 +206,123 @@ export const parseProfileFromText = action({
     });
 
     const text = response.choices[0]?.message?.content ?? "";
+    const finishReason = response.choices[0]?.finish_reason;
+    // Minimal diagnostic: surface input/output sizes + finish_reason so a
+    // truncated or empty LLM response is visible in convex logs without dumping
+    // full content. If a future upload comes back empty, these three numbers
+    // tell us where it broke.
+    console.log("[parseProfile]",
+      `input=${args.text.length}ch`,
+      `resp=${text.length}ch`,
+      `finish=${finishReason ?? "?"}`,
+    );
     try {
       const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error("No JSON");
-      const parsed = JSON.parse(jsonMatch[0]);
-
-      // Merge LLM-emitted top-level promoted keys into parsedFacets.extras under __promoted__<key>
-      const parsedFacets = { ...EMPTY_PARSED_FACETS, ...(parsed.parsedFacets ?? {}) };
-      const extras = { ...((parsedFacets as any).extras ?? {}) };
-      for (const k of promotedKeys) {
-        if (parsed.parsedFacets?.[k]) {
-          extras[`__promoted__${k}`] = parsed.parsedFacets[k];
-          delete (parsedFacets as any)[k]; // remove from top-level — only typed/extras shape allowed
-        }
+      if (!jsonMatch) {
+        console.log("[parseProfile] no-json-match; resp head:", text.substring(0, 300));
+        throw new Error("No JSON");
       }
-      (parsedFacets as any).extras = extras;
+      // Gemini occasionally emits literal control characters (unescaped \n,
+      // \t, etc.) inside string values when it copies source text into an
+      // evidence.context field. JSON.parse rejects those. Try strict parse
+      // first, then fall back to the repair pass — that way we keep parse
+      // costs at zero for the happy path.
+      let parsed: any;
+      try {
+        parsed = JSON.parse(jsonMatch[0]);
+      } catch (firstErr: any) {
+        const repaired = repairJsonControlChars(jsonMatch[0]);
+        parsed = JSON.parse(repaired);
+        console.log("[parseProfile] used json-repair (strict-parse failed:", firstErr?.message, ")");
+      }
 
-      // Phase 3a — normalize relationships block
+      // Normalize the LLM's facets into the canonical { value, evidence } shape.
+      // The model sometimes flattens evidence to the top level and stores the value
+      // under a facet-named field (e.g. `language: "English"`); facetNormalize coerces
+      // that back to the schema we persist.
+      const rawFacets: Record<string, unknown> = parsed.parsedFacets ?? {};
+      const parsedFacets: Record<string, FacetValue[] | Record<string, FacetValue[]>> = {
+        ...EMPTY_PARSED_FACETS,
+      };
+      for (const k of TYPED_FACET_KEYS) {
+        parsedFacets[k] = normalizeFacetArray(rawFacets[k]);
+      }
+
+      const extras: Record<string, FacetValue[]> = {};
+      const rawExtras = (rawFacets.extras ?? {}) as Record<string, unknown>;
+      for (const [k, v] of Object.entries(rawExtras)) {
+        const norm = normalizeFacetArray(v);
+        if (norm.length > 0) extras[k] = norm;
+      }
+      for (const k of promotedKeys) {
+        const norm = normalizeFacetArray(rawFacets[k]);
+        if (norm.length > 0) extras[`__promoted__${k}`] = norm;
+      }
+      parsedFacets.extras = extras;
+
+      // Phase 3a — normalize relationships block. We map+sanitize each entry
+      // because the graph validator uses v.optional(v.string()) for fields like
+      // `endReason`, which accepts ABSENT but rejects an explicit `null` — and
+      // Gemini happily emits `null` for unknown optional fields.
       const rawRel = parsed.relationships ?? {};
+      const sanitizePreviousSchool = (s: any): PreviousSchoolHint | null => {
+        if (!s || typeof s !== "object" || typeof s.name !== "string") return null;
+        const out: PreviousSchoolHint = { name: s.name };
+        if (typeof s.role === "string") out.role = s.role;
+        if (Array.isArray(s.subjects)) {
+          const subjects = s.subjects.filter((x: any): x is string => typeof x === "string");
+          if (subjects.length > 0) out.subjects = subjects;
+        }
+        if (typeof s.yearStart === "number" && Number.isFinite(s.yearStart)) out.yearStart = s.yearStart;
+        if (typeof s.yearEnd === "number" && Number.isFinite(s.yearEnd)) out.yearEnd = s.yearEnd;
+        if (typeof s.endReason === "string" && s.endReason.trim()) out.endReason = s.endReason;
+        return out;
+      };
+      const sanitizeQualificationHint = (q: any): QualificationHint | null => {
+        if (!q || typeof q !== "object" || typeof q.degree !== "string") return null;
+        const out: QualificationHint = { degree: q.degree };
+        if (typeof q.university === "string") out.university = q.university;
+        if (typeof q.yearStart === "number" && Number.isFinite(q.yearStart)) out.yearStart = q.yearStart;
+        if (typeof q.yearEnd === "number" && Number.isFinite(q.yearEnd)) out.yearEnd = q.yearEnd;
+        return out;
+      };
       const relationships: RelationshipsHint = {
         previousSchools: Array.isArray(rawRel.previousSchools)
-          ? rawRel.previousSchools.filter(
-              (s: any): s is PreviousSchoolHint =>
-                s !== null && typeof s === "object" && typeof s.name === "string",
-            )
+          ? rawRel.previousSchools.map(sanitizePreviousSchool).filter((x: PreviousSchoolHint | null): x is PreviousSchoolHint => x !== null)
           : [],
         qualifications: Array.isArray(rawRel.qualifications)
-          ? rawRel.qualifications.filter(
-              (q: any): q is QualificationHint =>
-                q !== null && typeof q === "object" && typeof q.degree === "string",
-            )
+          ? rawRel.qualifications.map(sanitizeQualificationHint).filter((x: QualificationHint | null): x is QualificationHint => x !== null)
           : [],
-        certifications: Array.isArray(rawRel.certifications)
-          ? rawRel.certifications.filter((c: any): c is string => typeof c === "string")
-          : [],
-        referredBy: typeof rawRel.referredBy === "string" ? rawRel.referredBy : undefined,
+        certifications: normalizeStringArray(rawRel.certifications),
+        referredBy: typeof rawRel.referredBy === "string" && rawRel.referredBy.trim() ? rawRel.referredBy : undefined,
         region: typeof rawRel.region === "string" && VALID_REGIONS.has(rawRel.region)
           ? rawRel.region
-          : (typeof rawRel.region === "string" ? "Other" : undefined),
+          : (typeof rawRel.region === "string" && rawRel.region.trim() ? "Other" : undefined),
       };
 
+      // Top-level string fields the LLM may emit as facet-objects rather than
+      // plain strings. Coerce them through normalizeOptionalString/Array so the
+      // downstream mutation (which expects scalars) accepts them.
+      const yrs = parsed.yearsExperience;
       return {
         ...emptyProfile(),
-        ...parsed,
+        name: normalizeOptionalString(parsed.name),
+        email: normalizeOptionalString(parsed.email),
+        phone: normalizeOptionalString(parsed.phone),
+        location: normalizeOptionalString(parsed.location),
+        currentSchool: normalizeOptionalString(parsed.currentSchool),
+        qualifications: normalizeStringArray(parsed.qualifications),
+        certifications: normalizeStringArray(parsed.certifications),
+        boardExperience: normalizeStringArray(parsed.boardExperience),
+        subjects: normalizeStringArray(parsed.subjects),
+        yearsExperience: typeof yrs === "number" && Number.isFinite(yrs) ? yrs : null,
         parsedFacets: parsedFacets as any,
         rawChunks: Array.isArray(parsed.rawChunks) ? parsed.rawChunks : [],
         candidateSummary: typeof parsed.candidateSummary === "string" ? parsed.candidateSummary : "",
         relationships,
       };
-    } catch {
+    } catch (err: any) {
+      console.log("[parseProfile] parse-failed:", err?.message ?? String(err), "resp tail:", text.substring(Math.max(0, text.length - 300)));
       return emptyProfile();
     }
   },
