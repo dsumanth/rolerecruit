@@ -3,17 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useQuery, useMutation } from "convex/react";
+import { usePaginatedQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 import { PageHeader, Badge, Button } from "@/components/ui";
 import { ApplicationTable } from "@/components/pipeline/application-table";
 import { ApplicationDrawer } from "@/components/pipeline/application-drawer";
-
-interface Application {
-  _id: string;
-  candidateId: string;
-  stage: string;
-  [key: string]: unknown;
-}
+import type { Application } from "@/components/pipeline/application-table";
 
 function jobBadge(status: string) {
   if (status === "active") return <Badge dot variant="success">Active</Badge>;
@@ -23,13 +19,41 @@ function jobBadge(status: string) {
 
 export default function PipelinePage({ params }: { params: { id: string } }) {
   const job = useQuery(api.jobs.get, { jobId: params.id as any });
-  const pipeline = useQuery(api.applications.getPipelineForJob, {
-    jobId: params.id as any,
-  });
   const moveStage = useMutation(api.applications.moveStage);
   const [selectedApp, setSelectedApp] = useState<any>(null);
+  const [filter, setFilter] = useState<{ stage?: string; search?: string }>({});
+  const [sort, setSort] = useState<"newest" | "score" | "name">("newest");
 
-  const allApps = pipeline ? (Object.values(pipeline).flat() as Application[]) : [];
+  const { results, status, loadMore } = usePaginatedQuery(
+    api.applications.getPipelineForJob,
+    { jobId: params.id as any, filter, sort },
+    { initialNumItems: 100 },
+  );
+
+  const sentinelRef = useInfiniteScroll({ status, loadMore, loadCount: 100 });
+
+  const allApps: Application[] = results.map((row: any) => ({
+    _id: row.applicationId,
+    candidateId: row.candidateId,
+    stage: row.stage,
+    aiMatchScore: row.aiMatchScore,
+    globalScore: undefined,
+    poolNames: undefined,
+    candidate: {
+      _id: row.candidateId,
+      name: row.name,
+      phone: row.phone,
+      email: row.email,
+      location: row.location,
+      qualifications: [],
+      certifications: [],
+      boardExperience: [],
+      subjects: row.subjects ?? [],
+      yearsExperience: row.yearsExperience,
+      currentSchool: undefined,
+      resumeUrl: undefined,
+    },
+  }));
 
   return (
     <div>
@@ -50,16 +74,17 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
       <JobTabs jobId={params.id} active="pipeline" />
 
       <div className="mt-7">
-        {!pipeline ? (
+        {status === "LoadingFirstPage" ? (
           <div className="py-12 text-center text-body-s text-ink-secondary">
             Loading pipeline...
           </div>
         ) : (
           <ApplicationTable
             applications={allApps}
-            sortBy="newest"
-            onSortChange={() => {}}
+            sortBy={sort}
+            onSortChange={setSort}
             onRowClick={setSelectedApp}
+            loadMoreRef={sentinelRef}
           />
         )}
       </div>
