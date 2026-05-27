@@ -10,6 +10,7 @@ import { TalentControls } from "@/components/talent/talent-controls";
 import { PoolSelector } from "@/components/talent/pool-selector";
 import { GlobalCriteriaPanel } from "@/components/talent/global-criteria-panel";
 import { ApplicationTable } from "@/components/pipeline/application-table";
+import { ApplicationDrawer } from "@/components/pipeline/application-drawer";
 import type { Application } from "@/components/pipeline/application-table";
 import { NlSearchBar } from "@/components/talent/nl-search-bar";
 
@@ -28,6 +29,7 @@ export default function TalentBankPage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [nlResults, setNlResults] = useState<any[] | null>(null);
   const [nlIntent, setNlIntent] = useState("");
+  const [selectedApp, setSelectedApp] = useState<any>(null);
 
   const handleSearchChange = (query: string) => {
     setSearchQuery(query);
@@ -255,8 +257,16 @@ export default function TalentBankPage() {
             onSortChange={setSortBy}
             showScoreAs="global"
             showPoolBadges={true}
+            onRowClick={setSelectedApp}
           />
         </Card>
+      )}
+
+      {selectedApp && (
+        <ApplicationDrawer
+          app={selectedApp}
+          onClose={() => setSelectedApp(null)}
+        />
       )}
     </div>
   );

@@ -23,4 +23,10 @@ crons.daily(
   {},
 );
 
+crons.interval(
+  "poll-pending-custom-domains",
+  { minutes: 2 },
+  internal.vercelDomains.pollPendingDomains,
+);
+
 export default crons;

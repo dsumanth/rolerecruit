@@ -30,6 +30,14 @@ export default defineSchema({
     planTier: v.union(v.literal("free"), v.literal("pro"), v.literal("trust")),
     slug: v.optional(v.string()),
     customDomain: v.optional(v.string()),
+    customDomainStatus: v.optional(v.union(
+      v.literal("pending_dns"),
+      v.literal("verifying_ssl"),
+      v.literal("verified"),
+      v.literal("failed"),
+    )),
+    customDomainVerifiedAt: v.optional(v.number()),
+    customDomainError: v.optional(v.string()),
     logoStorageId: v.optional(v.id("_storage")),
     whatsappEnabled: v.optional(v.boolean()),
     googleCalendarConnected: v.optional(v.boolean()),
@@ -46,6 +54,18 @@ export default defineSchema({
     autoRejectThreshold: v.optional(v.number()),
     autoSendDelaySec: v.optional(v.number()),
     redFlagOverrideCount: v.optional(v.number()),
+
+    // Careers-page profile (public)
+    tagline: v.optional(v.string()),
+    heroImageStorageId: v.optional(v.id("_storage")),
+    about: v.optional(v.string()),
+    foundedYear: v.optional(v.number()),
+    studentCount: v.optional(v.number()),
+    facultyCount: v.optional(v.number()),
+    perks: v.optional(v.array(v.object({
+      label: v.string(),
+      description: v.string(),
+    }))),
   })
     .index("by_trust", ["trustId"])
     .index("by_name", ["name"])

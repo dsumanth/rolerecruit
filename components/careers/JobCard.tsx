@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Card, Badge, Icon } from "@/components/ui";
 
 interface Props {
   jobId: string;
@@ -8,28 +7,52 @@ interface Props {
   level: string;
   qualifications: string[];
   minExperience?: number;
+  maxExperience?: number;
+  salaryRange?: string;
   slug: string;
 }
 
-export function JobCard({ jobId, title, subject, level, qualifications, minExperience, slug }: Props) {
+export function JobCard({
+  jobId,
+  title,
+  subject,
+  level,
+  qualifications,
+  minExperience,
+  maxExperience,
+  salaryRange,
+  slug,
+}: Props) {
+  const expBand =
+    minExperience != null && maxExperience != null
+      ? `${minExperience}–${maxExperience} yrs`
+      : minExperience != null
+        ? `${minExperience}+ yrs`
+        : null;
+
+  const footParts = [qualifications.join(", "), expBand].filter(Boolean);
+
   return (
-    <Link href={`/careers/${slug}/jobs/${jobId}`} className="block">
-      <Card padding="md" elevation={1} interactive>
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <h3 className="text-title-m text-ink truncate">{title}</h3>
-            <div className="flex flex-wrap gap-2 mt-2">
-              <Badge variant="info">{subject}</Badge>
-              <Badge variant="neutral">{level}</Badge>
-            </div>
-            <p className="text-body-s text-ink-secondary mt-3">
-              {qualifications.join(", ")}
-              {minExperience != null && <span className="text-ink-tertiary"> · {minExperience}+ years</span>}
-            </p>
-          </div>
-          <Icon name="ArrowRight" size={16} color="var(--ink-3)" className="mt-1 flex-shrink-0" />
-        </div>
-      </Card>
+    <Link
+      href={`/careers/${slug}/jobs/${jobId}`}
+      className="block rounded-lg bg-surface border border-hairline px-7 py-6 shadow-elev-1 transition-shadow duration-base ease-apple-out hover:shadow-elev-2"
+    >
+      <div className="flex items-center gap-2.5 text-caption text-ink-secondary mb-2">
+        <span className="h-1.5 w-1.5 rounded-full bg-accent" aria-hidden />
+        <span>
+          {subject} · {level}
+        </span>
+      </div>
+      <h3 className="text-display-s text-ink mb-3.5 tracking-tight">{title}</h3>
+      <p className="text-body-s text-ink-secondary">
+        {footParts.join(" · ")}
+        {salaryRange && (
+          <>
+            {footParts.length > 0 && <span> &middot; </span>}
+            <strong className="text-ink font-medium">{salaryRange}</strong>
+          </>
+        )}
+      </p>
     </Link>
   );
 }

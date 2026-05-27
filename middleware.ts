@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { get as getEdgeConfig } from "@vercel/edge-config";
 
 const PUBLIC_PATH_PREFIXES = [
   "/sign-in",
@@ -23,44 +24,21 @@ function isPublicPath(pathname: string) {
   );
 }
 
-export default function middleware(req: NextRequest) {
-  const host = req.headers.get("host") ?? "";
-  const { pathname } = req.nextUrl;
+function stripHostPort(host: string): string {
+  const idx = host.indexOf(":");
+  return idx === -1 ? host : host.slice(0, idx);
+}
 
-  // Subdomain routing: {slug}.rolerecruit.com → /careers/{slug}
-  if (
-    host.endsWith(".rolerecruit.com") &&
-    host !== "www.rolerecruit.com" &&
-    host !== "rolerecruit.com" &&
-    host !== "localhost" &&
-    !host.startsWith("127.")
-  ) {
-    const subdomain = host.split(".")[0];
-    if (subdomain && !pathname.startsWith("/_next") && !pathname.startsWith("/api")) {
-      const url = req.nextUrl.clone();
-      url.pathname = `/careers/${subdomain}${pathname === "/" ? "" : pathname}`;
-      return NextResponse.rewrite(url);
-    }
+async function resolveCustomDomain(host: string): Promise<string | null> {
+  if (!process.env.EDGE_CONFIG) return null;
+  try {
+    const map = await getEdgeConfig<Record<string, string>>("customDomains");
+    if (!map) return null;
+    return map[host] ?? null;
+  } catch (err) {
+    console.error("Edge Config lookup failed:", err);
+    return null;
   }
-
-  if (isPublicPath(pathname)) {
-    return NextResponse.next();
-  }
-
-  // Better Auth session cookie gate. The server components revalidate
-  // the session via isAuthenticated() — this is just a cheap presence check.
-  // Mirrors Better Auth's own fallback lookup: tries dot, dash, and __Secure-
-  // variants so we don't bounce users whose cookie was set with a different
-  // attribute set (e.g. Safari rewriting to the Secure-prefixed name behind
-  // certain TLS proxies).
-  if (!hasBetterAuthSession(req)) {
-    const signInUrl = req.nextUrl.clone();
-    signInUrl.pathname = "/sign-in";
-    signInUrl.searchParams.set("redirect_url", `${pathname}${req.nextUrl.search}`);
-    return NextResponse.redirect(signInUrl);
-  }
-
-  return NextResponse.next();
 }
 
 function hasBetterAuthSession(req: NextRequest): boolean {
@@ -74,6 +52,60 @@ function hasBetterAuthSession(req: NextRequest): boolean {
     if (req.cookies.get(name)?.value) return true;
   }
   return false;
+}
+
+export default async function middleware(req: NextRequest) {
+  const rawHost = req.headers.get("host") ?? "";
+  const host = stripHostPort(rawHost);
+  const { pathname } = req.nextUrl;
+
+  const isInfraPath = pathname.startsWith("/_next") || pathname.startsWith("/api");
+
+  // 1. Subdomain routing: {slug}.rolerecruit.com → /careers/{slug}
+  if (
+    host.endsWith(".rolerecruit.com") &&
+    host !== "www.rolerecruit.com" &&
+    host !== "rolerecruit.com"
+  ) {
+    const subdomain = host.split(".")[0];
+    if (subdomain && !isInfraPath) {
+      const url = req.nextUrl.clone();
+      url.pathname = `/careers/${subdomain}${pathname === "/" ? "" : pathname}`;
+      return NextResponse.rewrite(url);
+    }
+  }
+
+  // 2. Custom domain routing: careers.someschool.com → /careers/{slug}
+  if (
+    !host.endsWith(".rolerecruit.com") &&
+    host !== "rolerecruit.com" &&
+    host !== "localhost" &&
+    !host.startsWith("127.") &&
+    !isInfraPath
+  ) {
+    const slug = await resolveCustomDomain(host);
+    if (slug) {
+      const url = req.nextUrl.clone();
+      url.pathname = `/careers/${slug}${pathname === "/" ? "" : pathname}`;
+      return NextResponse.rewrite(url);
+    }
+  }
+
+  if (isPublicPath(pathname)) {
+    return NextResponse.next();
+  }
+
+  // Better Auth session cookie gate. The server components revalidate the
+  // session via getCurrentUser() — this is just a cheap presence check.
+  // Mirrors Better Auth's own fallback lookup (dot, dash, __Secure- variants).
+  if (!hasBetterAuthSession(req)) {
+    const signInUrl = req.nextUrl.clone();
+    signInUrl.pathname = "/sign-in";
+    signInUrl.searchParams.set("redirect_url", `${pathname}${req.nextUrl.search}`);
+    return NextResponse.redirect(signInUrl);
+  }
+
+  return NextResponse.next();
 }
 
 export const config = {

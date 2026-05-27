@@ -1,5 +1,6 @@
 import { mutation, query, internalQuery, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
+import { internal } from "./_generated/api";
 
 const DEFAULT_PIPELINE_STAGES = [
   { id: "sourced", name: "Sourced", order: 0, isTerminal: false, color: "#86868b" },
@@ -91,7 +92,10 @@ export const get = query({
     const logoUrl = school.logoStorageId
       ? await ctx.storage.getUrl(school.logoStorageId)
       : null;
-    return { ...school, logoUrl };
+    const heroImageUrl = school.heroImageStorageId
+      ? await ctx.storage.getUrl(school.heroImageStorageId)
+      : null;
+    return { ...school, logoUrl, heroImageUrl };
   },
 });
 
@@ -136,6 +140,40 @@ export const clearLogo = mutation({
   },
 });
 
+export const generateHeroImageUploadUrl = mutation({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.storage.generateUploadUrl();
+  },
+});
+
+export const setHeroImage = mutation({
+  args: {
+    schoolId: v.id("schools"),
+    storageId: v.id("_storage"),
+  },
+  handler: async (ctx, args) => {
+    const school = await ctx.db.get(args.schoolId);
+    if (!school) throw new Error("School not found");
+    if (school.heroImageStorageId) {
+      await ctx.storage.delete(school.heroImageStorageId);
+    }
+    await ctx.db.patch(args.schoolId, { heroImageStorageId: args.storageId });
+  },
+});
+
+export const clearHeroImage = mutation({
+  args: { schoolId: v.id("schools") },
+  handler: async (ctx, args) => {
+    const school = await ctx.db.get(args.schoolId);
+    if (!school) throw new Error("School not found");
+    if (school.heroImageStorageId) {
+      await ctx.storage.delete(school.heroImageStorageId);
+    }
+    await ctx.db.patch(args.schoolId, { heroImageStorageId: undefined });
+  },
+});
+
 export const updateSettings = mutation({
   args: {
     schoolId: v.id("schools"),
@@ -149,12 +187,27 @@ export const updateSettings = mutation({
       rejection: v.optional(v.union(v.literal("whatsapp"), v.literal("email"), v.literal("both"), v.literal("none"))),
       custom: v.optional(v.union(v.literal("whatsapp"), v.literal("email"), v.literal("both"), v.literal("none"))),
     })),
+    tagline: v.optional(v.string()),
+    about: v.optional(v.string()),
+    foundedYear: v.optional(v.number()),
+    studentCount: v.optional(v.number()),
+    facultyCount: v.optional(v.number()),
+    perks: v.optional(v.array(v.object({
+      label: v.string(),
+      description: v.string(),
+    }))),
   },
   handler: async (ctx, args) => {
     const patch: Record<string, any> = {};
     if (args.slug !== undefined) patch.slug = args.slug || undefined;
     if (args.whatsappEnabled !== undefined) patch.whatsappEnabled = args.whatsappEnabled;
     if (args.messageChannelPrefs !== undefined) patch.messageChannelPrefs = args.messageChannelPrefs;
+    if (args.tagline !== undefined) patch.tagline = args.tagline || undefined;
+    if (args.about !== undefined) patch.about = args.about || undefined;
+    if (args.foundedYear !== undefined) patch.foundedYear = args.foundedYear;
+    if (args.studentCount !== undefined) patch.studentCount = args.studentCount;
+    if (args.facultyCount !== undefined) patch.facultyCount = args.facultyCount;
+    if (args.perks !== undefined) patch.perks = args.perks;
     return await ctx.db.patch(args.schoolId, patch);
   },
 });
@@ -196,5 +249,128 @@ export const updateTriageConfig = mutation({
   handler: async (ctx, args) => {
     const { schoolId, ...patch } = args;
     await ctx.db.patch(schoolId, patch);
+  },
+});
+
+// ─── Custom domains ────────────────────────────────────────────────────────
+
+function normalizeDomain(input: string): string {
+  return input.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+}
+
+function validateCustomDomain(domain: string): string | null {
+  if (!domain) return "Domain is required";
+  if (!/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/.test(domain)) {
+    return "Invalid domain format";
+  }
+  if (domain.split(".").length < 3) {
+    return "Please use a subdomain (e.g. careers.yourschool.com), not the apex domain";
+  }
+  if (domain.endsWith(".rolerecruit.com") || domain === "rolerecruit.com") {
+    return "Cannot use a rolerecruit.com domain as a custom domain";
+  }
+  return null;
+}
+
+export const requestCustomDomain = mutation({
+  args: {
+    schoolId: v.id("schools"),
+    domain: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const domain = normalizeDomain(args.domain);
+    const validationError = validateCustomDomain(domain);
+    if (validationError) throw new Error(validationError);
+
+    const existing = await ctx.db
+      .query("schools")
+      .withIndex("by_customDomain", (q) => q.eq("customDomain", domain))
+      .first();
+    if (existing && existing._id !== args.schoolId) {
+      throw new Error("This domain is already claimed by another school");
+    }
+
+    const school = await ctx.db.get(args.schoolId);
+    if (!school) throw new Error("School not found");
+
+    await ctx.db.patch(args.schoolId, {
+      customDomain: domain,
+      customDomainStatus: "pending_dns",
+      customDomainVerifiedAt: undefined,
+      customDomainError: undefined,
+    });
+
+    await ctx.scheduler.runAfter(0, internal.vercelDomains.registerDomain, {
+      schoolId: args.schoolId,
+      domain,
+    });
+
+    return { domain };
+  },
+});
+
+export const removeCustomDomain = mutation({
+  args: { schoolId: v.id("schools") },
+  handler: async (ctx, args) => {
+    const school = await ctx.db.get(args.schoolId);
+    if (!school || !school.customDomain) return;
+    const domain = school.customDomain;
+
+    await ctx.db.patch(args.schoolId, {
+      customDomain: undefined,
+      customDomainStatus: undefined,
+      customDomainVerifiedAt: undefined,
+      customDomainError: undefined,
+    });
+
+    await ctx.scheduler.runAfter(0, internal.vercelDomains.unregisterDomain, {
+      domain,
+    });
+  },
+});
+
+export const setCustomDomainStatusInternal = internalMutation({
+  args: {
+    schoolId: v.id("schools"),
+    status: v.union(
+      v.literal("pending_dns"),
+      v.literal("verifying_ssl"),
+      v.literal("verified"),
+      v.literal("failed"),
+    ),
+    error: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const patch: Record<string, any> = {
+      customDomainStatus: args.status,
+      customDomainError: args.error,
+    };
+    if (args.status === "verified") {
+      patch.customDomainVerifiedAt = Date.now();
+    }
+    await ctx.db.patch(args.schoolId, patch);
+  },
+});
+
+export const listPendingCustomDomains = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const schools = await ctx.db.query("schools").collect();
+    return schools
+      .filter((s) =>
+        s.customDomain &&
+        (s.customDomainStatus === "pending_dns" || s.customDomainStatus === "verifying_ssl")
+      )
+      .map((s) => ({ _id: s._id, customDomain: s.customDomain!, slug: s.slug }));
+  },
+});
+
+export const listVerifiedCustomDomains = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const schools = await ctx.db.query("schools").collect();
+    return schools
+      .filter((s) => s.customDomain && s.customDomainStatus === "verified" && s.slug)
+      .map((s) => ({ domain: s.customDomain!, slug: s.slug! }));
   },
 });

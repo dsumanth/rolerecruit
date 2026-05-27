@@ -7,6 +7,7 @@ import { StatusTabs } from "@/components/pipeline/status-tabs";
 import { JobSidebar } from "@/components/pipeline/job-sidebar";
 import { PipelineControls } from "@/components/pipeline/pipeline-controls";
 import { ApplicationTable } from "@/components/pipeline/application-table";
+import { ApplicationDrawer } from "@/components/pipeline/application-drawer";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { SortMode } from "@/components/pipeline/pipeline-controls";
@@ -29,6 +30,7 @@ export function PipelineList({ schoolId }: { schoolId: any }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStage, setSelectedStage] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortMode>("newest");
+  const [selectedApp, setSelectedApp] = useState<any>(null);
 
   const pipelineConfig = useQuery(api.pipeline_config.getForSchool, { schoolId });
 
@@ -168,11 +170,19 @@ export function PipelineList({ schoolId }: { schoolId: any }) {
                 applications={filteredApps}
                 sortBy={sortBy}
                 onSortChange={setSortBy}
+                onRowClick={setSelectedApp}
               />
             </div>
           )}
         </main>
       </div>
+
+      {selectedApp && (
+        <ApplicationDrawer
+          app={selectedApp}
+          onClose={() => setSelectedApp(null)}
+        />
+      )}
     </div>
   );
 }
