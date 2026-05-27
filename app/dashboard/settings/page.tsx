@@ -354,7 +354,7 @@ export default function SettingsPage() {
                 <span className="text-caption text-ink-secondary">Required</span>
               </div>
               <div className="flex items-center justify-between py-1.5 px-3 rounded-xs bg-surface-canvas">
-                <span className="text-caption font-mono text-ink">DEEPSEEK_API_KEY</span>
+                <span className="text-caption font-mono text-ink">GOOGLE_API_KEY</span>
                 <span className="text-caption text-ink-secondary">Set in deployment</span>
               </div>
               <div className="flex items-center justify-between py-1.5 px-3 rounded-xs bg-surface-canvas">
