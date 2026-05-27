@@ -1,5 +1,5 @@
 import { cronJobs } from "convex/server";
-import { internal } from "./_generated/api";
+import { internal, api } from "./_generated/api";
 
 const crons = cronJobs();
 
@@ -13,6 +13,13 @@ crons.daily(
   "track-extras-frequency",
   { hourUTC: 3, minuteUTC: 0 }, // 03:00 UTC nightly
   internal.facetPromotion.trackExtrasFrequency,
+  {},
+);
+
+crons.daily(
+  "backfill-graph",
+  { hourUTC: 4, minuteUTC: 0 },
+  api.backfill.backfillGraph,
   {},
 );
 
