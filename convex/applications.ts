@@ -31,6 +31,7 @@ export const create = mutation({
     schoolId: v.id("schools"),
     aiMatchScore: v.optional(v.number()),
     skipTriage: v.optional(v.boolean()),
+    stage: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const config = await ctx.db
@@ -38,9 +39,9 @@ export const create = mutation({
       .withIndex("by_schoolId", (q) => q.eq("schoolId", args.schoolId))
       .first();
 
-    const firstStage = config?.stages
+    const firstStage = args.stage ?? (config?.stages
       ?.sort((a, b) => a.order - b.order)
-      .find(s => !s.isTerminal)?.id ?? "sourced";
+      .find(s => !s.isTerminal)?.id ?? "sourced");
 
     const applicationId = await ctx.db.insert("applications", {
       candidateId: args.candidateId,

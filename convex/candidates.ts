@@ -4,6 +4,64 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { PARSED_FACETS_VERSION, EMBEDDING_VERSION } from "./versions";
 
+export const getRejectionHistory = query({
+  args: {
+    candidateId: v.id("candidates"),
+    excludeApplicationId: v.optional(v.id("applications")),
+  },
+  handler: async (ctx, args) => {
+    const apps = await ctx.db
+      .query("applications")
+      .withIndex("by_candidateId", (q) => q.eq("candidateId", args.candidateId))
+      .filter((q) => q.eq(q.field("pendingDeleteAt"), undefined))
+      .collect();
+
+    const result: any[] = [];
+    for (const app of apps) {
+      if (args.excludeApplicationId && app._id === args.excludeApplicationId) continue;
+
+      const evaluations = await ctx.db
+        .query("evaluations")
+        .withIndex("by_applicationId", (q) => q.eq("applicationId", app._id))
+        .filter((q) => q.eq(q.field("submitted"), true))
+        .collect();
+
+      const hasReject = evaluations.some((e: any) => e.recommendation === "reject");
+      if (app.stage !== "rejected" && !hasReject) continue;
+
+      const job = app.jobPostingId ? await ctx.db.get(app.jobPostingId) : null;
+      const evalSubmitted = evaluations
+        .filter((e: any) => e.recommendation != null)
+        .map((e: any) => e.submittedAt ?? 0);
+      const rejectedAt = Math.max(app._creationTime, ...(evalSubmitted.length ? evalSubmitted : [0]));
+
+      result.push({
+        applicationId: app._id,
+        jobId: app.jobPostingId,
+        jobTitle: (job as any)?.title ?? "(deleted role)",
+        jobSubject: (job as any)?.subject,
+        jobLevel: (job as any)?.level,
+        rejectedAt,
+        evaluations: evaluations.map((e: any) => ({
+          evaluatorRole: e.evaluatorRole,
+          recommendation: e.recommendation,
+          comments: e.comments,
+          scores: {
+            subjectKnowledge: e.subjectKnowledge,
+            classroomManagement: e.classroomManagement,
+            communication: e.communication,
+            overallFit: e.overallFit,
+          },
+          submittedAt: e.submittedAt,
+        })),
+      });
+    }
+
+    result.sort((a, b) => b.rejectedAt - a.rejectedAt);
+    return result;
+  },
+});
+
 export const create = mutation({
   args: {
     name: v.string(),
