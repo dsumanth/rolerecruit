@@ -39,4 +39,17 @@ describe("jobs.listBySchool — paginated", () => {
     expect(r.page.length).toBe(2);
     expect(r.isDone).toBe(false);
   });
+
+  it("countBySchool returns total matching", async () => {
+    const t = convexTest(schema, modules);
+    const schoolId = await t.mutation("schools:create", { name: "S", board: "CBSE", city: "M", state: "MH" });
+    for (let i = 0; i < 3; i++) {
+      await t.mutation("jobs:create", {
+        schoolId, title: `J ${i}`, subject: "M", level: "PGT", board: "CBSE",
+        qualifications: [], minExperience: 0, positions: 1, naturalLanguageDescription: "x",
+      });
+    }
+    const r = await t.query("jobs:countBySchool", { schoolId });
+    expect(r.total).toBe(3);
+  });
 });

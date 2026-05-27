@@ -315,6 +315,32 @@ export const hiredCountsForSchool = query({
   },
 });
 
+export const countBySchool = query({
+  args: {
+    schoolId: v.id("schools"),
+    filter: v.optional(v.object({
+      status: v.optional(v.union(
+        v.literal("draft"), v.literal("active"), v.literal("paused"),
+        v.literal("filled"), v.literal("closed"),
+      )),
+      search: v.optional(v.string()),
+    })),
+  },
+  handler: async (ctx, args) => {
+    let q = ctx.db.query("jobPostings")
+      .withIndex("by_schoolId", (q) => q.eq("schoolId", args.schoolId))
+      .filter((q) => q.eq(q.field("pendingDeleteAt"), undefined));
+    if (args.filter?.status) q = q.filter((qb) => qb.eq(qb.field("status"), args.filter!.status));
+    const rows = await q.collect();
+    let filtered = rows;
+    if (args.filter?.search) {
+      const s = args.filter.search.toLowerCase();
+      filtered = filtered.filter((j) => (j.title ?? "").toLowerCase().includes(s));
+    }
+    return { total: filtered.length };
+  },
+});
+
 export const listOpenForSchool = query({
   args: { schoolId: v.id("schools") },
   handler: async (ctx, args) => {
