@@ -2,6 +2,7 @@ import { mutation, query, internalMutation } from "./_generated/server";
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
+import { deleteApplicationChildren } from "./candidates";
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   sourced: ["screened", "rejected", "on_hold"],
@@ -352,5 +353,131 @@ export const generateAndAttachBookingLink = internalMutation({
     });
 
     return token;
+  },
+});
+
+// ============================================================================
+// Bulk delete: pending mark + undo (Task 7.1) + cascade finalize
+// ============================================================================
+
+function makeBatchId() {
+  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+}
+
+const removeManyAppsArgs = v.union(
+  v.object({ ids: v.array(v.id("applications")) }),
+  v.object({
+    matchAll: v.object({
+      jobId: v.union(v.id("jobPostings"), v.null()),
+      filter: v.optional(v.any()),
+    }),
+  }),
+);
+
+export const removeManyApplications = mutation({
+  args: removeManyAppsArgs,
+  handler: async (ctx, args) => {
+    const a = args as { ids?: string[]; matchAll?: { jobId: any; filter?: any } };
+    let ids: any[] = [];
+    if (a.ids) {
+      ids = a.ids;
+    } else if (a.matchAll) {
+      const matchAll = a.matchAll;
+      const builder = matchAll.jobId
+        ? ctx.db.query("applications").withIndex("by_jobPostingId", (q) => q.eq("jobPostingId", matchAll.jobId))
+        : ctx.db.query("applications");
+      const apps = await (builder as any)
+        .filter((q: any) => q.eq(q.field("pendingDeleteAt"), undefined))
+        .collect();
+      ids = apps.map((row: any) => row._id);
+    }
+
+    const batchId = makeBatchId();
+    let count = 0;
+    for (const id of ids) {
+      const row = await ctx.db.get(id as any) as any;
+      if (!row || row.pendingDeleteAt != null) continue;
+      await ctx.db.patch(id as any, { pendingDeleteAt: Date.now(), pendingDeleteBatchId: batchId });
+      count++;
+    }
+    await ctx.scheduler.runAfter(10_000, internal.applications.finalizeBatchDelete, { batchId });
+    return { batchId, count };
+  },
+});
+
+export const undoBatchDelete = mutation({
+  args: { batchId: v.string() },
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("applications")
+      .filter((q) => q.eq(q.field("pendingDeleteBatchId"), args.batchId))
+      .collect();
+    let restored = 0;
+    for (const row of rows) {
+      if (row.pendingDeleteAt == null) continue;
+      await ctx.db.patch(row._id, { pendingDeleteAt: undefined, pendingDeleteBatchId: undefined });
+      restored++;
+    }
+    return { restored };
+  },
+});
+
+export const finalizeBatchDelete = internalMutation({
+  args: { batchId: v.string() },
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("applications")
+      .filter((q) => q.eq(q.field("pendingDeleteBatchId"), args.batchId))
+      .collect();
+    for (const row of rows) {
+      if (row.pendingDeleteAt == null) continue;
+      await deleteApplicationChildren(ctx, row._id);
+      await ctx.db.delete(row._id);
+    }
+  },
+});
+
+// ============================================================================
+// Bulk stage change: bulkSetStage (Task 7.2)
+// ============================================================================
+
+const bulkSetStageArgs = v.union(
+  v.object({ ids: v.array(v.id("applications")), stage: v.string() }),
+  v.object({
+    matchAll: v.object({
+      jobId: v.union(v.id("jobPostings"), v.null()),
+      filter: v.optional(v.any()),
+    }),
+    stage: v.string(),
+  }),
+);
+
+export const bulkSetStage = mutation({
+  args: bulkSetStageArgs,
+  handler: async (ctx, args) => {
+    const a = args as { ids?: string[]; matchAll?: { jobId: any; filter?: any }; stage: string };
+    let ids: any[] = [];
+    if (a.ids) {
+      ids = a.ids;
+    } else if (a.matchAll) {
+      const matchAll = a.matchAll;
+      const builder = matchAll.jobId
+        ? ctx.db.query("applications").withIndex("by_jobPostingId", (q) => q.eq("jobPostingId", matchAll.jobId))
+        : ctx.db.query("applications");
+      const apps = await (builder as any)
+        .filter((q: any) => q.eq(q.field("pendingDeleteAt"), undefined))
+        .collect();
+      ids = apps.map((r: any) => r._id);
+    }
+
+    const batchId = makeBatchId();
+    const previousStages: Array<{ id: any; previousStage: string }> = [];
+    for (const id of ids) {
+      const row = await ctx.db.get(id as any) as any;
+      if (!row) continue;
+      previousStages.push({ id, previousStage: row.stage });
+      await ctx.db.patch(id as any, { stage: a.stage });
+    }
+    return { batchId, previousStages };
   },
 });
