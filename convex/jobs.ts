@@ -278,6 +278,13 @@ export const saveScoringRules = mutation({
   },
 });
 
+export const saveCriteriaText = mutation({
+  args: { jobId: v.id("jobPostings"), text: v.string() },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.jobId, { criteria: args.text });
+  },
+});
+
 export const setRoleEmbeddings = mutation({
   args: {
     jobId: v.id("jobPostings"),
