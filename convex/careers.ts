@@ -79,6 +79,8 @@ export const submitApplication = mutation({
     subjects: v.array(v.string()),
     yearsExperience: v.optional(v.number()),
     currentSchool: v.optional(v.string()),
+    resumeStorageId: v.optional(v.id("_storage")),
+    resumeOriginalName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     if (!args.phone && !args.email) {
@@ -102,25 +104,9 @@ export const submitApplication = mutation({
       talentBankFlag: false,
     });
 
-    const profileText = [
-      `Name: ${args.name}`,
-      args.email ? `Email: ${args.email}` : null,
-      args.phone ? `Phone: ${args.phone}` : null,
-      args.qualifications.length ? `Qualifications: ${args.qualifications.join(", ")}` : null,
-      (args.certifications ?? []).length ? `Certifications: ${(args.certifications ?? []).join(", ")}` : null,
-      (args.boardExperience ?? []).length ? `Board Experience: ${(args.boardExperience ?? []).join(", ")}` : null,
-      args.subjects.length ? `Subjects: ${args.subjects.join(", ")}` : null,
-      args.yearsExperience != null ? `Years of Experience: ${args.yearsExperience}` : null,
-      args.currentSchool ? `Current School: ${args.currentSchool}` : null,
-    ].filter(Boolean).join("\n");
-
     await ctx.runMutation(internal.candidates.setOrigin, {
       candidateId,
       origin: "fresh_application",
-    });
-    await ctx.scheduler.runAfter(0, api.intake.parseAndStoreCandidate, {
-      candidateId,
-      rawText: profileText,
     });
 
     const trackingToken = generateTrackingToken();
@@ -136,9 +122,39 @@ export const submitApplication = mutation({
       createdAt: Date.now(),
     });
 
-    // Kick off triage for the new application. Phase 1: runs hybrid match across
-    // all open roles at the school, then writes a triageDecisions row.
-    await ctx.scheduler.runAfter(0, api.triage.runTriage, { applicationId: appId });
+    if (args.resumeStorageId) {
+      // PDF path: extract text, then parse, then triage — chained inside the action
+      // so triage doesn't race against an unparsed candidate.
+      await ctx.scheduler.runAfter(0, internal.intake_pdf.extractTextFromResume, {
+        candidateId,
+        storageId: args.resumeStorageId,
+        originalName: args.resumeOriginalName,
+        applicationId: appId,
+      });
+    } else {
+      // Text-fields-only path: build profileText from form fields, then parse + triage
+      // independently (existing behavior).
+      const profileText = [
+        `Name: ${args.name}`,
+        args.email ? `Email: ${args.email}` : null,
+        args.phone ? `Phone: ${args.phone}` : null,
+        args.qualifications.length ? `Qualifications: ${args.qualifications.join(", ")}` : null,
+        (args.certifications ?? []).length ? `Certifications: ${(args.certifications ?? []).join(", ")}` : null,
+        (args.boardExperience ?? []).length ? `Board Experience: ${(args.boardExperience ?? []).join(", ")}` : null,
+        args.subjects.length ? `Subjects: ${args.subjects.join(", ")}` : null,
+        args.yearsExperience != null ? `Years of Experience: ${args.yearsExperience}` : null,
+        args.currentSchool ? `Current School: ${args.currentSchool}` : null,
+      ].filter(Boolean).join("\n");
+
+      await ctx.scheduler.runAfter(0, api.intake.parseAndStoreCandidate, {
+        candidateId,
+        rawText: profileText,
+      });
+
+      // Kick off triage for the new application. Phase 1: runs hybrid match across
+      // all open roles at the school, then writes a triageDecisions row.
+      await ctx.scheduler.runAfter(0, api.triage.runTriage, { applicationId: appId });
+    }
 
     const school = await ctx.db.get(args.schoolId);
     const jobTitle = args.jobId ? (await ctx.db.get(args.jobId))?.title : undefined;

@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@convex-dev/better-auth": "^0.12.2",
+    "@google/generative-ai": "^0.24.1",
     "@hello-pangea/dnd": "^17.0.0",
     "@tanstack/react-virtual": "^3.13.25",
     "@vercel/edge-config": "^1.4.3",
@@ -21,11 +22,13 @@
     "convex": "^1.17.0",
     "convex-helpers": "^0.1.118",
     "lucide-react": "^1.16.0",
+    "mammoth": "^1.12.0",
     "next": "14.2.15",
     "openai": "^6.39.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "resend": "^6.12.3",
+    "unpdf": "^1.6.2",
     "zod": "^3.23.0"
   },
   "devDependencies": {

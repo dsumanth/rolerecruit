@@ -176,6 +176,79 @@ export const writeCompiledData = internalMutation({
   },
 });
 
+export const attachResumeFile = internalMutation({
+  args: {
+    candidateId: v.id("candidates"),
+    storageId: v.id("_storage"),
+    originalName: v.optional(v.string()),
+    method: v.union(
+      v.literal("pdf-parse"),
+      v.literal("openai-vision"),
+      v.literal("gemini-vision"),
+      v.literal("mammoth"),
+      v.literal("plain-text"),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const url = await ctx.storage.getUrl(args.storageId);
+    await ctx.db.patch(args.candidateId, {
+      resumeStorageId: args.storageId,
+      resumeOriginalName: args.originalName,
+      resumeExtractionMethod: args.method,
+      resumeUrl: url ?? undefined,
+    });
+  },
+});
+
+export const createFromUpload = mutation({
+  args: {
+    schoolId: v.id("schools"),
+    storageId: v.id("_storage"),
+    originalName: v.optional(v.string()),
+    sourceChannel: v.optional(v.string()),
+    candidateNameHint: v.optional(v.string()),
+    candidateEmail: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const candidateId = await ctx.db.insert("candidates", {
+      name: args.candidateNameHint ?? args.originalName ?? "Unnamed Candidate",
+      email: args.candidateEmail,
+      qualifications: [],
+      certifications: [],
+      boardExperience: [],
+      subjects: [],
+      sourceChannel: args.sourceChannel ?? "hr_upload",
+      talentBankFlag: false,
+      origin: "manual_import",
+    });
+
+    const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+    let trackingToken = "";
+    for (let i = 0; i < 32; i++) {
+      trackingToken += chars[Math.floor(Math.random() * chars.length)];
+    }
+
+    const applicationId = await ctx.db.insert("applications", {
+      candidateId,
+      schoolId: args.schoolId,
+      stage: "sourced",
+      trackingToken,
+      source: "manual",
+      matchedAt: Date.now(),
+      createdAt: Date.now(),
+    });
+
+    await ctx.scheduler.runAfter(0, internal.intake_pdf.extractTextFromResume, {
+      candidateId,
+      storageId: args.storageId,
+      originalName: args.originalName,
+      applicationId,
+    });
+
+    return { candidateId, applicationId };
+  },
+});
+
 export const setOrigin = internalMutation({
   args: {
     candidateId: v.id("candidates"),

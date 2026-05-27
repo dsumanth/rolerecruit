@@ -1,9 +1,14 @@
 // convex/intake.ts
-import { action } from "./_generated/server";
+import { action, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
 import { validateEvidence } from "./evidenceValidator";
 import type { ParsedProfile, RawChunk } from "./types";
+
+export const generateResumeUploadUrl = mutation({
+  args: {},
+  handler: async (ctx) => await ctx.storage.generateUploadUrl(),
+});
 
 function sectionText(chunks: RawChunk[], section: RawChunk["section"]): string {
   return chunks.filter((c) => c.section === section).map((c) => c.text).join("\n");

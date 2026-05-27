@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { TalentControls } from "@/components/talent/talent-controls";
 import { PoolSelector } from "@/components/talent/pool-selector";
 import { GlobalCriteriaPanel } from "@/components/talent/global-criteria-panel";
+import { UploadResumeModal } from "@/components/talent/upload-resume-modal";
 import { ApplicationTable } from "@/components/pipeline/application-table";
 import { ApplicationDrawer } from "@/components/pipeline/application-drawer";
 import type { Application } from "@/components/pipeline/application-table";
@@ -26,6 +27,7 @@ export default function TalentBankPage() {
   const [sortBy, setSortBy] = useState<"newest" | "score" | "name">("newest");
   const [showPoolManager, setShowPoolManager] = useState(false);
   const [showCriteriaPanel, setShowCriteriaPanel] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [nlResults, setNlResults] = useState<any[] | null>(null);
   const [nlIntent, setNlIntent] = useState("");
@@ -183,9 +185,25 @@ export default function TalentBankPage() {
             >
               Global Criteria
             </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setShowUploadModal(true)}
+              disabled={!schoolId}
+            >
+              Upload Resume
+            </Button>
           </>
         }
       />
+
+      {schoolId && (
+        <UploadResumeModal
+          open={showUploadModal}
+          onOpenChange={setShowUploadModal}
+          schoolId={schoolId}
+        />
+      )}
 
       {showPoolManager && schoolId && (
         <div className="mb-4">

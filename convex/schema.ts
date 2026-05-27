@@ -196,6 +196,15 @@ export default defineSchema({
     yearsExperience: v.optional(v.number()),
     currentSchool: v.optional(v.string()),
     resumeUrl: v.optional(v.string()),
+    resumeStorageId: v.optional(v.id("_storage")),
+    resumeOriginalName: v.optional(v.string()),
+    resumeExtractionMethod: v.optional(v.union(
+      v.literal("pdf-parse"),
+      v.literal("openai-vision"),
+      v.literal("gemini-vision"),
+      v.literal("mammoth"),
+      v.literal("plain-text"),
+    )),
     sourceChannel: v.optional(v.string()),
     credentialVerificationStatus: v.optional(
       v.union(v.literal("verified"), v.literal("flagged"), v.literal("pending"))
