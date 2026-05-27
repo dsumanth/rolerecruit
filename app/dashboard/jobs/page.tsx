@@ -13,6 +13,7 @@ import { SelectAllMatchingBanner } from "@/components/ui/select-all-matching-ban
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { UndoToast } from "@/components/ui/undo-toast";
 import { JobsList } from "@/components/jobs/jobs-list";
+import { rowsToCsv, downloadCsv } from "@/lib/csv-export";
 
 type StatusFilter = "all" | "active" | "draft" | "paused" | "filled" | "closed";
 
@@ -131,7 +132,23 @@ export default function JobsPage() {
           {sel.mode.kind === "ids" && (
             <button
               className="bg-surface text-ink px-3 py-1.5 rounded text-body-s border border-hairline"
-              onClick={() => { /* CSV Phase 12 */ }}
+              onClick={() => {
+                const selectedRows = sel.mode.kind === "ids"
+                  ? results.filter((j: any) => sel.isSelected(j._id))
+                  : [];
+                if (selectedRows.length === 0) return;
+                const csv = rowsToCsv(selectedRows, [
+                  { key: "title", label: "Title" },
+                  { key: "subject", label: "Subject" },
+                  { key: "level", label: "Level" },
+                  { key: "board", label: "Board" },
+                  { key: "status", label: "Status" },
+                  { key: "positions", label: "Positions" },
+                  { key: "_creationTime", label: "Created At" },
+                ]);
+                const today = new Date().toISOString().slice(0, 10);
+                downloadCsv(`jobs-${today}.csv`, csv);
+              }}
             >
               Export CSV
             </button>
