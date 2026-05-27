@@ -1,5 +1,5 @@
 // convex/backfill.ts
-import { action, internalQuery, query } from "./_generated/server";
+import { action, internalAction, internalQuery, query } from "./_generated/server";
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
 import { PARSED_FACETS_VERSION, EMBEDDING_VERSION, GRAPH_VERSION } from "./versions";
@@ -80,12 +80,13 @@ export const candidatesMissingGraphPage = internalQuery({
  * backfill (Phase 3b) can re-extract previousSchools + universities from
  * rawChunks for richer signal.
  */
-export const backfillGraph = action({
+export const backfillGraph = internalAction({
   args: { pageSize: v.optional(v.number()) },
-  handler: async (ctx, args): Promise<{ processed: number }> => {
+  handler: async (ctx, args): Promise<{ processed: number; failed: number }> => {
     const pageSize = args.pageSize ?? DEFAULT_GRAPH_PAGE_SIZE;
     let cursor: string | null = null;
     let processed = 0;
+    let failed = 0;
 
     while (true) {
       const result: { page: Array<any>; isDone: boolean; continueCursor: string } =
@@ -100,17 +101,23 @@ export const backfillGraph = action({
           qualifications: [],
           certifications: c.certifications ?? [],
         };
-        await ctx.runMutation(api.graph.materializeGraphFromIntake, {
-          candidateId: c._id,
-          relationships: synthetic,
-          subjects: c.subjects ?? [],
-          boardExperience: c.boardExperience ?? [],
-        });
-        processed++;
+        try {
+          await ctx.runMutation(api.graph.materializeGraphFromIntake, {
+            candidateId: c._id,
+            relationships: synthetic,
+            subjects: c.subjects ?? [],
+            boardExperience: c.boardExperience ?? [],
+          });
+          processed++;
+        } catch (err) {
+          failed++;
+          console.error(`[backfillGraph] candidate ${c._id} failed:`, err);
+          // continue — don't let one bad candidate block the entire backfill
+        }
       }
       if (result.isDone) break;
       cursor = result.continueCursor;
     }
-    return { processed };
+    return { processed, failed };
   },
 });

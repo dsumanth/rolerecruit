@@ -325,6 +325,7 @@ describe("graph backfill", () => {
     // Run backfill with pageSize=2 to force multiple pages
     const result = await t.action("backfill:backfillGraph", { pageSize: 2 });
     expect(result.processed).toBe(5);
+    expect(result.failed).toBe(0);
 
     // All 5 should have a Candidate node + at least one edge (Physics SPECIALIZES_IN + CBSE BELONGS_TO + CTET CERTIFIED_IN)
     for (const id of ids) {

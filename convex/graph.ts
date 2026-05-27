@@ -3,10 +3,10 @@
 // Owns canonicalization, idempotent node/edge upserts, cohort composition,
 // bounded traversals, and the intake-time materializeGraphFromIntake orchestrator.
 
-import { internalMutation, mutation, query, internalQuery, internalAction } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import { GRAPH_VERSION } from "./versions";
 import type {
   GraphNodeType,
   GraphEdgeType,
@@ -275,7 +275,6 @@ export const materializeGraphFromIntake = mutation({
     }
 
     // Stamp the candidate row so backfill knows the graph was built
-    const { GRAPH_VERSION } = await import("./versions");
     await ctx.db.patch(args.candidateId, { graphVersion: GRAPH_VERSION });
 
     return { nodesUpserted, edgesUpserted };

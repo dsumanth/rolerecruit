@@ -1,5 +1,5 @@
 import { cronJobs } from "convex/server";
-import { internal, api } from "./_generated/api";
+import { internal } from "./_generated/api";
 
 const crons = cronJobs();
 
@@ -19,7 +19,7 @@ crons.daily(
 crons.daily(
   "backfill-graph",
   { hourUTC: 4, minuteUTC: 0 },
-  api.backfill.backfillGraph,
+  internal.backfill.backfillGraph,
   {},
 );
 

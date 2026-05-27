@@ -25,6 +25,3 @@ export const FACET_TRACKER_LOOKBACK_MS = 25 * 60 * 60 * 1000; // 25h — slightl
 
 // Phase 3a — Knowledge Graph
 export const GRAPH_VERSION = "graph-v1";
-
-// Cron heartbeat for nightly graph backfill — slightly > 24h to catch overlap
-export const GRAPH_BACKFILL_LOOKBACK_MS = 25 * 60 * 60 * 1000;
