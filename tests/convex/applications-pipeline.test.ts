@@ -78,6 +78,26 @@ describe("applications.getPipelineForJob — paginated", () => {
     expect(result.page.length).toBe(0);
   });
 
+  it("countForJob returns total matching", async () => {
+    const t = convexTest(schema, modules);
+    const schoolId = await t.mutation("schools:create", { name: "S", board: "CBSE", city: "M", state: "MH" });
+    const jobId = await t.mutation("jobs:create", {
+      schoolId, title: "T", subject: "S", level: "PGT", board: "CBSE",
+      qualifications: [], minExperience: 0, positions: 1, naturalLanguageDescription: "x",
+    });
+    for (let i = 0; i < 4; i++) {
+      const cId = await t.mutation("candidates:create", {
+        name: `c${i}`, email: `${i}@x.com`,
+        qualifications: [], subjects: [],
+      });
+      await t.mutation("applications:create", {
+        candidateId: cId, schoolId, jobPostingId: jobId, skipTriage: true,
+      });
+    }
+    const r = await t.query("applications:countForJob", { jobId });
+    expect(r.total).toBe(4);
+  });
+
   it("returns one row per application (no dedup by candidateId)", async () => {
     const t = convexTest(schema, modules);
     const schoolId = await t.mutation("schools:create", {

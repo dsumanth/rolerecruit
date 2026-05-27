@@ -227,6 +227,36 @@ export const getPipelineForJob = query({
   },
 });
 
+export const countForJob = query({
+  args: {
+    jobId: v.id("jobPostings"),
+    filter: v.optional(v.object({
+      stage: v.optional(v.string()),
+      search: v.optional(v.string()),
+    })),
+  },
+  handler: async (ctx, args) => {
+    const apps = await ctx.db
+      .query("applications")
+      .withIndex("by_jobPostingId", (q) => q.eq("jobPostingId", args.jobId))
+      .filter((q) => q.eq(q.field("pendingDeleteAt"), undefined))
+      .collect();
+    let total = 0;
+    for (const app of apps) {
+      if (args.filter?.stage && app.stage !== args.filter.stage) continue;
+      const cand = await ctx.db.get(app.candidateId);
+      if (!cand || cand.pendingDeleteAt != null) continue;
+      if (args.filter?.search) {
+        const s = args.filter.search.toLowerCase();
+        const hay = `${cand.name ?? ""} ${cand.email ?? ""}`.toLowerCase();
+        if (!hay.includes(s)) continue;
+      }
+      total++;
+    }
+    return { total };
+  },
+});
+
 export const getUnmatchedForSchool = query({
   args: { schoolId: v.id("schools") },
   handler: async (ctx, args) => {
