@@ -3,14 +3,22 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { JobsList } from "../../components/jobs/jobs-list";
 
+const ALL_MOCK_JOBS = [
+  { _id: "1", title: "Math",    subject: "Mathematics", level: "Senior", board: "CBSE", status: "active", _creationTime: Date.now(), positions: 1 },
+  { _id: "2", title: "Physics", subject: "Physics",     level: "Lead",   board: "ICSE", status: "draft",  _creationTime: Date.now(), positions: 1 },
+  { _id: "3", title: "English", subject: "English",     level: "Mid",    board: "CBSE", status: "active", _creationTime: Date.now(), positions: 1 },
+];
+
 vi.mock("convex/react", () => ({
-  useQuery: (ref: string) => {
-    if (ref === "jobs.hiredCountsForSchool") return {};
-    return [
-      { _id: "1", title: "Math",    subject: "Mathematics", level: "Senior", board: "CBSE", status: "active", _creationTime: Date.now(), positions: 1 },
-      { _id: "2", title: "Physics", subject: "Physics",     level: "Lead",   board: "ICSE", status: "draft",  _creationTime: Date.now(), positions: 1 },
-      { _id: "3", title: "English", subject: "English",     level: "Mid",    board: "CBSE", status: "active", _creationTime: Date.now(), positions: 1 },
-    ];
+  useQuery: (_ref: string) => {
+    return {};
+  },
+  usePaginatedQuery: (_ref: string, args: { filter?: { status?: string } }) => {
+    const statusFilter = args?.filter?.status;
+    const results = statusFilter
+      ? ALL_MOCK_JOBS.filter((j) => j.status === statusFilter)
+      : ALL_MOCK_JOBS;
+    return { results, status: "Exhausted", loadMore: () => {} };
   },
 }));
 
