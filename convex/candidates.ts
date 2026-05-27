@@ -156,6 +156,50 @@ export const listForSchool = query({
   },
 });
 
+export const countForSchool = query({
+  args: {
+    schoolId: v.id("schools"),
+    filter: v.optional(v.object({
+      poolId: v.optional(v.union(v.id("pools"), v.literal("all"))),
+      stages: v.optional(v.array(v.string())),
+      search: v.optional(v.string()),
+    })),
+  },
+  handler: async (ctx, args) => {
+    const apps = await ctx.db
+      .query("applications")
+      .withIndex("by_schoolId", (q) => q.eq("schoolId", args.schoolId))
+      .filter((q) => q.eq(q.field("pendingDeleteAt"), undefined))
+      .collect();
+    const seen = new Set<string>();
+    let total = 0;
+    for (const app of apps) {
+      if (seen.has(app.candidateId)) continue;
+      seen.add(app.candidateId);
+
+      if (args.filter?.stages && args.filter.stages.length > 0
+          && !args.filter.stages.includes(app.stage)) continue;
+      const cand = await ctx.db.get(app.candidateId);
+      if (!cand || cand.pendingDeleteAt != null) continue;
+      if (args.filter?.search) {
+        const s = args.filter.search.toLowerCase();
+        const hay = `${cand.name ?? ""} ${cand.email ?? ""}`.toLowerCase();
+        if (!hay.includes(s)) continue;
+      }
+      if (args.filter?.poolId && args.filter.poolId !== "all") {
+        const member = await ctx.db
+          .query("candidatePools")
+          .withIndex("by_candidateId", (q) => q.eq("candidateId", cand._id))
+          .filter((q) => q.eq(q.field("poolId"), args.filter!.poolId))
+          .first();
+        if (!member) continue;
+      }
+      total++;
+    }
+    return { total };
+  },
+});
+
 // ============================================================================
 // Phase 1: compiled candidate data (Task 13)
 // ============================================================================

@@ -89,4 +89,20 @@ describe("candidates.listForSchool — paginated", () => {
     expect(result.page.length).toBe(1);
     expect(result.page[0].candidateId).toBe(candidateId);
   });
+
+  it("countForSchool returns total matching", async () => {
+    const t = convexTest(schema, modules);
+    const schoolId = await t.mutation("schools:create", {
+      name: "S", board: "CBSE", city: "M", state: "MH",
+    });
+    for (let i = 0; i < 5; i++) {
+      const candidateId = await t.mutation("candidates:create", {
+        name: `Cand ${i}`, email: `c${i}@x.com`,
+        qualifications: [], subjects: [],
+      });
+      await t.mutation("applications:create", { candidateId, schoolId, skipTriage: true });
+    }
+    const total = await t.query("candidates:countForSchool", { schoolId });
+    expect(total.total).toBe(5);
+  });
 });
