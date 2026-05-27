@@ -191,7 +191,8 @@ export default defineSchema({
     pendingDeleteBatchId: v.optional(v.string()),
   })
     .index("by_schoolId", ["schoolId"])
-    .index("by_status", ["status"]),
+    .index("by_status", ["status"])
+    .index("by_schoolId_title", ["schoolId", "title"]),
 
   candidates: defineTable({
     // existing fields
@@ -365,7 +366,9 @@ export default defineSchema({
     .index("by_stage", ["stage"])
     .index("by_trackingToken", ["trackingToken"])
     .index("by_schoolId_triageOutcome", ["schoolId", "triageOutcome"])
-    .index("by_source", ["source"]),
+    .index("by_source", ["source"])
+    .index("by_schoolId_aiMatchScore", ["schoolId", "aiMatchScore"])
+    .index("by_jobPostingId_aiMatchScore", ["jobPostingId", "aiMatchScore"]),
 
   evaluations: defineTable({
     applicationId: v.id("applications"),
