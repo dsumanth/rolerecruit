@@ -31,6 +31,12 @@ export const DEFAULT_TRANSITIONS = [
 
 export const PIPELINE_STAGE_IDS = ["sourced", "screened", "demo_scheduled", "demo_completed", "offer_sent", "hired"] as const;
 
+// Linear pipeline stages where a candidate is still "in motion" — used by
+// graph sourcing queries (untappedOnly filter) to exclude candidates already
+// being actively recruited. Excludes "hired" (terminal good outcome) plus
+// "rejected"/"on_hold" (off-pipeline states that aren't in PIPELINE_STAGE_IDS).
+export const ACTIVE_PIPELINE_STAGES = ["sourced", "screened", "demo_scheduled", "demo_completed", "offer_sent"] as const;
+
 export const seedDefaultPipelineForSchool = internalMutation({
   args: { schoolId: v.id("schools") },
   handler: async (ctx, args) => {

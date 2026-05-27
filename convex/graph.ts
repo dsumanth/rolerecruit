@@ -12,6 +12,7 @@ import type {
   GraphEdgeType,
   RelationshipsHint,
 } from "./types";
+import { ACTIVE_PIPELINE_STAGES } from "./pipeline_defaults";
 
 // ============================================================================
 // Canonicalization
@@ -314,9 +315,9 @@ export const listCohorts = query({
   },
 });
 
-const ACTIVE_STAGES = new Set([
-  "sourced", "screened", "demo_scheduled", "demo_completed", "offer_sent",
-]);
+// Sourced from convex/pipeline_defaults.ts — single source of truth for the
+// "in motion" subset of pipeline stages. Used here by the untappedOnly filter.
+const ACTIVE_STAGES = new Set<string>(ACTIVE_PIPELINE_STAGES);
 
 export const listCandidatesInCohort = query({
   args: {
