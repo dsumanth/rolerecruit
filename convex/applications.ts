@@ -112,6 +112,13 @@ export const moveStage = mutation({
 
     await ctx.db.patch(args.applicationId, { stage: args.newStage });
 
+    // Auto-close the job when hires reach the configured positions count.
+    if (args.newStage === "hired" && app.jobPostingId) {
+      await ctx.scheduler.runAfter(0, internal.jobs.maybeAutoFillJob, {
+        jobId: app.jobPostingId,
+      });
+    }
+
     // Check for automation on this transition
     const automation = await ctx.db
       .query("pipelineAutomations")
@@ -221,6 +228,21 @@ export const setSource = internalMutation({
     const patch: any = { source: args.source, matchedAt: Date.now() };
     if (args.matchedFromPoolId) patch.matchedFromPoolId = args.matchedFromPoolId;
     await ctx.db.patch(args.applicationId, patch);
+  },
+});
+
+/**
+ * Set the primary jobPostingId on an application. Used by triage when an
+ * application arrives without a target role (talent-bank upload, agent-sourced)
+ * and the reverse-match picks the best open role.
+ */
+export const setPrimaryJob = internalMutation({
+  args: {
+    applicationId: v.id("applications"),
+    jobPostingId: v.id("jobPostings"),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.applicationId, { jobPostingId: args.jobPostingId });
   },
 });
 

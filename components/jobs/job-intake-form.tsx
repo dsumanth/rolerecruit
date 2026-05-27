@@ -32,14 +32,20 @@ export function JobIntakeForm({ schoolId }: { schoolId: string }) {
   const [parsed, setParsed] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
   const [description, setDescription] = useState("");
+  const [criteria, setCriteria] = useState("");
   const [title, setTitle] = useState("");
   const [subject, setSubject] = useState("");
   const [level, setLevel] = useState("TGT");
   const [board, setBoard] = useState("CBSE");
+  const [positions, setPositions] = useState(1);
 
   const handleParseWithAI = async () => {
     if (!description.trim()) {
       setError("Please write a job description first.");
+      return;
+    }
+    if (!title.trim()) {
+      setError("Please give the role a title before parsing.");
       return;
     }
 
@@ -49,24 +55,29 @@ export function JobIntakeForm({ schoolId }: { schoolId: string }) {
     try {
       const job = await createJob({
         schoolId: schoolId as any,
-        title: title || "Untitled Role",
+        title,
         subject: subject || "TBD",
         level: level as "PRT" | "TGT" | "PGT" | "Other",
         board,
         qualifications: [],
         naturalLanguageDescription: description,
+        criteria: criteria.trim() || description,
+        positions,
       });
 
       const result = await parseWithAI({ jobId: job as any });
 
-      const criteria = (result as any).parsedCriteria;
-      if (criteria) {
-        if (criteria.subjects?.length) setSubject(criteria.subjects[0]);
-        if (criteria.board) setBoard(criteria.board);
-        if (criteria.level) setLevel(criteria.level);
-        setTitle(
-          `${criteria.subjects?.[0] || subject} ${criteria.level || level} Teacher`
-        );
+      // Only fill blanks — don't clobber what the user typed. Subject is a
+      // free-text field that starts empty, so an empty value clearly means
+      // "untouched." Level/Board are Selects with default values (TGT/CBSE),
+      // which we can't reliably distinguish from a user choice, so we leave
+      // them alone here. The level value coming back is already normalized
+      // by parseJobWithAI to one of PRT|TGT|PGT|Other.
+      const parsedCriteria = (result as any).parsedCriteria;
+      if (parsedCriteria) {
+        if (!subject.trim() && parsedCriteria.subjects?.length) {
+          setSubject(parsedCriteria.subjects[0]);
+        }
       }
 
       setParsed(true);
@@ -95,6 +106,8 @@ export function JobIntakeForm({ schoolId }: { schoolId: string }) {
           board,
           qualifications: [],
           naturalLanguageDescription: description,
+          criteria: criteria.trim() || description,
+          positions,
         });
         router.push("/dashboard/jobs");
       }
@@ -123,6 +136,31 @@ export function JobIntakeForm({ schoolId }: { schoolId: string }) {
   return (
     <Card padding="lg" elevation={1}>
       <form onSubmit={handleSaveDraft} className="space-y-7">
+        <div className="grid grid-cols-[1fr_120px] gap-5">
+          <div>
+            <label className="block text-body-s font-medium text-ink mb-1.5">Job title</label>
+            <Input
+              size="md"
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Physics PGT Teacher"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-body-s font-medium text-ink mb-1.5">Positions</label>
+            <Input
+              size="md"
+              type="number"
+              min={1}
+              value={positions}
+              onChange={(e) => setPositions(Math.max(1, parseInt(e.target.value || "1", 10)))}
+              required
+            />
+          </div>
+        </div>
+
         <div>
           <label className="block text-body-s font-medium text-ink mb-1.5">
             Describe the role
@@ -146,7 +184,7 @@ export function JobIntakeForm({ schoolId }: { schoolId: string }) {
                 variant="secondary"
                 size="md"
                 onClick={handleParseWithAI}
-                disabled={!description.trim()}
+                disabled={!description.trim() || !title.trim()}
                 loading={parsing}
               >
                 {parsing ? "Parsing with AI" : "Parse with AI"}
@@ -161,18 +199,23 @@ export function JobIntakeForm({ schoolId }: { schoolId: string }) {
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-5">
-          <div>
-            <label className="block text-body-s font-medium text-ink mb-1.5">Job title</label>
-            <Input
-              size="md"
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Physics PGT Teacher"
-              required
-            />
-          </div>
+        <div>
+          <label className="block text-body-s font-medium text-ink mb-1.5">
+            Criteria <span className="text-ink-tertiary font-normal">(optional)</span>
+          </label>
+          <p className="text-caption text-ink-secondary mb-3">
+            What you're really looking for. You can edit this later on the role's Criteria tab.
+          </p>
+          <textarea
+            value={criteria}
+            onChange={(e) => setCriteria(e.target.value)}
+            rows={4}
+            className="w-full rounded-sm bg-surface border border-hairline-strong px-3 py-2 text-body-s text-ink placeholder:text-ink-tertiary outline-none transition-all duration-fast focus:border-accent focus:ring-2 focus:ring-accent-soft min-h-[96px] resize-none"
+            placeholder="Must have managed a board prep class. Prior IB exposure is a plus. Comfortable with project-based learning."
+          />
+        </div>
+
+        <div className="grid grid-cols-3 gap-5">
           <div>
             <label className="block text-body-s font-medium text-ink mb-1.5">Subject</label>
             <Input

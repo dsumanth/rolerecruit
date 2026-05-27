@@ -65,13 +65,30 @@ export const runTriage = action({
       if (hit) perRole.push({ roleId: role._id, score: hit.score, reasons: hit.reasons });
     }
 
-    const primary = perRole.find((p) => String(p.roleId) === String(app.jobPostingId)) ?? {
-      roleId: app.jobPostingId,
-      score: 0,
-      reasons: [],
-    };
+    // Pick primary: if the application was tied to a specific job, use that;
+    // otherwise (talent-bank uploads, agent-sourced candidates) reverse-match
+    // against all open roles and treat the best score as primary. Without this
+    // branch, jobPostingId-less applications silently triage as score=0 →
+    // auto_rejected, which is what was happening for resume uploads.
+    const sortedPerRole = [...perRole].sort((a, b) => b.score - a.score);
+    let primary: { roleId: any; score: number; reasons: string[] };
+    if (app.jobPostingId) {
+      primary = perRole.find((p) => String(p.roleId) === String(app.jobPostingId)) ?? {
+        roleId: app.jobPostingId,
+        score: 0,
+        reasons: [],
+      };
+    } else if (sortedPerRole[0]) {
+      primary = sortedPerRole[0];
+      await ctx.runMutation(internal.applications.setPrimaryJob, {
+        applicationId: args.applicationId,
+        jobPostingId: primary.roleId as any,
+      });
+    } else {
+      primary = { roleId: undefined, score: 0, reasons: [] };
+    }
     const crossRoles = perRole
-      .filter((p) => String(p.roleId) !== String(app.jobPostingId) && p.score >= 70)
+      .filter((p) => String(p.roleId) !== String(primary.roleId) && p.score >= 70)
       .sort((a, b) => b.score - a.score);
 
     const candidate = await ctx.runQuery(api.candidates.get, { candidateId: app.candidateId });
@@ -122,7 +139,7 @@ export const runTriage = action({
       applicationId: args.applicationId,
       candidateId: app.candidateId,
       schoolId: app.schoolId,
-      primaryRoleId: app.jobPostingId,
+      primaryRoleId: primary.roleId,
       primaryMatchScore: primary.score,
       primaryMatchReasons: primary.reasons,
       crossRoleMatches: crossRoles.map((c) => ({ roleId: c.roleId as any, score: c.score, reasons: c.reasons })),

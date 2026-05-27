@@ -220,6 +220,7 @@ export const createFromUpload = mutation({
       sourceChannel: args.sourceChannel ?? "hr_upload",
       talentBankFlag: false,
       origin: "manual_import",
+      parseStatus: "pending",
     });
 
     const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -246,6 +247,23 @@ export const createFromUpload = mutation({
     });
 
     return { candidateId, applicationId };
+  },
+});
+
+export const setParseStatus = internalMutation({
+  args: {
+    candidateId: v.id("candidates"),
+    status: v.union(v.literal("pending"), v.literal("done"), v.literal("failed")),
+    error: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const patch: Record<string, unknown> = { parseStatus: args.status };
+    if (args.status === "failed") {
+      patch.parseError = args.error ?? "Unknown error";
+    } else {
+      patch.parseError = undefined;
+    }
+    await ctx.db.patch(args.candidateId, patch);
   },
 });
 

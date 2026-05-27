@@ -12,6 +12,8 @@ import { ScoringRuleEditor } from "@/components/criteria/ScoringRuleEditor";
 function jobBadge(status: string) {
   if (status === "active") return <Badge dot variant="success">Active</Badge>;
   if (status === "draft") return <Badge dot variant="neutral">Draft</Badge>;
+  if (status === "paused") return <Badge dot variant="warning">On hold</Badge>;
+  if (status === "filled") return <Badge dot variant="success">Filled</Badge>;
   return <Badge dot variant="neutral">Closed</Badge>;
 }
 

@@ -13,42 +13,55 @@ interface Props {
 
 export function JobActions({ jobId, status }: Props) {
   const router = useRouter();
+  const setStatus = useMutation(api.jobs.setStatus);
   const publishJob = useMutation(api.jobs.publish);
   const closeJob = useMutation(api.jobs.close);
+  const deleteDraft = useMutation(api.jobs.deleteDraft);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handlePublish = async () => {
+  const run = async (fn: () => Promise<unknown>, failMessage: string) => {
     setError("");
     setLoading(true);
     try {
-      await publishJob({ jobId: jobId as any });
+      await fn();
       router.refresh();
     } catch (err: any) {
-      setError(err.message || "Failed to publish");
+      setError(err.message || failMessage);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleClose = async () => {
+  const handleDelete = async () => {
+    if (!window.confirm("Delete this draft? This can't be undone.")) return;
     setError("");
     setLoading(true);
     try {
-      await closeJob({ jobId: jobId as any, reason: "filled" });
-      router.refresh();
+      await deleteDraft({ jobId: jobId as any });
+      router.push("/dashboard/jobs");
     } catch (err: any) {
-      setError(err.message || "Failed to close job");
-    } finally {
+      setError(err.message || "Failed to delete");
       setLoading(false);
     }
   };
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {(status === "draft" || status === "paused") && (
-        <Button variant="primary" size="md" loading={loading} onClick={handlePublish}>
-          Publish Job
+      {status === "draft" && (
+        <>
+          <Button variant="primary" size="md" loading={loading} onClick={() => run(() => publishJob({ jobId: jobId as any }), "Failed to publish")}>
+            Publish role
+          </Button>
+          <Button variant="danger" size="md" loading={loading} onClick={handleDelete}>
+            Delete draft
+          </Button>
+        </>
+      )}
+
+      {status === "paused" && (
+        <Button variant="primary" size="md" loading={loading} onClick={() => run(() => setStatus({ jobId: jobId as any, status: "active" }), "Failed to resume")}>
+          Resume role
         </Button>
       )}
 
@@ -59,34 +72,52 @@ export function JobActions({ jobId, status }: Props) {
             size="md"
             onClick={() => router.push(`/dashboard/jobs/${jobId}/pipeline`)}
           >
-            View Pipeline
+            View pipeline
           </Button>
           <Button
             variant="secondary"
             size="md"
             onClick={() => router.push(`/dashboard/jobs/${jobId}/sourcing`)}
           >
-            Source Candidates
+            Source candidates
+          </Button>
+          <Button
+            variant="secondary"
+            size="md"
+            loading={loading}
+            onClick={() => run(() => setStatus({ jobId: jobId as any, status: "paused" }), "Failed to pause")}
+          >
+            Put on hold
           </Button>
           <Button
             variant="danger"
             size="md"
             loading={loading}
-            onClick={handleClose}
+            onClick={() => run(() => closeJob({ jobId: jobId as any, reason: "closed" }), "Failed to close")}
           >
-            Close Job
+            Close role
           </Button>
         </>
       )}
 
       {(status === "filled" || status === "closed") && (
-        <Button
-          variant="secondary"
-          size="md"
-          onClick={() => router.push(`/dashboard/jobs/${jobId}/pipeline`)}
-        >
-          View Pipeline
-        </Button>
+        <>
+          <Button
+            variant="secondary"
+            size="md"
+            onClick={() => router.push(`/dashboard/jobs/${jobId}/pipeline`)}
+          >
+            View pipeline
+          </Button>
+          <Button
+            variant="secondary"
+            size="md"
+            loading={loading}
+            onClick={() => run(() => setStatus({ jobId: jobId as any, status: "active" }), "Failed to reopen")}
+          >
+            Reopen
+          </Button>
+        </>
       )}
 
       {error && (

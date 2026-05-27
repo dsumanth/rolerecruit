@@ -4,15 +4,23 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { JobsList } from "../../components/jobs/jobs-list";
 
 vi.mock("convex/react", () => ({
-  useQuery: () => [
-    { _id: "1", title: "Math",    subject: "Mathematics", level: "Senior", board: "CBSE", status: "active", _creationTime: Date.now() },
-    { _id: "2", title: "Physics", subject: "Physics",     level: "Lead",   board: "ICSE", status: "draft",  _creationTime: Date.now() },
-    { _id: "3", title: "English", subject: "English",     level: "Mid",    board: "CBSE", status: "active", _creationTime: Date.now() },
-  ],
+  useQuery: (ref: string) => {
+    if (ref === "jobs.hiredCountsForSchool") return {};
+    return [
+      { _id: "1", title: "Math",    subject: "Mathematics", level: "Senior", board: "CBSE", status: "active", _creationTime: Date.now(), positions: 1 },
+      { _id: "2", title: "Physics", subject: "Physics",     level: "Lead",   board: "ICSE", status: "draft",  _creationTime: Date.now(), positions: 1 },
+      { _id: "3", title: "English", subject: "English",     level: "Mid",    board: "CBSE", status: "active", _creationTime: Date.now(), positions: 1 },
+    ];
+  },
 }));
 
 vi.mock("@/convex/_generated/api", () => ({
-  api: { jobs: { listBySchool: "jobs.listBySchool" } },
+  api: {
+    jobs: {
+      listBySchool: "jobs.listBySchool",
+      hiredCountsForSchool: "jobs.hiredCountsForSchool",
+    },
+  },
 }));
 
 vi.mock("next/link", () => ({

@@ -130,6 +130,14 @@ export default defineSchema({
     maxExperience: v.optional(v.number()),
     salaryRange: v.optional(v.string()),
     naturalLanguageDescription: v.string(),
+    // Editable natural-language criteria — fluid, can be updated post-publish.
+    // Seeded from naturalLanguageDescription on first create; surfaced on the
+    // job's Criteria page so recruiters can refine "what we're looking for"
+    // without losing the original description.
+    criteria: v.optional(v.string()),
+    // Headcount for this role. When the number of `hired`-stage applications
+    // for this job reaches `positions`, the job auto-closes (status="filled").
+    positions: v.optional(v.number()),
     parsedCriteria: v.optional(
       v.object({
         subjects: v.array(v.string()),
@@ -269,6 +277,16 @@ export default defineSchema({
 
     // NEW: parsing notes — flags when evidence validation didn't fully pass on retry
     parsingNotes: v.optional(v.string()),
+
+    // Surface resume parsing lifecycle so silent failures (missing GOOGLE_API_KEY,
+    // OCR errors, etc.) are visible in the UI instead of looking like "the parser
+    // didn't run." Set "pending" on upload, transitioned by extractTextFromResume.
+    parseStatus: v.optional(v.union(
+      v.literal("pending"),
+      v.literal("done"),
+      v.literal("failed"),
+    )),
+    parseError: v.optional(v.string()),
   })
     .index("by_origin", ["origin"])
     .index("by_parsedVersion", ["parsedVersion"])

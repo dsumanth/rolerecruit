@@ -19,6 +19,24 @@ interface TabItem {
   count?: number;
 }
 
+interface FacetValue {
+  value: string;
+  evidence: { quote: string; offset: number; context: string };
+}
+
+interface ParsedFacets {
+  specializations: FacetValue[];
+  gradeLevels: FacetValue[];
+  pedagogicalApproach: FacetValue[];
+  leadershipRoles: FacetValue[];
+  extracurricular: FacetValue[];
+  languages: FacetValue[];
+  schoolTypes: FacetValue[];
+  keyAchievements: FacetValue[];
+  redFlags: FacetValue[];
+  extras: Record<string, FacetValue[]>;
+}
+
 interface Candidate {
   _id: string;
   name: string;
@@ -32,6 +50,11 @@ interface Candidate {
   yearsExperience?: number;
   currentSchool?: string;
   resumeUrl?: string;
+  candidateSummary?: string;
+  parsedFacets?: ParsedFacets;
+  parseStatus?: "pending" | "done" | "failed";
+  parseError?: string;
+  parsedAt?: number;
 }
 
 interface Application {
@@ -187,6 +210,45 @@ export function ApplicationDrawer({ app: incomingApp, schoolName, onClose }: Pro
   );
 }
 
+function ParseStatusPill({ status, error }: { status?: string; error?: string }) {
+  if (!status || status === "done") return null;
+  if (status === "pending") {
+    return (
+      <div className="rounded-md bg-accent-soft border border-accent/20 px-3 py-2 text-xs text-accent">
+        Parsing resume…
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-md bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] border border-[color-mix(in_srgb,var(--danger)_25%,transparent)] px-3 py-2 text-xs text-danger">
+      <div className="font-medium mb-0.5">Resume parsing failed</div>
+      {error && <div className="text-ink-secondary">{error}</div>}
+    </div>
+  );
+}
+
+function FacetSection({
+  label,
+  values,
+}: {
+  label: string;
+  values: FacetValue[] | undefined;
+}) {
+  if (!values || values.length === 0) return null;
+  return (
+    <div>
+      <p className="text-xs text-ink-tertiary mb-1">{label}</p>
+      <div className="flex flex-wrap gap-1">
+        {values.map((v, i) => (
+          <span key={i} className="text-xs bg-surface-canvas px-2 py-0.5 rounded">
+            <EvidencePopover value={v.value} evidence={v.evidence} />
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function InfoTab({ app, candidate, onSwitchTab }: { app: Application; candidate: Candidate | null | undefined; onSwitchTab: (tab: string) => void }) {
   const fullApp = useQuery(api.applications.get, { applicationId: app._id as any });
   const schoolId = fullApp?.schoolId;
@@ -199,11 +261,20 @@ function InfoTab({ app, candidate, onSwitchTab }: { app: Application; candidate:
     api.pipeline_config.getActiveStages,
     schoolId ? { schoolId: schoolId as any } : "skip"
   ) ?? [];
+  const profileGraph = useQuery(
+    api.graph.profileGraphForCandidate,
+    candidate?._id ? { candidateId: candidate._id as any } : "skip",
+  );
 
   const getStageName = (stageId: string) => {
     const found = stageList.find((s: any) => s.id === stageId);
     return found?.name ?? stageId;
   };
+
+  const facets = candidate?.parsedFacets;
+  const extras = facets?.extras
+    ? Object.entries(facets.extras).filter(([key]) => !key.startsWith("__promoted__"))
+    : [];
 
   return (
     <div className="space-y-5">
@@ -252,6 +323,15 @@ function InfoTab({ app, candidate, onSwitchTab }: { app: Application; candidate:
         </div>
       ) : (
         <>
+          <ParseStatusPill status={candidate.parseStatus} error={candidate.parseError} />
+
+          {candidate.candidateSummary && (
+            <div className="pt-3 border-t border-hairline">
+              <p className="text-xs text-ink-tertiary mb-1">Summary</p>
+              <p className="text-sm text-ink leading-relaxed">{candidate.candidateSummary}</p>
+            </div>
+          )}
+
           {candidate.location && (
             <div>
               <p className="text-xs text-ink-tertiary mb-0.5">Location</p>
@@ -323,6 +403,108 @@ function InfoTab({ app, candidate, onSwitchTab }: { app: Application; candidate:
                 ))}
               </div>
             </div>
+          )}
+
+          {facets && (
+            <div className="pt-3 border-t border-hairline space-y-3">
+              <p className="text-xs text-ink-tertiary uppercase tracking-wide">Parsed from resume</p>
+              <FacetSection label="Specializations" values={facets.specializations} />
+              <FacetSection label="Grade levels" values={facets.gradeLevels} />
+              <FacetSection label="Pedagogical approach" values={facets.pedagogicalApproach} />
+              <FacetSection label="Key achievements" values={facets.keyAchievements} />
+              <FacetSection label="Leadership" values={facets.leadershipRoles} />
+              <FacetSection label="Extracurricular" values={facets.extracurricular} />
+              <FacetSection label="Languages" values={facets.languages} />
+              <FacetSection label="School types" values={facets.schoolTypes} />
+              {facets.redFlags && facets.redFlags.length > 0 && (
+                <div>
+                  <p className="text-xs text-danger mb-1">Red flags</p>
+                  <div className="flex flex-wrap gap-1">
+                    {facets.redFlags.map((v, i) => (
+                      <span key={i} className="text-xs bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] text-danger px-2 py-0.5 rounded">
+                        <EvidencePopover value={v.value} evidence={v.evidence} />
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {extras.length > 0 && (
+                <div className="space-y-2">
+                  {extras.map(([key, values]) => (
+                    <FacetSection key={key} label={key.replace(/_/g, " ")} values={values} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {profileGraph && (
+            <div className="pt-3 border-t border-hairline space-y-3">
+              <p className="text-xs text-ink-tertiary uppercase tracking-wide">Knowledge graph</p>
+
+              {profileGraph.schools.length > 0 && (
+                <div>
+                  <p className="text-xs text-ink-tertiary mb-1">Schools taught at</p>
+                  <ul className="space-y-1">
+                    {profileGraph.schools.map((s: any, i: number) => (
+                      <li key={i} className="text-sm text-ink">
+                        <span className="font-medium">{s.name}</span>
+                        {s.role && <span className="text-ink-secondary"> · {s.role}</span>}
+                        {(s.yearStart || s.yearEnd) && (
+                          <span className="text-ink-tertiary"> ({s.yearStart ?? "?"}–{s.yearEnd ?? "now"})</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {profileGraph.qualifications.length > 0 && (
+                <div>
+                  <p className="text-xs text-ink-tertiary mb-1">Qualifications</p>
+                  <ul className="space-y-1">
+                    {profileGraph.qualifications.map((q: any, i: number) => (
+                      <li key={i} className="text-sm text-ink">
+                        <span className="font-medium">{q.degree}</span>
+                        {q.university && <span className="text-ink-secondary"> · {q.university}</span>}
+                        {q.yearEnd && <span className="text-ink-tertiary"> ({q.yearEnd})</span>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {profileGraph.cohorts.length > 0 && (
+                <div>
+                  <p className="text-xs text-ink-tertiary mb-1">Cohorts</p>
+                  <div className="flex flex-wrap gap-1">
+                    {profileGraph.cohorts.map((c: any, i: number) => (
+                      <Badge key={i}>{c.displayName}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {profileGraph.region && (
+                <div>
+                  <p className="text-xs text-ink-tertiary mb-0.5">Region</p>
+                  <p className="text-sm text-ink">{profileGraph.region}</p>
+                </div>
+              )}
+
+              {profileGraph.referredByName && (
+                <div>
+                  <p className="text-xs text-ink-tertiary mb-0.5">Referred by</p>
+                  <p className="text-sm text-ink">{profileGraph.referredByName}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {candidate.parsedAt && (
+            <p className="text-xs text-ink-tertiary pt-2">
+              Last parsed {new Date(candidate.parsedAt).toLocaleString()}
+            </p>
           )}
         </>
       )}

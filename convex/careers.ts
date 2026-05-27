@@ -102,6 +102,7 @@ export const submitApplication = mutation({
       currentSchool: args.currentSchool,
       sourceChannel: "careers_portal",
       talentBankFlag: false,
+      parseStatus: "pending",
     });
 
     await ctx.runMutation(internal.candidates.setOrigin, {

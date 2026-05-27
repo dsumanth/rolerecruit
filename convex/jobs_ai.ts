@@ -55,15 +55,25 @@ export const parseJobWithAI = action({
       throw new Error(`Failed to parse AI response: ${text.substring(0, 300)}`);
     }
 
+    // The schema enforces `level ∈ {PRT, TGT, PGT, Other}`. The LLM has been
+    // observed to emit out-of-set values (e.g. "PGT, TGT" when a role spans
+    // two levels, or a verbose label for non-classroom roles). Normalize here
+    // so the validator on saveParsedCriteria — and the form pre-fill —
+    // never see a value that would crash downstream.
+    parsed.level = normalizeLevel(parsed.level);
+
+    const hasMinExp = typeof parsed.minExperience === "number" && Number.isFinite(parsed.minExperience);
     await ctx.runMutation(internal.jobs.saveParsedCriteria as any, {
       jobId: args.jobId,
       parsedCriteria: {
         subjects: Array.isArray(parsed.subjects) ? parsed.subjects : [],
         board: typeof parsed.board === "string" ? parsed.board : "",
-        level: typeof parsed.level === "string" ? parsed.level : "",
+        level: parsed.level,
         requiredQualifications: Array.isArray(parsed.requiredQualifications) ? parsed.requiredQualifications : [],
         preferredQualifications: Array.isArray(parsed.preferredQualifications) ? parsed.preferredQualifications : [],
-        minExperience: typeof parsed.minExperience === "number" ? parsed.minExperience : null,
+        // Omit the key entirely when missing — Convex serializes `undefined`
+        // values as `null` on the wire, which v.optional(v.number()) rejects.
+        ...(hasMinExp ? { minExperience: parsed.minExperience } : {}),
         skills: Array.isArray(parsed.skills) ? parsed.skills : [],
       },
     });
@@ -71,6 +81,25 @@ export const parseJobWithAI = action({
     return { parsedCriteria: parsed };
   },
 });
+
+const VALID_LEVELS = ["PRT", "TGT", "PGT", "Other"] as const;
+type Level = (typeof VALID_LEVELS)[number];
+
+/**
+ * Coerce a freeform LLM-emitted level string to the schema enum. If the value
+ * cleanly matches PRT/TGT/PGT/Other (case-insensitive, after stripping any
+ * trailing notes like ", TGT" or " Teacher"), use that. Otherwise default to
+ * "Other" — non-classroom roles (Subject Matter Expert, Coordinator, etc.)
+ * legitimately don't fit the K-12 enum.
+ */
+export function normalizeLevel(input: unknown): Level {
+  if (typeof input !== "string") return "Other";
+  const head = input.trim().split(/[,/]/)[0]?.trim().toUpperCase() ?? "";
+  for (const lvl of VALID_LEVELS) {
+    if (head === lvl.toUpperCase()) return lvl;
+  }
+  return "Other";
+}
 
 export const computeRoleEmbeddings = action({
   args: { jobId: v.id("jobPostings") },

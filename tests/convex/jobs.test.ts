@@ -158,4 +158,80 @@ describe("jobs", () => {
     expect(activeJobs).toHaveLength(1);
     expect(activeJobs[0].title).toBe("Active Job");
   });
+
+  it("deletes a draft", async () => {
+    const t = convexTest(schema, modules);
+    const schoolId = await t.mutation("schools:create", {
+      name: "Test", board: "CBSE", city: "X", state: "Y",
+    });
+
+    const jobId = await t.mutation("jobs:create", {
+      schoolId,
+      title: "Draft to delete",
+      subject: "Math",
+      level: "TGT",
+      board: "CBSE",
+      qualifications: [],
+      naturalLanguageDescription: "desc",
+    });
+
+    await t.mutation("jobs:deleteDraft", { jobId });
+    const after = await t.query("jobs:get", { jobId });
+    expect(after).toBeNull();
+  });
+
+  it("refuses to delete a non-draft job", async () => {
+    const t = convexTest(schema, modules);
+    const schoolId = await t.mutation("schools:create", {
+      name: "Test", board: "CBSE", city: "X", state: "Y",
+    });
+
+    const jobId = await t.mutation("jobs:create", {
+      schoolId,
+      title: "Published",
+      subject: "Math",
+      level: "TGT",
+      board: "CBSE",
+      qualifications: [],
+      naturalLanguageDescription: "desc",
+    });
+    await t.mutation("jobs:publish", { jobId });
+
+    await expect(
+      t.mutation("jobs:deleteDraft", { jobId })
+    ).rejects.toThrow(/Only draft roles/);
+  });
+
+  it("updateJob patches multiple fields including description and qualifications", async () => {
+    const t = convexTest(schema, modules);
+    const schoolId = await t.mutation("schools:create", {
+      name: "Test", board: "CBSE", city: "X", state: "Y",
+    });
+
+    const jobId = await t.mutation("jobs:create", {
+      schoolId,
+      title: "Original",
+      subject: "Math",
+      level: "TGT",
+      board: "CBSE",
+      qualifications: ["B.Ed"],
+      naturalLanguageDescription: "Old description",
+    });
+
+    await t.mutation("jobs:updateJob", {
+      jobId,
+      title: "New title",
+      subject: "Physics",
+      level: "PGT",
+      naturalLanguageDescription: "New description",
+      qualifications: ["B.Ed", "M.Sc"],
+    });
+
+    const job = await t.query("jobs:get", { jobId });
+    expect(job!.title).toBe("New title");
+    expect(job!.subject).toBe("Physics");
+    expect(job!.level).toBe("PGT");
+    expect(job!.naturalLanguageDescription).toBe("New description");
+    expect(job!.qualifications).toEqual(["B.Ed", "M.Sc"]);
+  });
 });

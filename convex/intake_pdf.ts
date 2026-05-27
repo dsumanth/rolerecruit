@@ -92,48 +92,67 @@ export const extractTextFromResume = internalAction({
     applicationId: v.optional(v.id("applications")),
   },
   handler: async (ctx, args): Promise<void> => {
-    const blob = await ctx.storage.get(args.storageId);
-    if (!blob) throw new Error(`Resume file not found in storage: ${args.storageId}`);
-    const buf = Buffer.from(await blob.arrayBuffer());
-
-    const ext = getExt(args.originalName);
-
-    let text: string;
-    let method: ExtractionMethod;
-
-    if (ext === "docx") {
-      text = await extractWithMammoth(buf);
-      method = "mammoth";
-    } else if (IMAGE_EXTS.has(ext)) {
-      text = await extractWithGeminiVision(buf, imageMime(ext));
-      method = "gemini-vision";
-    } else {
-      // Default to PDF. Try cheap text-layer extraction first; fall back to
-      // Gemini vision when the layer is missing or sparse (scanned PDFs).
-      text = await extractWithUnpdf(buf);
-      method = "pdf-parse";
-      if (text.length < MIN_USABLE_TEXT_LEN) {
-        text = await extractWithGeminiVision(buf, "application/pdf");
-        method = "gemini-vision";
-      }
-    }
-
-    await ctx.runMutation(internal.candidates.attachResumeFile, {
-      candidateId: args.candidateId,
-      storageId: args.storageId,
-      originalName: args.originalName,
-      method,
-    });
-
-    await ctx.runAction(api.intake.parseAndStoreCandidate, {
-      candidateId: args.candidateId,
-      rawText: text,
-    });
-
-    if (args.applicationId) {
-      await ctx.scheduler.runAfter(0, api.triage.runTriage, {
-        applicationId: args.applicationId,
+    try {
+      await ctx.runMutation(internal.candidates.setParseStatus, {
+        candidateId: args.candidateId,
+        status: "pending",
       });
+
+      const blob = await ctx.storage.get(args.storageId);
+      if (!blob) throw new Error(`Resume file not found in storage: ${args.storageId}`);
+      const buf = Buffer.from(await blob.arrayBuffer());
+
+      const ext = getExt(args.originalName);
+
+      let text: string;
+      let method: ExtractionMethod;
+
+      if (ext === "docx") {
+        text = await extractWithMammoth(buf);
+        method = "mammoth";
+      } else if (IMAGE_EXTS.has(ext)) {
+        text = await extractWithGeminiVision(buf, imageMime(ext));
+        method = "gemini-vision";
+      } else {
+        // Default to PDF. Try cheap text-layer extraction first; fall back to
+        // Gemini vision when the layer is missing or sparse (scanned PDFs).
+        text = await extractWithUnpdf(buf);
+        method = "pdf-parse";
+        if (text.length < MIN_USABLE_TEXT_LEN) {
+          text = await extractWithGeminiVision(buf, "application/pdf");
+          method = "gemini-vision";
+        }
+      }
+
+      await ctx.runMutation(internal.candidates.attachResumeFile, {
+        candidateId: args.candidateId,
+        storageId: args.storageId,
+        originalName: args.originalName,
+        method,
+      });
+
+      await ctx.runAction(api.intake.parseAndStoreCandidate, {
+        candidateId: args.candidateId,
+        rawText: text,
+      });
+
+      await ctx.runMutation(internal.candidates.setParseStatus, {
+        candidateId: args.candidateId,
+        status: "done",
+      });
+
+      if (args.applicationId) {
+        await ctx.scheduler.runAfter(0, api.triage.runTriage, {
+          applicationId: args.applicationId,
+        });
+      }
+    } catch (err: any) {
+      await ctx.runMutation(internal.candidates.setParseStatus, {
+        candidateId: args.candidateId,
+        status: "failed",
+        error: err?.message ?? String(err),
+      });
+      throw err;
     }
   },
 });

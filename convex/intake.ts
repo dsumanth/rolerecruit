@@ -87,5 +87,13 @@ export const parseAndStoreCandidate = action({
         boardExperience: c?.boardExperience ?? [],
       });
     }
+
+    // 6. Mark the candidate's parse pipeline as done so the UI can stop showing
+    //    "Parsing…" pills. (extractTextFromResume also sets this after itself,
+    //    but the text-only careers path comes in here directly with no wrapper.)
+    await ctx.runMutation(internal.candidates.setParseStatus, {
+      candidateId: args.candidateId,
+      status: "done",
+    });
   },
 });

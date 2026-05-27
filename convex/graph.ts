@@ -365,6 +365,125 @@ export const listCandidatesInCohort = query({
 });
 
 /**
+ * profileGraphForCandidate — assemble the candidate's knowledge-graph
+ * neighborhood into a single payload for the candidate-info UI:
+ *   - schools taught at (via TAUGHT_AT edges)
+ *   - qualifications held and the universities they came from (HOLDS + FROM)
+ *   - cohorts (BELONGS_TO Cohort)
+ *   - certifications (CERTIFIED_IN)
+ *   - subjects specialized in (SPECIALIZES_IN)
+ *   - boards (BELONGS_TO Board)
+ *   - region (LOCATED_IN)
+ *   - referredByName (free-text attribute on the candidate node)
+ *
+ * Returns null when the candidate has no graph node yet (parsing hasn't built
+ * one, or parsing failed). Idempotent + safe to call on any candidate id.
+ */
+export const profileGraphForCandidate = query({
+  args: { candidateId: v.id("candidates") },
+  handler: async (ctx, args) => {
+    const candNode = await ctx.db
+      .query("nodes")
+      .withIndex("by_type_externalId", (q) =>
+        q.eq("type", "Candidate").eq("externalId", String(args.candidateId)),
+      )
+      .first();
+    if (!candNode) return null;
+
+    const outEdges = await ctx.db
+      .query("edges")
+      .withIndex("by_from_type", (q) => q.eq("fromId", candNode._id))
+      .collect();
+
+    const schools: Array<{ name: string; role?: string; subjects?: string[]; yearStart?: number; yearEnd?: number; endReason?: string }> = [];
+    const qualifications: Array<{ degree: string; yearStart?: number; yearEnd?: number; university?: string }> = [];
+    const cohorts: Array<{ displayName: string; university?: string; program?: string; endYear?: number }> = [];
+    const certifications: string[] = [];
+    const subjects: string[] = [];
+    const boards: string[] = [];
+    let region: string | null = null;
+
+    for (const edge of outEdges) {
+      const other = await ctx.db.get(edge.toId);
+      if (!other) continue;
+      const attrs = edge.attributes as any;
+      switch (edge.type) {
+        case "TAUGHT_AT":
+          schools.push({
+            name: other.displayName,
+            role: attrs?.role,
+            subjects: attrs?.subjects,
+            yearStart: attrs?.yearStart,
+            yearEnd: attrs?.yearEnd,
+            endReason: attrs?.endReason,
+          });
+          break;
+        case "HOLDS": {
+          let university: string | undefined;
+          if (other.type === "Qualification") {
+            const fromEdges = await ctx.db
+              .query("edges")
+              .withIndex("by_from_type", (q) => q.eq("fromId", other._id).eq("type", "FROM"))
+              .collect();
+            for (const fe of fromEdges) {
+              const uni = await ctx.db.get(fe.toId);
+              if (uni && uni.type === "University") {
+                university = uni.displayName;
+                break;
+              }
+            }
+          }
+          qualifications.push({
+            degree: other.displayName,
+            yearStart: attrs?.yearStart,
+            yearEnd: attrs?.yearEnd,
+            university,
+          });
+          break;
+        }
+        case "CERTIFIED_IN":
+          certifications.push(other.displayName);
+          break;
+        case "SPECIALIZES_IN":
+          subjects.push(other.displayName);
+          break;
+        case "BELONGS_TO":
+          if (other.type === "Board") {
+            boards.push(other.displayName);
+          } else if (other.type === "Cohort") {
+            const cohortAttrs = (other.attributes ?? {}) as any;
+            cohorts.push({
+              displayName: other.displayName,
+              university: cohortAttrs.university,
+              program: cohortAttrs.program,
+              endYear: cohortAttrs.endYear,
+            });
+          }
+          break;
+        case "LOCATED_IN":
+          region = other.displayName;
+          break;
+        default:
+          break;
+      }
+    }
+
+    const referredByName = (candNode.attributes as any)?.referredByName as string | undefined;
+
+    return {
+      schools,
+      qualifications,
+      cohorts,
+      certifications,
+      subjects,
+      boards,
+      region,
+      referredByName: referredByName ?? null,
+    };
+  },
+});
+
+/**
  * neighbors — 1-hop traversal from a node. Used by future Phase 3b/3c work and
  * by the cohort drilldown for "candidates similar to this one." Bounded by limit.
  */
