@@ -278,3 +278,46 @@ describe("intake → graph integration", () => {
     expect(c!.graphVersion).toBe("graph-v1");
   });
 });
+
+describe("graph backfill", () => {
+  it("backfillGraph paginates through candidates and stamps graphVersion", async () => {
+    const t = convexTest(schema, modules);
+
+    // Seed 5 candidates, all with parsedFacets but no graph
+    const ids: any[] = [];
+    for (let i = 0; i < 5; i++) {
+      const cId = await t.mutation("candidates:create", {
+        name: `Cand ${i}`, qualifications: ["B.Ed"], certifications: ["CTET"],
+        boardExperience: ["CBSE"], subjects: ["Physics"],
+      });
+      // Patch with minimal parsed state (no graphVersion → backfill picks it up)
+      await t.run(async (ctx: any) => {
+        await ctx.db.patch(cId, {
+          parsedFacets: {
+            specializations: [], gradeLevels: [], pedagogicalApproach: [],
+            leadershipRoles: [], extracurricular: [], languages: [],
+            schoolTypes: [], keyAchievements: [], redFlags: [], extras: {},
+          },
+          rawChunks: [],
+          parsedAt: Date.now(),
+          parsedVersion: "facets-v2",
+        });
+      });
+      ids.push(cId);
+    }
+
+    // Run backfill with pageSize=2 to force multiple pages
+    const result = await t.action("backfill:backfillGraph", { pageSize: 2 });
+    expect(result.processed).toBe(5);
+
+    // All 5 should have a Candidate node + at least one edge (Physics SPECIALIZES_IN + CBSE BELONGS_TO + CTET CERTIFIED_IN)
+    for (const id of ids) {
+      const c = await t.query("candidates:get", { candidateId: id });
+      expect(c!.graphVersion).toBe("graph-v1");
+    }
+    const candNodes = await t.run(async (ctx: any) =>
+      ctx.db.query("nodes").withIndex("by_type", (q: any) => q.eq("type", "Candidate")).collect()
+    );
+    expect(candNodes.length).toBe(5);
+  });
+});

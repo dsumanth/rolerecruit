@@ -1,8 +1,10 @@
 // convex/backfill.ts
-import { action, query } from "./_generated/server";
+import { action, internalQuery, query } from "./_generated/server";
 import { v } from "convex/values";
-import { api } from "./_generated/api";
-import { PARSED_FACETS_VERSION, EMBEDDING_VERSION } from "./versions";
+import { api, internal } from "./_generated/api";
+import { PARSED_FACETS_VERSION, EMBEDDING_VERSION, GRAPH_VERSION } from "./versions";
+
+const DEFAULT_GRAPH_PAGE_SIZE = 200;
 
 export const findStaleCandidates = query({
   args: { limit: v.optional(v.number()) },
@@ -40,6 +42,74 @@ export const runBackfillBatch = action({
         rawText: text,
       });
       processed++;
+    }
+    return { processed };
+  },
+});
+
+// ============================================================================
+// Phase 3a — graph backfill
+// ============================================================================
+
+export const candidatesMissingGraphPage = internalQuery({
+  args: {
+    cursor: v.union(v.string(), v.null()),
+    numItems: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const result = await ctx.db.query("candidates").paginate({
+      cursor: args.cursor,
+      numItems: args.numItems ?? DEFAULT_GRAPH_PAGE_SIZE,
+    });
+    return {
+      page: result.page.filter((c) => c.graphVersion !== GRAPH_VERSION),
+      isDone: result.isDone,
+      continueCursor: result.continueCursor,
+    };
+  },
+});
+
+/**
+ * backfillGraph — for every candidate whose graphVersion ≠ current GRAPH_VERSION,
+ * call materializeGraphFromIntake.
+ *
+ * For Phase 3a we DO NOT re-run the LLM during backfill (that would be expensive
+ * at scale). Instead we synthesize a RelationshipsHint from the structured
+ * candidate fields already in the row (subjects, boardExperience, currentSchool,
+ * certifications) — yielding a partial but useful graph. A separate LLM-driven
+ * backfill (Phase 3b) can re-extract previousSchools + universities from
+ * rawChunks for richer signal.
+ */
+export const backfillGraph = action({
+  args: { pageSize: v.optional(v.number()) },
+  handler: async (ctx, args): Promise<{ processed: number }> => {
+    const pageSize = args.pageSize ?? DEFAULT_GRAPH_PAGE_SIZE;
+    let cursor: string | null = null;
+    let processed = 0;
+
+    while (true) {
+      const result: { page: Array<any>; isDone: boolean; continueCursor: string } =
+        await ctx.runQuery(internal.backfill.candidatesMissingGraphPage, {
+          cursor, numItems: pageSize,
+        });
+      for (const c of result.page) {
+        // Synthesize a minimal relationships block from the structured fields.
+        // currentSchool → previousSchools (best-effort; without yearStart/yearEnd).
+        const synthetic = {
+          previousSchools: c.currentSchool ? [{ name: c.currentSchool }] : [],
+          qualifications: [],
+          certifications: c.certifications ?? [],
+        };
+        await ctx.runMutation(api.graph.materializeGraphFromIntake, {
+          candidateId: c._id,
+          relationships: synthetic,
+          subjects: c.subjects ?? [],
+          boardExperience: c.boardExperience ?? [],
+        });
+        processed++;
+      }
+      if (result.isDone) break;
+      cursor = result.continueCursor;
     }
     return { processed };
   },
