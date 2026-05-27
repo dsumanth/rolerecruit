@@ -447,3 +447,91 @@ export const demoteFacetForCandidate = internalMutation({
     });
   },
 });
+
+// ============================================================================
+// Soft-delete: pending mark + undo (Task 6.1) + cascade finalize (Task 6.2)
+// ============================================================================
+
+function makeBatchId() {
+  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+}
+
+const removeManyArgs = v.union(
+  v.object({ ids: v.array(v.id("candidates")) }),
+  v.object({
+    matchAll: v.object({
+      schoolId: v.id("schools"),
+      filter: v.optional(v.any()),
+    }),
+  }),
+);
+
+export const removeMany = mutation({
+  args: removeManyArgs,
+  handler: async (ctx, args) => {
+    let ids: any[] = [];
+    if ("ids" in args) {
+      ids = args.ids;
+    } else {
+      // matchAll: resolve via applications under the school, collect unique candidateIds.
+      const apps = await ctx.db
+        .query("applications")
+        .withIndex("by_schoolId", (q) => q.eq("schoolId", args.matchAll.schoolId))
+        .filter((q) => q.eq(q.field("pendingDeleteAt"), undefined))
+        .collect();
+      const candIds = new Set<string>();
+      for (const app of apps) candIds.add(app.candidateId);
+      ids = Array.from(candIds);
+    }
+
+    const batchId = makeBatchId();
+    let count = 0;
+    for (const id of ids) {
+      const doc = await ctx.db.get(id);
+      if (!doc || doc.pendingDeleteAt != null) continue;
+      await ctx.db.patch(id, { pendingDeleteAt: Date.now(), pendingDeleteBatchId: batchId });
+      count++;
+    }
+    await ctx.scheduler.runAfter(10_000, internal.candidates.finalizeBatchDelete, { batchId });
+    return { batchId, count };
+  },
+});
+
+export const remove = mutation({
+  args: { candidateId: v.id("candidates") },
+  handler: async (ctx, args) => {
+    const doc = await ctx.db.get(args.candidateId);
+    if (!doc || doc.pendingDeleteAt != null) {
+      return { batchId: "", count: 0 as const };
+    }
+    const batchId = makeBatchId();
+    await ctx.db.patch(args.candidateId, { pendingDeleteAt: Date.now(), pendingDeleteBatchId: batchId });
+    await ctx.scheduler.runAfter(10_000, internal.candidates.finalizeBatchDelete, { batchId });
+    return { batchId, count: 1 as const };
+  },
+});
+
+export const undoBatchDelete = mutation({
+  args: { batchId: v.string() },
+  handler: async (ctx, args) => {
+    const cands = await ctx.db
+      .query("candidates")
+      .filter((q) => q.eq(q.field("pendingDeleteBatchId"), args.batchId))
+      .collect();
+    let restored = 0;
+    for (const c of cands) {
+      if (c.pendingDeleteAt == null) continue;
+      await ctx.db.patch(c._id, { pendingDeleteAt: undefined, pendingDeleteBatchId: undefined });
+      restored++;
+    }
+    return { restored };
+  },
+});
+
+// Stub — full cascade implemented in Task 6.2 below.
+export const finalizeBatchDelete = internalMutation({
+  args: { batchId: v.string() },
+  handler: async (_ctx, _args) => {
+    // Implemented in Task 6.2
+  },
+});
