@@ -443,6 +443,38 @@ export const finalizeBatchDelete = internalMutation({
   },
 });
 
+const bulkSetStatusArgs = v.union(
+  v.object({ ids: v.array(v.id("jobPostings")), status: v.string() }),
+  v.object({ matchAll: v.object({ schoolId: v.id("schools"), filter: v.optional(v.any()) }), status: v.string() }),
+);
+
+export const bulkSetStatus = mutation({
+  args: bulkSetStatusArgs,
+  handler: async (ctx, args) => {
+    const a = args as { ids?: string[]; matchAll?: { schoolId: any; filter?: any }; status: string };
+    let ids: any[] = [];
+    if (a.ids) {
+      ids = a.ids;
+    } else if (a.matchAll) {
+      const matchAll = a.matchAll;
+      const rows = await ctx.db.query("jobPostings")
+        .withIndex("by_schoolId", (q) => q.eq("schoolId", matchAll.schoolId))
+        .filter((q) => q.eq(q.field("pendingDeleteAt"), undefined))
+        .collect();
+      ids = rows.map((r) => r._id);
+    }
+    const batchId = makeBatchId();
+    const previousStatuses: Array<{ id: any; previousStatus: string }> = [];
+    for (const id of ids) {
+      const j = await ctx.db.get(id as any) as any;
+      if (!j) continue;
+      previousStatuses.push({ id, previousStatus: j.status });
+      await ctx.db.patch(id as any, { status: a.status });
+    }
+    return { batchId, previousStatuses };
+  },
+});
+
 export const backfillRoleEmbeddings = action({
   args: {},
   handler: async (ctx): Promise<{ processed: number }> => {
