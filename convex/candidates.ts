@@ -1,4 +1,5 @@
 import { mutation, query, internalMutation, internalAction } from "./_generated/server";
+import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { PARSED_FACETS_VERSION, EMBEDDING_VERSION } from "./versions";
@@ -69,49 +70,78 @@ export const updateScore = internalMutation({
 export const listForSchool = query({
   args: {
     schoolId: v.id("schools"),
-    sourceChannel: v.optional(v.string()),
-    poolId: v.optional(v.id("pools")),
+    paginationOpts: paginationOptsValidator,
+    filter: v.optional(v.object({
+      poolId: v.optional(v.union(v.id("pools"), v.literal("all"))),
+      stages: v.optional(v.array(v.string())),
+      search: v.optional(v.string()),
+    })),
+    sort: v.optional(v.union(
+      v.literal("newest"), v.literal("score"), v.literal("name"),
+    )),
   },
   handler: async (ctx, args) => {
-    const apps = await ctx.db
+    const indexName =
+      args.sort === "score" ? "by_schoolId_aiMatchScore" : "by_schoolId";
+
+    const builder = ctx.db
       .query("applications")
-      .withIndex("by_schoolId", (q) => q.eq("schoolId", args.schoolId))
-      .collect();
+      .withIndex(indexName as any, (q: any) => q.eq("schoolId", args.schoolId));
 
-    const candidateMap = new Map<string, any>();
-    const seen = new Set<string>();
+    const filtered = builder.filter((q) => {
+      let expr = q.eq(q.field("pendingDeleteAt"), undefined);
+      if (args.filter?.stages && args.filter.stages.length > 0) {
+        const stageExprs = args.filter.stages.map((s) => q.eq(q.field("stage"), s));
+        expr = q.and(expr, q.or(...stageExprs));
+      }
+      return expr;
+    });
 
-    for (const app of apps) {
-      if (seen.has(app.candidateId)) continue;
-      seen.add(app.candidateId);
+    const ordered = filtered.order("desc");
+    const result = await ordered.paginate(args.paginationOpts);
+
+    const enriched: any[] = [];
+    for (const app of result.page) {
       const candidate = await ctx.db.get(app.candidateId);
       if (!candidate) continue;
-      if (args.sourceChannel && candidate.sourceChannel !== args.sourceChannel) continue;
+      if (candidate.pendingDeleteAt != null) continue;
 
-      const poolIds = candidate.poolIds ?? [];
-      const poolNames: string[] = [];
-      for (const pId of poolIds) {
-        const pool = await ctx.db.get(pId);
-        if (pool) poolNames.push(pool.name);
+      if (args.filter?.search) {
+        const s = args.filter.search.toLowerCase();
+        const haystack = `${candidate.name ?? ""} ${candidate.email ?? ""}`.toLowerCase();
+        if (!haystack.includes(s)) continue;
       }
 
-      if (args.poolId) {
-        if (!poolIds.includes(args.poolId)) continue;
+      if (args.filter?.poolId && args.filter.poolId !== "all") {
+        const poolMember = await ctx.db
+          .query("candidatePools")
+          .withIndex("by_candidateId", (q) => q.eq("candidateId", candidate._id))
+          .filter((q) => q.eq(q.field("poolId"), args.filter!.poolId))
+          .first();
+        if (!poolMember) continue;
       }
 
-      candidateMap.set(candidate._id, {
-        ...candidate,
+      enriched.push({
         applicationId: app._id,
+        candidateId: candidate._id,
+        name: candidate.name,
+        email: candidate.email,
+        phone: candidate.phone,
         stage: app.stage,
         aiMatchScore: app.aiMatchScore,
-        globalScore: app.globalScore,
-        scoringResult: app.scoringResult,
-        poolIds,
-        poolNames,
+        subjects: candidate.subjects ?? [],
+        yearsExperience: candidate.yearsExperience,
+        location: candidate.location,
+        sourceChannel: candidate.sourceChannel,
+        createdAt: app._creationTime,
       });
     }
 
-    return Array.from(candidateMap.values());
+    return {
+      page: enriched,
+      isDone: result.isDone,
+      continueCursor: result.continueCursor,
+    };
   },
 });
 

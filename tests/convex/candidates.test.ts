@@ -78,11 +78,14 @@ describe("candidates", () => {
       confidence: 90,
     });
 
-    const results = await t.query("candidates:listForSchool", { schoolId });
-    expect(results).toHaveLength(1);
-    expect(results[0].poolNames).toBeDefined();
-    expect(results[0].poolNames).toContain("TGT English");
-    expect(results[0].poolIds).toContain(poolId);
+    const results = await t.query("candidates:listForSchool", {
+      schoolId,
+      paginationOpts: { cursor: null, numItems: 100 },
+    });
+    expect(results.page).toHaveLength(1);
+    // New shape: poolNames/poolIds are no longer returned (replaced by candidatePools join per-request)
+    expect(results.page[0].candidateId).toBeDefined();
+    expect(results.page[0].stage).toBeDefined();
   });
 
   it("listForSchool filters by poolId", async () => {
@@ -120,14 +123,18 @@ describe("candidates", () => {
     await t.mutation("pools:assignToPool", { candidateId: candidate1, poolId: pool1, confidence: 90 });
     await t.mutation("pools:assignToPool", { candidateId: candidate2, poolId: pool2, confidence: 85 });
 
-    const allResults = await t.query("candidates:listForSchool", { schoolId });
-    expect(allResults).toHaveLength(2);
+    const allResults = await t.query("candidates:listForSchool", {
+      schoolId,
+      paginationOpts: { cursor: null, numItems: 100 },
+    });
+    expect(allResults.page).toHaveLength(2);
 
     const filteredResults = await t.query("candidates:listForSchool", {
       schoolId,
-      poolId: pool1,
+      paginationOpts: { cursor: null, numItems: 100 },
+      filter: { poolId: pool1 },
     });
-    expect(filteredResults).toHaveLength(1);
-    expect(filteredResults[0].name).toBe("Candidate 1");
+    expect(filteredResults.page).toHaveLength(1);
+    expect(filteredResults.page[0].name).toBe("Candidate 1");
   });
 });
