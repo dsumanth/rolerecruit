@@ -11,10 +11,10 @@ export default defineConfig({
   use: {
     baseURL: "http://localhost:3000",
     trace: "on-first-retry",
-    // When CLERK_E2E_STORAGE_STATE is set, use it as the default storageState
+    // When BETTER_AUTH_E2E_STORAGE_STATE is set, use it as the default storageState
     // for all tests. Individual fixtures can override this.
-    ...(process.env.CLERK_E2E_STORAGE_STATE
-      ? { storageState: process.env.CLERK_E2E_STORAGE_STATE }
+    ...(process.env.BETTER_AUTH_E2E_STORAGE_STATE
+      ? { storageState: process.env.BETTER_AUTH_E2E_STORAGE_STATE }
       : {}),
   },
   // Skip Playwright's webServer entirely when E2E_USE_EXTERNAL_SERVER is set —

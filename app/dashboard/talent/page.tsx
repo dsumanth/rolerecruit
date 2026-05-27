@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { useUser } from "@clerk/nextjs";
+import { authClient } from "@/lib/auth-client";
 import { Button, Card, PageHeader } from "@/components/ui";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TalentControls } from "@/components/talent/talent-controls";
@@ -14,7 +14,8 @@ import type { Application } from "@/components/pipeline/application-table";
 import { NlSearchBar } from "@/components/talent/nl-search-bar";
 
 export default function TalentBankPage() {
-  const { user } = useUser();
+  const { data: session } = authClient.useSession();
+  const user = session?.user;
   const profile = useQuery(api.users.getByClerkId, user?.id ? { userId: user.id } : "skip");
   const schoolId = profile?.schoolId;
 

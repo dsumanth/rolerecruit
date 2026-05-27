@@ -1,6 +1,6 @@
 "use client";
 import { useQuery } from "convex/react";
-import { useUser } from "@clerk/nextjs";
+import { authClient } from "@/lib/auth-client";
 import { api } from "@/convex/_generated/api";
 import { TriageCard } from "@/components/triage/triage-card";
 import { PageHeader } from "@/components/ui/page-header";
@@ -15,8 +15,8 @@ const TABS = [
 ] as const;
 
 export default function TriagePage() {
-  const { user } = useUser();
-  const userId = user?.id ?? "";
+  const { data: session } = authClient.useSession();
+  const userId = session?.user.id ?? "";
   const profile = useQuery(api.users.getByClerkId, userId ? { userId } : "skip");
   const schoolId = profile?.schoolId;
   const [tab, setTab] = useState<string>("human_review");

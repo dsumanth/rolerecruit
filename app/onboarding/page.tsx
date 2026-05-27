@@ -2,7 +2,7 @@
 
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { useAuth } from "@clerk/nextjs";
+import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { ReactNode } from "react";
@@ -18,7 +18,9 @@ const BOARD_OPTIONS = [
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { userId } = useAuth();
+  const { data: session } = authClient.useSession();
+  const userId = session?.user.id;
+  const userEmail = session?.user.email ?? "";
   const createSchool = useMutation(api.schools.create);
   const createProfile = useMutation(api.users.createProfile);
   const [name, setName] = useState("");
@@ -46,7 +48,7 @@ export default function OnboardingPage() {
       await createProfile({
         userId,
         name: userName,
-        email: "",
+        email: userEmail,
         schoolId,
         role: "hr_admin",
       });

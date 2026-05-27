@@ -1,18 +1,18 @@
 /**
- * One-shot helper to record a Clerk auth state file for E2E tests.
+ * One-shot helper to record a Better Auth session cookie file for E2E tests.
  *
  * Usage:
- *   1. Make sure the dev server is running: `bun run dev` (on http://localhost:3000)
- *   2. Run: `bun tests/e2e/save-auth-state.ts`
- *   3. A Chromium window opens. Sign in manually as your hr_admin test user
- *      (or whatever role the triage specs need).
- *   4. Once you see /dashboard (or any logged-in page), come back to the terminal
- *      and press Enter.
- *   5. The script saves the browser storage state to
+ *   1. Start the dev server: `bun run dev` (on http://localhost:3000)
+ *   2. Make sure your test hr_admin user exists (sign up, verify email,
+ *      complete /onboarding).
+ *   3. Run: `bun tests/e2e/save-auth-state.ts`
+ *   4. A Chromium window opens. Sign in as your hr_admin user.
+ *   5. Once you reach /dashboard, come back to the terminal and press Enter.
+ *   6. The script saves the browser storage state to
  *      tests/e2e/.auth/hr-admin.json and exits.
  *
  * After that:
- *   export CLERK_E2E_STORAGE_STATE=tests/e2e/.auth/hr-admin.json
+ *   export BETTER_AUTH_E2E_STORAGE_STATE=tests/e2e/.auth/hr-admin.json
  *   bun run test:e2e
  *
  * The .auth/ directory is gitignored so the file never gets committed.
@@ -52,24 +52,27 @@ async function main() {
     process.stdin.once("data", () => resolve());
   });
 
-  // Verify the user is actually authenticated
+  // Verify the user is actually authenticated by looking for the Better Auth
+  // session cookie. The default cookie name is `better-auth.session_token`.
   const url = page.url();
   const cookies = await ctx.cookies();
-  const hasClerkSession = cookies.some((c) => c.name.startsWith("__session") || c.name.includes("clerk"));
+  const sessionCookie = cookies.find((c) => c.name === "better-auth.session_token");
 
-  if (!hasClerkSession) {
-    console.warn("\n⚠  No Clerk session cookies detected. The saved state may not authenticate.");
+  if (!sessionCookie) {
+    console.warn("\n⚠  No Better Auth session cookie detected. The saved state may not authenticate.");
     console.warn(`   Current URL: ${url}`);
     console.warn("   Sign in inside the browser first, THEN press Enter.");
   }
 
   await ctx.storageState({ path: STATE_PATH });
   console.log(`\n✓ Saved auth state to ${STATE_PATH}`);
-  console.log(`✓ Found ${cookies.length} cookies, ${cookies.filter((c) => c.name.startsWith("__session") || c.name.includes("clerk")).length} Clerk-related.`);
+  console.log(
+    `✓ Found ${cookies.length} cookies${sessionCookie ? " (including better-auth.session_token)" : ""}.`
+  );
 
   if (existsSync(STATE_PATH)) {
     console.log(`\nNext:`);
-    console.log(`  export CLERK_E2E_STORAGE_STATE=${STATE_PATH}`);
+    console.log(`  export BETTER_AUTH_E2E_STORAGE_STATE=${STATE_PATH}`);
     console.log(`  bun run test:e2e\n`);
   }
 

@@ -2,7 +2,7 @@
 
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { useAuth } from "@clerk/nextjs";
+import { authClient } from "@/lib/auth-client";
 import type { ReactNode } from "react";
 
 export function RoleGate({
@@ -14,7 +14,8 @@ export function RoleGate({
   children: ReactNode;
   fallback?: ReactNode;
 }) {
-  const { userId } = useAuth();
+  const { data: session } = authClient.useSession();
+  const userId = session?.user.id;
   const permissions = useQuery(api.users.getPermissions, userId ? { userId } : "skip");
 
   if (!userId || !permissions) return null;

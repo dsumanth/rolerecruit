@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth, useUser } from "@clerk/nextjs";
 import { useMutation } from "convex/react";
+import Link from "next/link";
 import { api } from "@/convex/_generated/api";
 import { ConvexClientProvider } from "@/components/ConvexClientProvider";
 import { Card, Button } from "@/components/ui";
 import { nameInitial } from "@/components/ui/avatar";
-import Link from "next/link";
+import { authClient } from "@/lib/auth-client";
 
 type InviteData = {
   token: string;
@@ -32,8 +32,7 @@ function roleLabel(role: string) {
 
 function AcceptInviteInner({ invite, token }: { invite: InviteData; token: string }) {
   const router = useRouter();
-  const { isSignedIn, isLoaded: authLoaded } = useAuth();
-  const { user } = useUser();
+  const { data: session, isPending: authLoading } = authClient.useSession();
   const acceptInvite = useMutation(api.invitations.accept);
   const [accepting, setAccepting] = useState(false);
   const [error, setError] = useState("");
@@ -58,7 +57,7 @@ function AcceptInviteInner({ invite, token }: { invite: InviteData; token: strin
     );
   }
 
-  if (!authLoaded) {
+  if (authLoading) {
     return (
       <Card padding="lg" elevation={1} className="max-w-[480px] mx-auto text-center">
         <p className="text-body-s text-ink-secondary">Loading...</p>
@@ -66,8 +65,12 @@ function AcceptInviteInner({ invite, token }: { invite: InviteData; token: strin
     );
   }
 
+  const user = session?.user;
+  const isSignedIn = Boolean(user);
+
   if (!isSignedIn) {
     const returnUrl = `/accept-invite/${token}`;
+    const inviteEmailParam = encodeURIComponent(invite.email);
     return (
       <Card padding="lg" elevation={1} className="max-w-[480px] mx-auto">
         <div className="flex items-center gap-2.5 pb-5 mb-5 border-b border-hairline">
@@ -79,7 +82,7 @@ function AcceptInviteInner({ invite, token }: { invite: InviteData; token: strin
             <p className="text-caption text-ink-secondary truncate">{roleLabel(invite.role)} invitation</p>
           </div>
         </div>
-        <h1 className="text-display-s text-ink mb-2">You're invited</h1>
+        <h1 className="text-display-s text-ink mb-2">You&apos;re invited</h1>
         <p className="text-body-s text-ink-secondary mb-6">
           Sign in or create an account to accept this invitation.
         </p>
@@ -87,7 +90,10 @@ function AcceptInviteInner({ invite, token }: { invite: InviteData; token: strin
           <Link href={`/sign-in?redirect_url=${encodeURIComponent(returnUrl)}`} className="flex-1">
             <Button variant="secondary" size="lg" className="w-full">Sign in</Button>
           </Link>
-          <Link href={`/sign-up?redirect_url=${encodeURIComponent(returnUrl)}`} className="flex-1">
+          <Link
+            href={`/sign-up?redirect_url=${encodeURIComponent(returnUrl)}&invite_email=${inviteEmailParam}`}
+            className="flex-1"
+          >
             <Button variant="primary" size="lg" className="w-full">Sign up</Button>
           </Link>
         </div>
@@ -95,9 +101,9 @@ function AcceptInviteInner({ invite, token }: { invite: InviteData; token: strin
     );
   }
 
+  const userEmail = user?.email ?? "";
   const emailMismatch =
-    user?.primaryEmailAddress?.emailAddress &&
-    user.primaryEmailAddress.emailAddress.toLowerCase() !== invite.email.toLowerCase();
+    userEmail && userEmail.toLowerCase() !== invite.email.toLowerCase();
 
   const handleAccept = async () => {
     if (!user) return;
@@ -107,8 +113,8 @@ function AcceptInviteInner({ invite, token }: { invite: InviteData; token: strin
       await acceptInvite({
         token,
         userId: user.id,
-        name: user.fullName ?? user.primaryEmailAddress?.emailAddress ?? "User",
-        email: user.primaryEmailAddress?.emailAddress ?? "",
+        name: user.name ?? userEmail ?? "User",
+        email: userEmail,
       });
       router.push("/dashboard");
     } catch (e: any) {
@@ -138,7 +144,7 @@ function AcceptInviteInner({ invite, token }: { invite: InviteData; token: strin
       {emailMismatch ? (
         <div className="rounded-md bg-[color-mix(in_srgb,var(--warning)_8%,transparent)] border border-[color-mix(in_srgb,var(--warning)_25%,transparent)] px-4 py-3 text-body-s text-warning">
           This invitation was sent to <span className="font-medium">{invite.email}</span>.
-          You're signed in as <span className="font-medium">{user?.primaryEmailAddress?.emailAddress}</span>.
+          You&apos;re signed in as <span className="font-medium">{userEmail}</span>.
           Please sign in with the invited email address.
         </div>
       ) : (
