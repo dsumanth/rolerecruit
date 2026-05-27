@@ -1,20 +1,24 @@
-import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { fetchQuery } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
+import { fetchAuthQuery } from "@/lib/auth-server";
 
 export async function requireProfile() {
-  const { userId } = await auth();
+  // Single source of truth: ask Convex for the current user. Skips the extra
+  // isAuthenticated() round trip, which can briefly disagree with the user
+  // query right after sign-in while auth state propagates.
+  const user = await fetchAuthQuery(api.auth.getCurrentUser);
 
-  if (!userId) {
+  if (!user) {
     redirect("/sign-in");
   }
 
-  const profile = await fetchQuery(api.users.getProfile, { userId });
+  const profile = await fetchAuthQuery(api.users.getProfile, {
+    userId: user._id,
+  });
 
   if (!profile) {
     redirect("/onboarding");
   }
 
-  return { userId, profile };
+  return { userId: user._id, profile };
 }

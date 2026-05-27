@@ -13,9 +13,10 @@
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
-    "@clerk/nextjs": "^6.0.0",
+    "@convex-dev/better-auth": "^0.12.2",
     "@hello-pangea/dnd": "^17.0.0",
     "@tanstack/react-virtual": "^3.13.25",
+    "better-auth": "^1.6.9",
     "convex": "^1.17.0",
     "convex-helpers": "^0.1.118",
     "lucide-react": "^1.16.0",

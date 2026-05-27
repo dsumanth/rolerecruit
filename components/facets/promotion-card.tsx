@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation } from "convex/react";
-import { useUser } from "@clerk/nextjs";
+import { authClient } from "@/lib/auth-client";
 import { api } from "@/convex/_generated/api";
 import type { Doc } from "@/convex/_generated/dataModel";
 import { Badge } from "@/components/ui/badge";
@@ -33,8 +33,8 @@ function formatDate(ts: number): string {
 }
 
 export function PromotionCard({ row }: Props) {
-  const { user } = useUser();
-  const actorUserId = user?.id ?? "unknown";
+  const { data: session } = authClient.useSession();
+  const actorUserId = session?.user.id ?? "unknown";
   const promote = useMutation(api.facetPromotion.promote);
   const dismiss = useMutation(api.facetPromotion.dismiss);
   const demote = useMutation(api.facetPromotion.demote);

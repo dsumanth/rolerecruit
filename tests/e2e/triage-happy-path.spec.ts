@@ -17,7 +17,7 @@ import { join } from "node:path";
  * tests/e2e/README.md.
  */
 
-const shouldRun = !!process.env.CLERK_E2E_STORAGE_STATE;
+const shouldRun = !!process.env.BETTER_AUTH_E2E_STORAGE_STATE;
 const maybeTest = shouldRun ? test : test.skip;
 
 const seedPath = join(__dirname, ".fixtures", "seed.json");

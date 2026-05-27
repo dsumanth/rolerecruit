@@ -1,11 +1,12 @@
 "use client";
 import { useQuery, useMutation } from "convex/react";
-import { useUser } from "@clerk/nextjs";
+import { authClient } from "@/lib/auth-client";
 import { api } from "@/convex/_generated/api";
 import { useState, useEffect } from "react";
 
 export default function TriageSettingsPage() {
-  const { user } = useUser();
+  const { data: session } = authClient.useSession();
+  const user = session?.user;
   const profile = useQuery(
     api.users.getByClerkId,
     user?.id ? { userId: user.id } : "skip",

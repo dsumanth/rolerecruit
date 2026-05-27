@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { useUser } from "@clerk/nextjs";
+import { authClient } from "@/lib/auth-client";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Badge, Button, Card, Input } from "@/components/ui";
 
@@ -27,7 +27,8 @@ const ALL_PERMISSIONS = [
 ];
 
 export default function RolesPage() {
-  const { user } = useUser();
+  const { data: session } = authClient.useSession();
+  const user = session?.user;
   const profile = useQuery(api.users.getByClerkId, user?.id ? { userId: user.id } : "skip");
   const roles = useQuery(api.roles.list, profile?.schoolId ? { schoolId: profile.schoolId } : "skip");
   const updateRole = useMutation(api.roles.update);

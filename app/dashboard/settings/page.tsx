@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { useUser } from "@clerk/nextjs";
+import { authClient } from "@/lib/auth-client";
 import { Button, Card, Input, Toggle } from "@/components/ui";
 import { SchoolLogo } from "@/components/careers/SchoolLogo";
 
 export default function SettingsPage() {
-  const { user } = useUser();
+  const { data: session } = authClient.useSession();
+  const user = session?.user;
   const profile = useQuery(api.users.getByClerkId, user?.id ? { userId: user.id } : "skip");
   const school = useQuery(api.schools.get, profile?.schoolId ? { schoolId: profile.schoolId } : "skip");
   const updateSettings = useMutation(api.schools.updateSettings);

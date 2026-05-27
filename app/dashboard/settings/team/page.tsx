@@ -2,13 +2,14 @@
 
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { useUser } from "@clerk/nextjs";
+import { authClient } from "@/lib/auth-client";
 import { RoleBadge } from "@/components/auth/role-gate";
 import { useState, useEffect } from "react";
 import { Button, Card, Input, Select } from "@/components/ui";
 
 export default function TeamSettingsPage() {
-  const { user } = useUser();
+  const { data: session } = authClient.useSession();
+  const user = session?.user;
   const profile = useQuery(api.users.getByClerkId, user?.id ? { userId: user.id } : "skip");
   const members = useQuery(api.users.getBySchool, profile?.schoolId ? { schoolId: profile.schoolId } : "skip");
   const roles = useQuery(api.roles.list, profile?.schoolId ? { schoolId: profile.schoolId } : "skip");
