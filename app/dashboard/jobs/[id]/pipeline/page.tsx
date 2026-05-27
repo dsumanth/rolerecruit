@@ -99,6 +99,7 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
     aiMatchScore: row.aiMatchScore,
     globalScore: undefined,
     poolNames: undefined,
+    priorRejectCount: row.priorRejectCount ?? 0,
     candidate: {
       _id: row.candidateId,
       name: row.name,

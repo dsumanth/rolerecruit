@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { InlineExpansion } from "@/components/pipeline/inline-expansion";
 import { PoolOriginBadge } from "@/components/shared/pool-origin-badge";
+import { RejectionHistoryIndicator } from "@/components/pipeline/rejection-history-indicator";
 
 type BadgeVariant = "neutral" | "info" | "success" | "warning" | "danger";
 
@@ -202,9 +203,15 @@ export function ApplicationTable({
                     />
                   </div>
                   <div>
-                    <p className="font-medium text-ink">
-                      {app.candidate?.name ?? "Unknown"}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-ink">{app.candidate?.name ?? "Unknown"}</span>
+                      {(app as any).priorRejectCount > 0 && (
+                        <RejectionHistoryIndicator
+                          count={(app as any).priorRejectCount}
+                          onClick={() => onRowClick?.(app)}
+                        />
+                      )}
+                    </div>
                     <PoolOriginBadge source={app.source} />
                     {showPoolBadges && app.poolNames && app.poolNames.length > 0 && (
                       <div className="flex gap-1 mt-1 flex-wrap">
