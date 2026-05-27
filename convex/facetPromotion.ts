@@ -33,32 +33,48 @@ interface CandidateExtraOccurrence {
  *
  * Designed to be called by a nightly cron OR on-demand.
  */
+// Default candidates-per-page for the paginating scans below. Can be overridden
+// per-call by passing `pageSize` to the action — primarily for tests that need
+// to exercise the multi-page loop without seeding hundreds of rows.
+const DEFAULT_PAGE_SIZE = 500;
+
 export const trackExtrasFrequency = internalAction({
-  args: { lookbackMs: v.optional(v.number()) },
+  args: { lookbackMs: v.optional(v.number()), pageSize: v.optional(v.number()) },
   handler: async (ctx, args): Promise<{ keysSeen: number; newRows: number; updatedRows: number }> => {
     const lookback = args.lookbackMs ?? FACET_TRACKER_LOOKBACK_MS;
     const since = Date.now() - lookback;
+    const pageSize = args.pageSize ?? DEFAULT_PAGE_SIZE;
 
-    const recent = await ctx.runQuery(internal.facetPromotion.listRecentlyParsed, { since });
-
-    // Collect all (key, candidateId, value, evidence) occurrences
+    // Collect all (key, candidateId, value, evidence) occurrences across all
+    // recently-parsed candidates by walking the table page-by-page.
     const occurrences: CandidateExtraOccurrence[] = [];
-    for (const c of recent) {
-      const extras = c.parsedFacets?.extras ?? {};
-      for (const [key, arr] of Object.entries(extras)) {
-        // Skip already-promoted keys to avoid double-counting
-        if (key.startsWith("__promoted__")) continue;
-        for (const fv of arr as any[]) {
-          occurrences.push({
-            candidateId: c._id,
-            key,
-            value: fv.value,
-            quote: fv.evidence?.quote ?? "",
-            offset: fv.evidence?.offset ?? 0,
-            context: fv.evidence?.context ?? "",
-          });
+    let cursor: string | null = null;
+    while (true) {
+      const result: { page: Array<any>; isDone: boolean; continueCursor: string } =
+        await ctx.runQuery(internal.facetPromotion.recentlyParsedPage, {
+          since,
+          cursor,
+          numItems: pageSize,
+        });
+      for (const c of result.page) {
+        const extras = c.parsedFacets?.extras ?? {};
+        for (const [key, arr] of Object.entries(extras)) {
+          // Skip already-promoted keys to avoid double-counting
+          if (key.startsWith("__promoted__")) continue;
+          for (const fv of arr as any[]) {
+            occurrences.push({
+              candidateId: c._id,
+              key,
+              value: fv.value,
+              quote: fv.evidence?.quote ?? "",
+              offset: fv.evidence?.offset ?? 0,
+              context: fv.evidence?.context ?? "",
+            });
+          }
         }
       }
+      if (result.isDone) break;
+      cursor = result.continueCursor;
     }
 
     // Group by key
@@ -83,14 +99,28 @@ export const trackExtrasFrequency = internalAction({
   },
 });
 
-export const listRecentlyParsed = internalQuery({
-  args: { since: v.number() },
+/**
+ * recentlyParsedPage — one page of candidates whose `parsedAt >= since`. The
+ * filter is in-memory because no `by_parsedAt` index exists yet. With cursor
+ * pagination the whole table is reachable regardless of size, at the cost of
+ * one query per ~500 candidates.
+ */
+export const recentlyParsedPage = internalQuery({
+  args: {
+    since: v.number(),
+    cursor: v.union(v.string(), v.null()),
+    numItems: v.optional(v.number()),
+  },
   handler: async (ctx, args) => {
-    // No `by_parsedAt` index yet — scan all candidates and filter. For Phase 2's
-    // expected pool size (≤10K), this is fine. Add the index in a follow-up if
-    // we cross 100K candidates.
-    const all = await ctx.db.query("candidates").take(2000);
-    return all.filter((c) => (c.parsedAt ?? 0) >= args.since);
+    const result = await ctx.db.query("candidates").paginate({
+      cursor: args.cursor,
+      numItems: args.numItems ?? DEFAULT_PAGE_SIZE,
+    });
+    return {
+      page: result.page.filter((c) => (c.parsedAt ?? 0) >= args.since),
+      isDone: result.isDone,
+      continueCursor: result.continueCursor,
+    };
   },
 });
 
@@ -298,64 +328,109 @@ export const demote = mutation({
 });
 
 export const backfillPromotion = internalAction({
-  args: { key: v.string() },
+  args: { key: v.string(), pageSize: v.optional(v.number()) },
   handler: async (ctx, args): Promise<{ processed: number }> => {
-    const all = await ctx.runQuery(internal.facetPromotion.candidatesWithExtraKey, {
-      key: args.key,
-    });
+    const pageSize = args.pageSize ?? DEFAULT_PAGE_SIZE;
+    let cursor: string | null = null;
     let processed = 0;
-    for (const c of all) {
-      await ctx.runMutation(internal.candidates.promoteFacetForCandidate, {
-        candidateId: c._id,
-        key: args.key,
-      });
-      processed++;
+    while (true) {
+      const result: { page: Array<any>; isDone: boolean; continueCursor: string } =
+        await ctx.runQuery(internal.facetPromotion.candidatesWithExtraKeyPage, {
+          key: args.key,
+          cursor,
+          numItems: pageSize,
+        });
+      for (const c of result.page) {
+        await ctx.runMutation(internal.candidates.promoteFacetForCandidate, {
+          candidateId: c._id,
+          key: args.key,
+        });
+        processed++;
+      }
+      if (result.isDone) break;
+      cursor = result.continueCursor;
     }
     return { processed };
   },
 });
 
 export const backfillDemotion = internalAction({
-  args: { key: v.string() },
+  args: { key: v.string(), pageSize: v.optional(v.number()) },
   handler: async (ctx, args): Promise<{ processed: number }> => {
-    const all = await ctx.runQuery(internal.facetPromotion.candidatesWithPromotedKey, {
-      key: args.key,
-    });
+    const pageSize = args.pageSize ?? DEFAULT_PAGE_SIZE;
+    let cursor: string | null = null;
     let processed = 0;
-    for (const c of all) {
-      await ctx.runMutation(internal.candidates.demoteFacetForCandidate, {
-        candidateId: c._id,
-        key: args.key,
-      });
-      processed++;
+    while (true) {
+      const result: { page: Array<any>; isDone: boolean; continueCursor: string } =
+        await ctx.runQuery(internal.facetPromotion.candidatesWithPromotedKeyPage, {
+          key: args.key,
+          cursor,
+          numItems: pageSize,
+        });
+      for (const c of result.page) {
+        await ctx.runMutation(internal.candidates.demoteFacetForCandidate, {
+          candidateId: c._id,
+          key: args.key,
+        });
+        processed++;
+      }
+      if (result.isDone) break;
+      cursor = result.continueCursor;
     }
     return { processed };
   },
 });
 
 /**
- * candidatesWithExtraKey — internalQuery: returns candidates whose
- * parsedFacets.extras contains the given (un-prefixed) key. Used by the
- * promotion backfill action. No index on extras keys; we scan up to 5K rows.
+ * candidatesWithExtraKeyPage — one page of candidates whose parsedFacets.extras
+ * carries the (un-prefixed) key. The action above walks through pages until
+ * isDone. No index on extras keys exists (Convex doesn't index dynamic JSON
+ * object keys); the filter is in-memory per page.
  */
-export const candidatesWithExtraKey = internalQuery({
-  args: { key: v.string() },
+export const candidatesWithExtraKeyPage = internalQuery({
+  args: {
+    key: v.string(),
+    cursor: v.union(v.string(), v.null()),
+    numItems: v.optional(v.number()),
+  },
   handler: async (ctx, args) => {
-    const all = await ctx.db.query("candidates").take(5000);
-    return all.filter((c) => c.parsedFacets?.extras && (c.parsedFacets.extras as any)[args.key]);
+    const result = await ctx.db.query("candidates").paginate({
+      cursor: args.cursor,
+      numItems: args.numItems ?? DEFAULT_PAGE_SIZE,
+    });
+    return {
+      page: result.page.filter(
+        (c) => c.parsedFacets?.extras && (c.parsedFacets.extras as any)[args.key],
+      ),
+      isDone: result.isDone,
+      continueCursor: result.continueCursor,
+    };
   },
 });
 
 /**
- * candidatesWithPromotedKey — internalQuery: returns candidates whose
- * parsedFacets.extras contains the `__promoted__<key>` form. Used by the
- * demotion backfill action.
+ * candidatesWithPromotedKeyPage — one page of candidates whose
+ * parsedFacets.extras carries the `__promoted__<key>` form. Used by the
+ * demotion backfill action's cursor loop.
  */
-export const candidatesWithPromotedKey = internalQuery({
-  args: { key: v.string() },
+export const candidatesWithPromotedKeyPage = internalQuery({
+  args: {
+    key: v.string(),
+    cursor: v.union(v.string(), v.null()),
+    numItems: v.optional(v.number()),
+  },
   handler: async (ctx, args) => {
     const promotedKey = `__promoted__${args.key}`;
-    const all = await ctx.db.query("candidates").take(5000);
-    return all.filter((c) => c.parsedFacets?.extras && (c.parsedFacets.extras as any)[promotedKey]);
+    const result = await ctx.db.query("candidates").paginate({
+      cursor: args.cursor,
+      numItems: args.numItems ?? DEFAULT_PAGE_SIZE,
+    });
+    return {
+      page: result.page.filter(
+        (c) => c.parsedFacets?.extras && (c.parsedFacets.extras as any)[promotedKey],
+      ),
+      isDone: result.isDone,
+      continueCursor: result.continueCursor,
+    };
   },
 });
