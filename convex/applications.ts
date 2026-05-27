@@ -1,4 +1,5 @@
 import { mutation, query, internalMutation } from "./_generated/server";
+import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
 
@@ -165,29 +166,64 @@ export const moveStage = mutation({
 });
 
 export const getPipelineForJob = query({
-  args: { jobId: v.id("jobPostings") },
+  args: {
+    jobId: v.id("jobPostings"),
+    paginationOpts: paginationOptsValidator,
+    filter: v.optional(v.object({
+      stage: v.optional(v.string()),
+      search: v.optional(v.string()),
+    })),
+    sort: v.optional(v.union(
+      v.literal("newest"), v.literal("score"), v.literal("name"),
+    )),
+  },
   handler: async (ctx, args) => {
-    const apps = await ctx.db
+    // Sort note:
+    // - "newest" uses by_jobPostingId + _creationTime desc.
+    // - "score" uses by_jobPostingId_aiMatchScore. Applications without aiMatchScore
+    //   are EXCLUDED from results (Convex sparse-index semantics).
+    // - "name" has no backing index today; falls back to "newest" order. The UI
+    //   sort label is misleading; follow-up will add by_jobPostingId_name when needed.
+    const indexName = args.sort === "score" ? "by_jobPostingId_aiMatchScore" : "by_jobPostingId";
+    const builder = ctx.db
       .query("applications")
-      .withIndex("by_jobPostingId", (q) => q.eq("jobPostingId", args.jobId))
-      .collect();
+      .withIndex(indexName as any, (q: any) => q.eq("jobPostingId", args.jobId));
 
-    const result: Record<string, any[]> = {};
-    for (const stage of PIPELINE_STAGES) {
-      result[stage] = [];
-    }
-
-    for (const app of apps) {
-      if (result[app.stage]) {
-        const candidate = await ctx.db.get(app.candidateId);
-        result[app.stage].push({
-          ...app,
-          candidate: candidate ?? null,
-        });
+    const filtered = builder.filter((q) => {
+      let expr = q.eq(q.field("pendingDeleteAt"), undefined);
+      if (args.filter?.stage) {
+        expr = q.and(expr, q.eq(q.field("stage"), args.filter.stage));
       }
+      return expr;
+    });
+
+    const result = await filtered.order("desc").paginate(args.paginationOpts);
+
+    const enriched: any[] = [];
+    for (const app of result.page) {
+      const candidate = await ctx.db.get(app.candidateId);
+      if (!candidate || candidate.pendingDeleteAt != null) continue;
+      if (args.filter?.search) {
+        const s = args.filter.search.toLowerCase();
+        const hay = `${candidate.name ?? ""} ${candidate.email ?? ""}`.toLowerCase();
+        if (!hay.includes(s)) continue;
+      }
+      enriched.push({
+        applicationId: app._id,
+        candidateId: candidate._id,
+        name: candidate.name,
+        email: candidate.email,
+        phone: candidate.phone,
+        stage: app.stage,
+        aiMatchScore: app.aiMatchScore,
+        subjects: candidate.subjects ?? [],
+        yearsExperience: candidate.yearsExperience,
+        location: candidate.location,
+        createdAt: app._creationTime,
+      });
     }
 
-    return result;
+    return { page: enriched, isDone: result.isDone, continueCursor: result.continueCursor };
   },
 });
 
