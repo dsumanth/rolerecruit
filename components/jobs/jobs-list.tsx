@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useState, useMemo } from "react";
 import { useQuery } from "convex/react";
+import { usePaginatedQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 import { Card, Badge, EmptyState, Icon, Skeleton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
@@ -11,6 +13,7 @@ type StatusFilter = "all" | "active" | "draft" | "paused" | "filled" | "closed";
 
 interface Props {
   schoolId: string;
+  loadMoreRef?: (node: HTMLElement | null) => void;
 }
 
 interface Job {
@@ -36,16 +39,29 @@ function formatDate(ts: number): string {
   return new Date(ts).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" });
 }
 
-export function JobsList({ schoolId }: Props) {
-  const jobs = useQuery(api.jobs.listBySchool, { schoolId: schoolId as any }) as Job[] | undefined;
+export function JobsList({ schoolId, loadMoreRef }: Props) {
+  const [filter, setFilter] = useState<StatusFilter>("all");
+
+  const { results, status, loadMore } = usePaginatedQuery(
+    api.jobs.listBySchool,
+    {
+      schoolId: schoolId as any,
+      filter: filter !== "all" ? { status: filter as any } : undefined,
+    },
+    { initialNumItems: 100 },
+  );
+
+  const sentinelRef = useInfiniteScroll({ status, loadMore, loadCount: 100 });
+
   const pipelineStats = useQuery(
     api.jobs.hiredCountsForSchool,
     { schoolId: schoolId as any },
   ) as Record<string, number> | undefined;
-  const [filter, setFilter] = useState<StatusFilter>("all");
 
+  const jobs = results as Job[];
+
+  // Count by status across currently loaded results (for chip badges)
   const counts = useMemo(() => {
-    if (!jobs) return { all: 0, active: 0, draft: 0, paused: 0, filled: 0, closed: 0 };
     return {
       all: jobs.length,
       active: jobs.filter((j) => j.status === "active").length,
@@ -56,13 +72,7 @@ export function JobsList({ schoolId }: Props) {
     };
   }, [jobs]);
 
-  const filtered = useMemo(() => {
-    if (!jobs) return [];
-    if (filter === "all") return jobs;
-    return jobs.filter((j) => j.status === filter);
-  }, [jobs, filter]);
-
-  if (!jobs) {
+  if (status === "LoadingFirstPage") {
     return (
       <div className="space-y-3">
         {[1, 2, 3].map((i) => <Skeleton key={i} className="h-16 w-full" />)}
@@ -70,7 +80,7 @@ export function JobsList({ schoolId }: Props) {
     );
   }
 
-  if (jobs.length === 0) {
+  if (jobs.length === 0 && filter === "all") {
     return (
       <Card padding="lg" elevation={1}>
         <EmptyState
@@ -95,37 +105,47 @@ export function JobsList({ schoolId }: Props) {
         <FilterChip label="Closed"  count={counts.closed}  active={filter === "closed"}  onClick={() => setFilter("closed")} />
       </div>
 
-      <Card padding="none" elevation={1}>
-        <div className="grid grid-cols-[1.4fr_0.8fr_140px_100px_24px] gap-4 px-5 py-3 border-b border-hairline">
-          <div className="text-micro text-ink-secondary">Role</div>
-          <div className="text-micro text-ink-secondary">Posted</div>
-          <div className="text-micro text-ink-secondary">Hires / Positions</div>
-          <div className="text-micro text-ink-secondary">Status</div>
-          <div />
-        </div>
-        {filtered.map((job) => {
-          const positions = job.positions ?? 1;
-          const hired = pipelineStats?.[job._id] ?? 0;
-          return (
-            <Link key={job._id} href={`/dashboard/jobs/${job._id}`}>
-              <div className="grid grid-cols-[1.4fr_0.8fr_140px_100px_24px] gap-4 items-center px-5 py-4 border-b border-hairline last:border-b-0 hover:bg-accent-soft transition-colors duration-fast">
-                <div className="min-w-0">
-                  <div className="text-body-s font-semibold text-ink truncate">{job.title}</div>
-                  <div className="text-caption text-ink-secondary truncate">
-                    {[job.subject, job.level, job.board].filter(Boolean).join(" · ")}
+      {jobs.length === 0 ? (
+        <Card padding="lg" elevation={1}>
+          <EmptyState
+            title="No jobs found"
+            description="No jobs match the selected filter."
+          />
+        </Card>
+      ) : (
+        <Card padding="none" elevation={1}>
+          <div className="grid grid-cols-[1.4fr_0.8fr_140px_100px_24px] gap-4 px-5 py-3 border-b border-hairline">
+            <div className="text-micro text-ink-secondary">Role</div>
+            <div className="text-micro text-ink-secondary">Posted</div>
+            <div className="text-micro text-ink-secondary">Hires / Positions</div>
+            <div className="text-micro text-ink-secondary">Status</div>
+            <div />
+          </div>
+          {jobs.map((job) => {
+            const positions = job.positions ?? 1;
+            const hired = pipelineStats?.[job._id] ?? 0;
+            return (
+              <Link key={job._id} href={`/dashboard/jobs/${job._id}`}>
+                <div className="grid grid-cols-[1.4fr_0.8fr_140px_100px_24px] gap-4 items-center px-5 py-4 border-b border-hairline last:border-b-0 hover:bg-accent-soft transition-colors duration-fast">
+                  <div className="min-w-0">
+                    <div className="text-body-s font-semibold text-ink truncate">{job.title}</div>
+                    <div className="text-caption text-ink-secondary truncate">
+                      {[job.subject, job.level, job.board].filter(Boolean).join(" · ")}
+                    </div>
                   </div>
+                  <div className="text-caption text-ink-secondary">{formatDate(job._creationTime)}</div>
+                  <div className="text-body-s text-ink tabular-nums">
+                    {hired} / {positions}
+                  </div>
+                  <div>{jobBadge(job.status)}</div>
+                  <Icon name="ChevronRight" size={14} color="var(--ink-3)" />
                 </div>
-                <div className="text-caption text-ink-secondary">{formatDate(job._creationTime)}</div>
-                <div className="text-body-s text-ink tabular-nums">
-                  {hired} / {positions}
-                </div>
-                <div>{jobBadge(job.status)}</div>
-                <Icon name="ChevronRight" size={14} color="var(--ink-3)" />
-              </div>
-            </Link>
-          );
-        })}
-      </Card>
+              </Link>
+            );
+          })}
+          <div ref={loadMoreRef ?? sentinelRef} style={{ height: 1 }} />
+        </Card>
+      )}
     </div>
   );
 }
