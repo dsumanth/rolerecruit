@@ -280,3 +280,120 @@ export const materializeGraphFromIntake = mutation({
     return { nodesUpserted, edgesUpserted };
   },
 });
+
+// ============================================================================
+// Sourcing queries
+// ============================================================================
+
+export const listCohorts = query({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 50;
+    const cohortNodes = await ctx.db
+      .query("nodes")
+      .withIndex("by_type", (q) => q.eq("type", "Cohort"))
+      .collect();
+
+    const enriched = await Promise.all(cohortNodes.map(async (n) => {
+      const memberEdges = await ctx.db
+        .query("edges")
+        .withIndex("by_to_type", (q) => q.eq("toId", n._id).eq("type", "BELONGS_TO"))
+        .collect();
+      return {
+        nodeId: n._id,
+        displayName: n.displayName,
+        externalId: n.externalId,
+        attributes: n.attributes,
+        memberCount: memberEdges.length,
+      };
+    }));
+
+    return enriched
+      .sort((a, b) => b.memberCount - a.memberCount)
+      .slice(0, limit);
+  },
+});
+
+const ACTIVE_STAGES = new Set([
+  "sourced", "screened", "demo_scheduled", "demo_completed", "offer_sent",
+]);
+
+export const listCandidatesInCohort = query({
+  args: {
+    cohortNodeId: v.id("nodes"),
+    untappedOnly: v.boolean(),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 50;
+
+    // BELONGS_TO edges pointing AT this cohort node — from = Candidate node
+    const memberEdges = await ctx.db
+      .query("edges")
+      .withIndex("by_to_type", (q) => q.eq("toId", args.cohortNodeId).eq("type", "BELONGS_TO"))
+      .collect();
+
+    const candidates: any[] = [];
+    for (const edge of memberEdges) {
+      const candNode = await ctx.db.get(edge.fromId);
+      if (!candNode || candNode.type !== "Candidate") continue;
+      const candidateId = candNode.externalId as Id<"candidates">;
+      const candidate = await ctx.db.get(candidateId);
+      if (!candidate) continue;
+
+      if (args.untappedOnly) {
+        const apps = await ctx.db
+          .query("applications")
+          .withIndex("by_candidateId", (q) => q.eq("candidateId", candidateId))
+          .collect();
+        const inMotion = apps.some((a: any) => ACTIVE_STAGES.has(a.stage));
+        if (inMotion) continue;
+      }
+
+      candidates.push({
+        candidateId,
+        name: candidate.name,
+        subjects: (candidate as any).subjects,
+        yearsExperience: (candidate as any).yearsExperience,
+        boardExperience: (candidate as any).boardExperience,
+        currentSchool: (candidate as any).currentSchool,
+      });
+      if (candidates.length >= limit) break;
+    }
+    return candidates;
+  },
+});
+
+/**
+ * neighbors — 1-hop traversal from a node. Used by future Phase 3b/3c work and
+ * by the cohort drilldown for "candidates similar to this one." Bounded by limit.
+ */
+export const neighbors = query({
+  args: {
+    nodeId: v.id("nodes"),
+    edgeType: v.optional(v.string()),
+    direction: v.optional(v.union(v.literal("out"), v.literal("in"))),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const dir = args.direction ?? "out";
+    const limit = args.limit ?? 100;
+
+    let edges;
+    if (dir === "out") {
+      edges = args.edgeType
+        ? await ctx.db.query("edges").withIndex("by_from_type", (q) => q.eq("fromId", args.nodeId).eq("type", args.edgeType as any)).take(limit)
+        : await ctx.db.query("edges").withIndex("by_from_type", (q) => q.eq("fromId", args.nodeId)).take(limit);
+    } else {
+      edges = args.edgeType
+        ? await ctx.db.query("edges").withIndex("by_to_type", (q) => q.eq("toId", args.nodeId).eq("type", args.edgeType as any)).take(limit)
+        : await ctx.db.query("edges").withIndex("by_to_type", (q) => q.eq("toId", args.nodeId)).take(limit);
+    }
+
+    const results = await Promise.all(edges.map(async (e) => {
+      const other = await ctx.db.get(dir === "out" ? e.toId : e.fromId);
+      return { edge: e, node: other };
+    }));
+    return results.filter((r) => r.node);
+  },
+});

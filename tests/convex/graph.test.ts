@@ -11,6 +11,14 @@ import * as backfill from "../../convex/backfill";
 import * as authConfig from "../../convex/auth.config";
 import * as server from "../../convex/_generated/server";
 import * as apiModule from "../../convex/_generated/api";
+import * as schools from "../../convex/schools";
+import * as applications from "../../convex/applications";
+import * as triage from "../../convex/triage";
+import * as outreach from "../../convex/outreach";
+import * as reverseMatching from "../../convex/reverseMatching";
+import * as scoring from "../../convex/scoring";
+import * as jobs from "../../convex/jobs";
+import * as jobsAi from "../../convex/jobs_ai";
 
 const modules = {
   "schema.ts": async () => ({ default: schema }),
@@ -23,6 +31,14 @@ const modules = {
   "auth.config.ts": async () => authConfig,
   "_generated/server.js": async () => server,
   "_generated/api.js": async () => apiModule,
+  "schools.ts": async () => schools,
+  "applications.ts": async () => applications,
+  "triage.ts": async () => triage,
+  "outreach.ts": async () => outreach,
+  "reverseMatching.ts": async () => reverseMatching,
+  "scoring.ts": async () => scoring,
+  "jobs.ts": async () => jobs,
+  "jobs_ai.ts": async () => jobsAi,
 };
 
 const ORIGINAL_DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY;
@@ -319,5 +335,96 @@ describe("graph backfill", () => {
       ctx.db.query("nodes").withIndex("by_type", (q: any) => q.eq("type", "Candidate")).collect()
     );
     expect(candNodes.length).toBe(5);
+  });
+});
+
+describe("cohort sourcing queries", () => {
+  it("listCohorts returns cohorts with member counts", async () => {
+    const t = convexTest(schema, modules);
+    const c1 = await t.mutation("candidates:create", { name: "A", qualifications: ["B.Ed"], subjects: [] });
+    const c2 = await t.mutation("candidates:create", { name: "B", qualifications: ["B.Ed"], subjects: [] });
+    const c3 = await t.mutation("candidates:create", { name: "C", qualifications: ["M.Ed"], subjects: [] });
+
+    const rel = (degree: string, year: number) => ({
+      previousSchools: [], certifications: [],
+      qualifications: [{ degree, university: "Delhi University", yearEnd: year }],
+    });
+    await t.mutation("graph:materializeGraphFromIntake", {
+      candidateId: c1, relationships: rel("B.Ed", 2019), subjects: [], boardExperience: [],
+    });
+    await t.mutation("graph:materializeGraphFromIntake", {
+      candidateId: c2, relationships: rel("B.Ed", 2019), subjects: [], boardExperience: [],
+    });
+    await t.mutation("graph:materializeGraphFromIntake", {
+      candidateId: c3, relationships: rel("M.Ed", 2020), subjects: [], boardExperience: [],
+    });
+
+    const cohorts = await t.query("graph:listCohorts", { limit: 50 });
+    expect(cohorts.length).toBe(2);
+    const buEd = cohorts.find((c: any) => c.displayName === "Delhi University B.Ed 2019");
+    expect(buEd?.memberCount).toBe(2);
+    const mEd = cohorts.find((c: any) => c.displayName === "Delhi University M.Ed 2020");
+    expect(mEd?.memberCount).toBe(1);
+  });
+
+  it("listCandidatesInCohort returns candidates connected to the cohort", async () => {
+    const t = convexTest(schema, modules);
+    const c1 = await t.mutation("candidates:create", { name: "A", qualifications: ["B.Ed"], subjects: [] });
+    const c2 = await t.mutation("candidates:create", { name: "B", qualifications: ["B.Ed"], subjects: [] });
+    const rel = {
+      previousSchools: [], certifications: [],
+      qualifications: [{ degree: "B.Ed", university: "Delhi University", yearEnd: 2019 }],
+    };
+    await t.mutation("graph:materializeGraphFromIntake", {
+      candidateId: c1, relationships: rel, subjects: [], boardExperience: [],
+    });
+    await t.mutation("graph:materializeGraphFromIntake", {
+      candidateId: c2, relationships: rel, subjects: [], boardExperience: [],
+    });
+
+    const cohorts = await t.query("graph:listCohorts", { limit: 50 });
+    const buEd = cohorts.find((c: any) => c.displayName === "Delhi University B.Ed 2019");
+    const members = await t.query("graph:listCandidatesInCohort", {
+      cohortNodeId: buEd!.nodeId,
+      untappedOnly: false,
+      limit: 50,
+    });
+    expect(members.length).toBe(2);
+    expect(members.map((m: any) => m.name).sort()).toEqual(["A", "B"]);
+  });
+
+  it("listCandidatesInCohort with untappedOnly=true excludes candidates with active applications", async () => {
+    const t = convexTest(schema, modules);
+    const schoolId = await t.mutation("schools:create", {
+      name: "S", board: "CBSE", city: "Mumbai", state: "MH",
+    });
+    const c1 = await t.mutation("candidates:create", { name: "Active", qualifications: ["B.Ed"], subjects: [] });
+    const c2 = await t.mutation("candidates:create", { name: "Untapped", qualifications: ["B.Ed"], subjects: [] });
+    const rel = {
+      previousSchools: [], certifications: [],
+      qualifications: [{ degree: "B.Ed", university: "Delhi University", yearEnd: 2019 }],
+    };
+    await t.mutation("graph:materializeGraphFromIntake", {
+      candidateId: c1, relationships: rel, subjects: [], boardExperience: [],
+    });
+    await t.mutation("graph:materializeGraphFromIntake", {
+      candidateId: c2, relationships: rel, subjects: [], boardExperience: [],
+    });
+
+    // c1 has an active application; c2 doesn't
+    await t.mutation("applications:create", {
+      candidateId: c1, schoolId, skipTriage: true,
+    });
+
+    const cohorts = await t.query("graph:listCohorts", { limit: 50 });
+    const buEd = cohorts.find((c: any) => c.displayName === "Delhi University B.Ed 2019");
+
+    const untapped = await t.query("graph:listCandidatesInCohort", {
+      cohortNodeId: buEd!.nodeId,
+      untappedOnly: true,
+      limit: 50,
+    });
+    expect(untapped.length).toBe(1);
+    expect(untapped[0].name).toBe("Untapped");
   });
 });
