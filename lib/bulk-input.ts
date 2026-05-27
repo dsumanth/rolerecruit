@@ -1,6 +1,8 @@
 import type { Id } from "@/convex/_generated/dataModel";
 
-export type BulkInput<F> = { ids: string[] } | { matchAll: F };
+export type BulkInput<F> =
+  | { ids: string[]; matchAll?: never }
+  | { matchAll: F; ids?: never };
 
 export function isIdsMode<F>(x: BulkInput<F>): x is { ids: string[] } {
   return Object.prototype.hasOwnProperty.call(x, "ids");
