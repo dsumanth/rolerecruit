@@ -236,6 +236,7 @@ export default defineSchema({
     parsedVersion: v.optional(v.string()),
     embeddingVersion: v.optional(v.string()),
     parsedAt: v.optional(v.number()),
+    graphVersion: v.optional(v.string()),
 
     // NEW: parsing notes — flags when evidence validation didn't fully pass on retry
     parsingNotes: v.optional(v.string()),
@@ -563,4 +564,47 @@ export default defineSchema({
     .index("by_key", ["key"])
     .index("by_status", ["status"])
     .index("by_status_occurrenceCount", ["status", "occurrenceCount"]),
+
+  nodes: defineTable({
+    type: v.union(
+      v.literal("Candidate"),
+      v.literal("School"),
+      v.literal("University"),
+      v.literal("Subject"),
+      v.literal("Board"),
+      v.literal("Certification"),
+      v.literal("Qualification"),
+      v.literal("Region"),
+      v.literal("Cohort"),
+    ),
+    externalId: v.string(),       // canonical id: normalized name, or Candidate's Id, or Cohort composite key
+    displayName: v.string(),       // human-readable label
+    attributes: v.optional(v.any()),
+    createdAt: v.number(),
+  })
+    .index("by_type_externalId", ["type", "externalId"])
+    .index("by_type", ["type"]),
+
+  edges: defineTable({
+    fromId: v.id("nodes"),
+    toId: v.id("nodes"),
+    type: v.union(
+      v.literal("TAUGHT_AT"),
+      v.literal("HOLDS"),
+      v.literal("FROM"),
+      v.literal("CERTIFIED_IN"),
+      v.literal("SPECIALIZES_IN"),
+      v.literal("REFERRED_BY"),
+      v.literal("TEACHES"),
+      v.literal("BELONGS_TO"),
+      v.literal("LOCATED_IN"),
+      v.literal("APPLIED_TO"),
+    ),
+    attributes: v.optional(v.any()),
+    weight: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_from_type", ["fromId", "type"])
+    .index("by_to_type", ["toId", "type"])
+    .index("by_type", ["type"]),
 });

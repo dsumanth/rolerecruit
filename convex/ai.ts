@@ -2,8 +2,14 @@ import OpenAI from "openai";
 import { action } from "./_generated/server";
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
-import { buildFacetExtractionPrompt, EMPTY_PARSED_FACETS } from "./prompts/facetExtraction";
-import type { ParsedProfile } from "./types";
+import { EMPTY_PARSED_FACETS, buildFacetExtractionPrompt } from "./prompts/facetExtraction";
+import type { ParsedProfile, RelationshipsHint, PreviousSchoolHint, QualificationHint } from "./types";
+import { EMPTY_RELATIONSHIPS } from "./types";
+
+const VALID_REGIONS = new Set([
+  "Delhi NCR", "Mumbai", "Bangalore", "Hyderabad", "Pune",
+  "Chennai", "Kolkata", "Other",
+]);
 
 const INDIAN_EDUCATION_TAXONOMY = `
 You are an AI that parses natural language job descriptions for Indian K-12 schools into structured criteria.
@@ -168,6 +174,7 @@ function emptyProfile(): ParsedProfile {
     parsedFacets: EMPTY_PARSED_FACETS,
     candidateSummary: "",
     rawChunks: [],
+    relationships: EMPTY_RELATIONSHIPS,
   };
 }
 
@@ -214,12 +221,37 @@ export const parseProfileFromText = action({
       }
       (parsedFacets as any).extras = extras;
 
+      // Phase 3a — normalize relationships block
+      const rawRel = parsed.relationships ?? {};
+      const relationships: RelationshipsHint = {
+        previousSchools: Array.isArray(rawRel.previousSchools)
+          ? rawRel.previousSchools.filter(
+              (s: any): s is PreviousSchoolHint =>
+                s !== null && typeof s === "object" && typeof s.name === "string",
+            )
+          : [],
+        qualifications: Array.isArray(rawRel.qualifications)
+          ? rawRel.qualifications.filter(
+              (q: any): q is QualificationHint =>
+                q !== null && typeof q === "object" && typeof q.degree === "string",
+            )
+          : [],
+        certifications: Array.isArray(rawRel.certifications)
+          ? rawRel.certifications.filter((c: any): c is string => typeof c === "string")
+          : [],
+        referredBy: typeof rawRel.referredBy === "string" ? rawRel.referredBy : undefined,
+        region: typeof rawRel.region === "string" && VALID_REGIONS.has(rawRel.region)
+          ? rawRel.region
+          : (typeof rawRel.region === "string" ? "Other" : undefined),
+      };
+
       return {
         ...emptyProfile(),
         ...parsed,
         parsedFacets: parsedFacets as any,
         rawChunks: Array.isArray(parsed.rawChunks) ? parsed.rawChunks : [],
         candidateSummary: typeof parsed.candidateSummary === "string" ? parsed.candidateSummary : "",
+        relationships,
       };
     } catch {
       return emptyProfile();

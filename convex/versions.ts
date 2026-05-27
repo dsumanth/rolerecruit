@@ -2,7 +2,7 @@
 // Bump these when the corresponding prompt or model changes.
 // The backfill action re-extracts candidates whose stamps no longer match.
 
-export const PARSED_FACETS_VERSION = "facets-v1";
+export const PARSED_FACETS_VERSION = "facets-v2";
 export const EMBEDDING_VERSION = "emb-text3sm-v1";
 export const JOB_EMBEDDING_VERSION = "emb-text3sm-v1";
 export const TRIAGE_PROMPT_VERSION = "triage-v1";
@@ -22,3 +22,6 @@ export const PROMOTION_WINDOW_DAYS = 90;
 
 // Cron heartbeat for the nightly frequency tracker (millis since last run)
 export const FACET_TRACKER_LOOKBACK_MS = 25 * 60 * 60 * 1000; // 25h — slightly > 24 to catch overlap
+
+// Phase 3a — Knowledge Graph
+export const GRAPH_VERSION = "graph-v1";

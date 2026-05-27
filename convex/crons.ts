@@ -16,4 +16,11 @@ crons.daily(
   {},
 );
 
+crons.daily(
+  "backfill-graph",
+  { hourUTC: 4, minuteUTC: 0 },
+  internal.backfill.backfillGraph,
+  {},
+);
+
 export default crons;

@@ -13,13 +13,22 @@ function fullText(chunks: RawChunk[]): string {
   return chunks.map((c) => c.text).join("\n");
 }
 
+function isEmptyRelationships(p: ParsedProfile): boolean {
+  const r = p.relationships;
+  return r.previousSchools.length === 0
+    && r.qualifications.length === 0
+    && r.certifications.length === 0
+    && !r.referredBy
+    && !r.region;
+}
+
 export const parseAndStoreCandidate = action({
   args: {
     candidateId: v.id("candidates"),
     rawText: v.string(),
   },
   handler: async (ctx, args): Promise<void> => {
-    // 1. Parse facets + chunks + summary
+    // 1. Parse facets + chunks + summary + relationships
     let parsed: ParsedProfile = await ctx.runAction(api.ai.parseProfileFromText, { text: args.rawText });
 
     // 2. Validate evidence; if validation fails, retry parse once
@@ -51,7 +60,7 @@ export const parseAndStoreCandidate = action({
       },
     });
 
-    // 4. Persist
+    // 4. Persist compiled data
     await ctx.runMutation(internal.candidates.writeCompiledData, {
       candidateId: args.candidateId,
       parsedFacets: parsed.parsedFacets,
@@ -60,5 +69,18 @@ export const parseAndStoreCandidate = action({
       facetEmbeddings: facetEmbeddings ?? undefined,
       parsingNotes,
     });
+
+    // 5. Materialize the knowledge graph (skip if relationships are all empty —
+    //    happens when no LLM key is configured or the LLM emitted nothing)
+    if (!isEmptyRelationships(parsed)) {
+      // Need the candidate's own subjects/boardExperience for SPECIALIZES_IN/BELONGS_TO edges
+      const c = await ctx.runQuery(api.candidates.get, { candidateId: args.candidateId });
+      await ctx.runMutation(api.graph.materializeGraphFromIntake, {
+        candidateId: args.candidateId,
+        relationships: parsed.relationships,
+        subjects: c?.subjects ?? [],
+        boardExperience: c?.boardExperience ?? [],
+      });
+    }
   },
 });
