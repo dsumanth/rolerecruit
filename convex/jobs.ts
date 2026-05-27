@@ -1,6 +1,7 @@
 import { mutation, query, internalMutation, action } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
+import { paginationOptsValidator } from "convex/server";
 
 export const create = mutation({
   args: {
@@ -148,28 +149,36 @@ export const get = query({
 export const listBySchool = query({
   args: {
     schoolId: v.id("schools"),
-    status: v.optional(
-      v.union(
-        v.literal("draft"),
-        v.literal("active"),
-        v.literal("paused"),
-        v.literal("filled"),
-        v.literal("closed")
-      )
-    ),
+    paginationOpts: paginationOptsValidator,
+    filter: v.optional(v.object({
+      status: v.optional(v.union(
+        v.literal("draft"), v.literal("active"), v.literal("paused"),
+        v.literal("filled"), v.literal("closed"),
+      )),
+      search: v.optional(v.string()),
+    })),
+    sort: v.optional(v.union(v.literal("newest"), v.literal("title"))),
   },
   handler: async (ctx, args) => {
-    if (args.status) {
-      return await ctx.db
-        .query("jobPostings")
-        .withIndex("by_schoolId", (q) => q.eq("schoolId", args.schoolId))
-        .filter((q) => q.eq(q.field("status"), args.status))
-        .collect();
+    // Sort note:
+    // - "newest" uses by_schoolId + _creationTime desc (Convex default).
+    // - "title" uses by_schoolId_title (asc alphabetical).
+    const indexName = args.sort === "title" ? "by_schoolId_title" : "by_schoolId";
+    const builder = ctx.db.query("jobPostings").withIndex(indexName as any, (q: any) => q.eq("schoolId", args.schoolId));
+    const filtered = builder.filter((q) => {
+      let expr = q.eq(q.field("pendingDeleteAt"), undefined);
+      if (args.filter?.status) expr = q.and(expr, q.eq(q.field("status"), args.filter.status));
+      return expr;
+    });
+    const ordered = args.sort === "title" ? filtered.order("asc") : filtered.order("desc");
+    const result = await ordered.paginate(args.paginationOpts);
+
+    let page = result.page;
+    if (args.filter?.search) {
+      const s = args.filter.search.toLowerCase();
+      page = page.filter((j) => (j.title ?? "").toLowerCase().includes(s));
     }
-    return await ctx.db
-      .query("jobPostings")
-      .withIndex("by_schoolId", (q) => q.eq("schoolId", args.schoolId))
-      .collect();
+    return { page, isDone: result.isDone, continueCursor: result.continueCursor };
   },
 });
 
