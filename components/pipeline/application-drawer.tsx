@@ -15,6 +15,7 @@ import { EvidencePopover } from "@/components/shared/evidence-popover";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { UndoToast } from "@/components/ui/undo-toast";
 import { useUndoToast } from "@/hooks/use-undo-toast";
+import { PreviousOutcomesSection } from "@/components/pipeline/previous-outcomes-section";
 
 interface TabItem {
   value: string;
@@ -212,6 +213,13 @@ export function ApplicationDrawer({ app: incomingApp, schoolName, onClose }: Pro
           )}
 
           {tab === "evaluate" && <EvaluateTab applicationId={app._id} />}
+
+          {candidate?._id && app._id && (
+            <PreviousOutcomesSection
+              candidateId={candidate._id}
+              currentApplicationId={app._id}
+            />
+          )}
 
           <div className="border-t border-hairline p-4 mt-4">
             <button
