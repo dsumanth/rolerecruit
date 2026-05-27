@@ -68,4 +68,25 @@ describe("candidates.listForSchool — paginated", () => {
     });
     expect(result.page.length).toBe(0);
   });
+
+  it("deduplicates candidates with multiple applications", async () => {
+    const t = convexTest(schema, modules);
+    const schoolId = await t.mutation("schools:create", {
+      name: "S", board: "CBSE", city: "M", state: "MH",
+    });
+    const candidateId = await t.mutation("candidates:create", {
+      name: "Dup", email: "dup@x.com",
+      qualifications: [], subjects: [],
+    });
+    // Same candidate, two applications to the same school
+    await t.mutation("applications:create", { candidateId, schoolId, skipTriage: true });
+    await t.mutation("applications:create", { candidateId, schoolId, skipTriage: true });
+
+    const result = await t.query("candidates:listForSchool", {
+      schoolId,
+      paginationOpts: { cursor: null, numItems: 10 },
+    });
+    expect(result.page.length).toBe(1);
+    expect(result.page[0].candidateId).toBe(candidateId);
+  });
 });

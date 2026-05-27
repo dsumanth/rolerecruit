@@ -81,6 +81,14 @@ export const listForSchool = query({
     )),
   },
   handler: async (ctx, args) => {
+    // Sort note:
+    // - "newest" uses by_schoolId + _creationTime desc (Convex default).
+    // - "score" uses by_schoolId_aiMatchScore. Applications without aiMatchScore
+    //   are EXCLUDED from results (Convex sparse-index semantics) — un-scored
+    //   candidates won't appear under this sort.
+    // - "name" has no backing index today; falls back to "newest" order. The UI
+    //   sort label is misleading; this will be fixed in a follow-up when a
+    //   by_schoolId_name index is added.
     const indexName =
       args.sort === "score" ? "by_schoolId_aiMatchScore" : "by_schoolId";
 
@@ -101,7 +109,10 @@ export const listForSchool = query({
     const result = await ordered.paginate(args.paginationOpts);
 
     const enriched: any[] = [];
+    const seen = new Set<string>();
     for (const app of result.page) {
+      if (seen.has(app.candidateId)) continue;
+      seen.add(app.candidateId);
       const candidate = await ctx.db.get(app.candidateId);
       if (!candidate) continue;
       if (candidate.pendingDeleteAt != null) continue;
