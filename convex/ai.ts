@@ -1,10 +1,10 @@
-import OpenAI from "openai";
 import { action } from "./_generated/server";
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
 import { EMPTY_PARSED_FACETS, buildFacetExtractionPrompt } from "./prompts/facetExtraction";
 import type { ParsedProfile, RelationshipsHint, PreviousSchoolHint, QualificationHint } from "./types";
 import { EMPTY_RELATIONSHIPS } from "./types";
+import { getLlmClient, LLM_MODEL } from "./lib/llmClient";
 
 const VALID_REGIONS = new Set([
   "Delhi NCR", "Mumbai", "Bangalore", "Hyderabad", "Pune",
@@ -32,12 +32,6 @@ Return a JSON object with this exact structure:
 }
 `;
 
-function getClient(): OpenAI | null {
-  const apiKey = process.env.DEEPSEEK_API_KEY;
-  if (!apiKey) return null;
-  return new OpenAI({ apiKey, baseURL: "https://api.deepseek.com" });
-}
-
 export async function parseJobDescription(
   description: string
 ): Promise<{
@@ -49,7 +43,7 @@ export async function parseJobDescription(
   minExperience: number | null;
   skills: string[];
 }> {
-  const client = getClient();
+  const client = getLlmClient();
   if (!client) {
     return {
       subjects: [],
@@ -63,7 +57,7 @@ export async function parseJobDescription(
   }
 
   const response = await client.chat.completions.create({
-    model: "deepseek-v4-flash",
+    model: LLM_MODEL,
     max_tokens: 1024,
     temperature: 0,
     messages: [
@@ -112,12 +106,12 @@ export const scoreCandidates = action({
     ),
   },
   handler: async (ctx, args) => {
-    const client = getClient();
+    const client = getLlmClient();
     if (!client) {
       return args.candidates.map((c) => ({
         candidateId: c._id,
         score: 50,
-        reasoning: "AI scoring not configured (DEEPSEEK_API_KEY missing)",
+        reasoning: "AI scoring not configured (GOOGLE_API_KEY missing)",
       }));
     }
 
@@ -127,7 +121,7 @@ export const scoreCandidates = action({
 
     try {
       const response = await client.chat.completions.create({
-        model: "deepseek-v4-flash",
+        model: LLM_MODEL,
         max_tokens: 4096,
         temperature: 0,
         messages: [
@@ -181,7 +175,7 @@ function emptyProfile(): ParsedProfile {
 export const parseProfileFromText = action({
   args: { text: v.string() },
   handler: async (ctx, args): Promise<ParsedProfile> => {
-    const client = getClient();
+    const client = getLlmClient();
     if (!client) return emptyProfile();
 
     // Phase 2: read promoted keys at runtime so the LLM extracts them as typed
@@ -195,7 +189,7 @@ export const parseProfileFromText = action({
     const systemPrompt = buildFacetExtractionPrompt(promotedKeys);
 
     const response = await client.chat.completions.create({
-      model: "deepseek-v4-flash",
+      model: LLM_MODEL,
       max_tokens: 4096,
       temperature: 0,
       messages: [
