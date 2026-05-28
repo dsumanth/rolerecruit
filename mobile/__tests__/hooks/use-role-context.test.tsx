@@ -44,4 +44,12 @@ describe("useRoleContext", () => {
     expect(result.current.isHR).toBe(true);
     expect(result.current.role).toBe("hr_admin");
   });
+
+  it("returns loading=false and isHR=false when signed in but profile not yet provisioned", () => {
+    mockUseSession.mockReturnValue({ loading: false, user: { id: "u1" } });
+    mockUseQuery.mockReturnValue(null);
+    const { result } = renderHook(() => useRoleContext());
+    expect(result.current.loading).toBe(false);
+    expect(result.current.isHR).toBe(false);
+  });
 });

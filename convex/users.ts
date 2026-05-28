@@ -1,5 +1,6 @@
 import { mutation, query, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
+import type { EvaluatorRole } from "./types";
 
 export const getProfile = query({
   args: { userId: v.string() },
@@ -160,7 +161,7 @@ export const getMobileRoleContext = query({
     return {
       userProfileId: profile._id,
       schoolId: profile.schoolId,
-      role: profile.role,
+      role: profile.role as EvaluatorRole,
       permissions,
       isHR,
     };

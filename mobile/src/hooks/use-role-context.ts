@@ -1,15 +1,26 @@
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
+import type { EvaluatorRole } from "@convex/types";
 import { useSession } from "@/hooks/use-session";
 
 export interface RoleContext {
   loading: boolean;
   isHR: boolean;
-  role: string | null;
+  role: EvaluatorRole | null;
   permissions: string[];
   userProfileId: string | null;
   schoolId: string | null;
 }
+
+const EMPTY: RoleContext = {
+  loading: false,
+  isHR: false,
+  role: null,
+  permissions: [],
+  userProfileId: null,
+  schoolId: null,
+};
+const LOADING: RoleContext = { ...EMPTY, loading: true };
 
 export function useRoleContext(): RoleContext {
   const { loading: sessionLoading, user } = useSession();
@@ -19,18 +30,10 @@ export function useRoleContext(): RoleContext {
     userId ? { userId } : "skip",
   );
 
-  if (sessionLoading) {
-    return { loading: true, isHR: false, role: null, permissions: [], userProfileId: null, schoolId: null };
-  }
-  if (!userId) {
-    return { loading: false, isHR: false, role: null, permissions: [], userProfileId: null, schoolId: null };
-  }
-  if (ctx === undefined) {
-    return { loading: true, isHR: false, role: null, permissions: [], userProfileId: null, schoolId: null };
-  }
-  if (ctx === null) {
-    return { loading: false, isHR: false, role: null, permissions: [], userProfileId: null, schoolId: null };
-  }
+  if (sessionLoading) return LOADING;
+  if (!userId) return EMPTY;
+  if (ctx === undefined) return LOADING;
+  if (ctx === null) return EMPTY;
   return {
     loading: false,
     isHR: ctx.isHR,
