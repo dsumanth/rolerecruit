@@ -19,6 +19,8 @@ const ITEMS: NavItem[] = [
   { href: "/dashboard/settings/messaging", label: "Messaging", icon: "MessageSquare" },
   { href: "/dashboard/settings/notifications", label: "Notifications", icon: "Bell", permission: "settings:manage" },
   { href: "/dashboard/settings/pipeline", label: "Pipeline stages", icon: "Kanban" },
+  { href: "/dashboard/settings/templates", label: "Form templates", icon: "FileText", permission: "settings:manage" },
+  { href: "/dashboard/settings/decision-rules", label: "Decision rules", icon: "Workflow", permission: "settings:manage" },
   { href: "/dashboard/settings/triage", label: "Triage", icon: "ClipboardList" },
   { href: "/dashboard/settings/conversation", label: "Conversation agent", icon: "Bot" },
   { href: "/dashboard/settings/facets", label: "Facets", icon: "Tags" },
