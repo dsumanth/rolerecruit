@@ -56,10 +56,10 @@ export function ScheduleDemoScreen() {
   useEffect(() => {
     if (!parentInvites || draft.evaluators.length > 0) return;
     const evaluators = parentInvites
-      .filter((r: any) => r.invite.status !== "cancelled")
+      .filter((r: any) => r.status !== "cancelled")
       .map((r: any) => ({
-        userId: r.invite.evaluatorUserId,
-        role: r.invite.evaluatorRole,
+        userId: r.evaluatorUserId,
+        role: r.evaluatorRole,
       }));
     const inThreeDays = new Date(Date.now() + 3 * 86_400_000);
     const pad = (n: number) => String(n).padStart(2, "0");

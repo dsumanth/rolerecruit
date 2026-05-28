@@ -17,10 +17,18 @@ jest.mock("@/hooks/use-active-decision-rules", () => ({
 
 const parentInvitesResult = [
   {
-    invite: { _id: "i1", status: "submitted", evaluatorUserId: "u1", evaluatorRole: "principal" },
+    _id: "i1",
+    evaluatorUserId: "u1",
+    evaluatorRole: "principal",
+    status: "submitted",
+    profile: null,
   },
   {
-    invite: { _id: "i2", status: "cancelled", evaluatorUserId: "u-skip", evaluatorRole: "hod" },
+    _id: "i2",
+    evaluatorUserId: "u-skip",
+    evaluatorRole: "hod",
+    status: "cancelled",
+    profile: null,
   },
 ];
 
