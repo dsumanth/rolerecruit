@@ -2383,7 +2383,7 @@ describe("DemoSummaryScreen", () => {
       recommendationTally: { hire: 2, maybe: 0, reject: 0 },
       dimensionAverages: {},
       perEvaluator: [
-        { invite: { _id: "i1", evaluatorRole: "principal", status: "submitted" }, profile: { name: "Mrs Iyer" }, evaluation: { recommendation: "hire" } },
+        { invite: { _id: "i1", status: "submitted" }, evaluatorName: "Mrs Iyer", evaluatorRole: "principal", evaluation: { recommendation: "hire" } },
       ],
     });
     render(<DemoSummaryScreen />);
@@ -2564,8 +2564,8 @@ export function DemoSummaryScreen() {
       {(perEvaluator ?? []).map((row: any) => (
         <PerEvaluatorRow
           key={row.invite._id}
-          name={row.profile?.name ?? "Unknown"}
-          role={row.invite.evaluatorRole}
+          name={row.evaluatorName ?? "Unknown"}
+          role={row.evaluatorRole}
           status={row.invite.status}
           recommendation={row.evaluation?.recommendation}
           bullets={row.evaluation?.voiceInputs?.[0]?.summaryPoints}
@@ -2640,7 +2640,7 @@ jest.mock("convex/react", () => ({
   useMutation: () => jest.fn(),
   useQuery: (name: string) => {
     if (typeof name === "string" && name.includes("evaluationInvites:listForDemoWithProfiles")) {
-      return [{ invite: { _id: "i1", evaluatorUserId: "u1", evaluatorRole: "principal" } }];
+      return [{ _id: "i1", evaluatorUserId: "u1", evaluatorRole: "principal", status: "submitted", profile: null }];
     }
     return undefined;
   },
@@ -2679,8 +2679,8 @@ const parentInvites = useQuery(
 useEffect(() => {
   if (!parentInvites || draft.evaluators.length > 0) return;
   const evaluators = parentInvites
-    .filter((r: any) => r.invite.status !== "cancelled")
-    .map((r: any) => ({ userId: r.invite.evaluatorUserId, role: r.invite.evaluatorRole }));
+    .filter((r: any) => r.status !== "cancelled")
+    .map((r: any) => ({ userId: r.evaluatorUserId, role: r.evaluatorRole }));
   const inThreeDays = new Date(Date.now() + 3 * 86_400_000);
   const pad = (n: number) => String(n).padStart(2, "0");
   setDraft((d) => ({
