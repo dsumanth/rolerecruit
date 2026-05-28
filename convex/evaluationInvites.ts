@@ -213,3 +213,12 @@ export const swap = mutation({
     return newInviteId;
   },
 });
+
+export const get = query({
+  args: { inviteId: v.id("evaluationInvites") },
+  handler: async (ctx, { inviteId }) => {
+    const inv = await ctx.db.get(inviteId);
+    if (!inv) throw new Error("Invite not found");
+    return inv;
+  },
+});
