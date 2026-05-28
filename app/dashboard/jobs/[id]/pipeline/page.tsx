@@ -17,39 +17,13 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { UndoToast } from "@/components/ui/undo-toast";
 import type { Application } from "@/components/pipeline/application-table";
 import { rowsToCsv, downloadCsv } from "@/lib/csv-export";
+import { JobTabs } from "@/components/jobs/job-tabs";
+import { StagePickerModal } from "@/components/pipeline/stage-picker-modal";
 
 function jobBadge(status: string) {
   if (status === "active") return <Badge dot variant="success">Active</Badge>;
   if (status === "draft") return <Badge dot variant="neutral">Draft</Badge>;
   return <Badge dot variant="neutral">Closed</Badge>;
-}
-
-const FALLBACK_STAGES = [
-  "sourced",
-  "screened",
-  "demo_scheduled",
-  "demo_completed",
-  "offer_sent",
-  "hired",
-  "rejected",
-  "on_hold",
-];
-
-function StagePicker({ value, onChange }: { value: string; onChange: (s: string) => void }) {
-  return (
-    <select
-      className="w-full px-3 py-2 rounded-sm bg-surface border border-hairline-strong text-ink text-body-s outline-none transition-all duration-fast ease-apple-out focus:border-accent focus:ring-2 focus:ring-accent-soft"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-    >
-      <option value="">Select a stage…</option>
-      {FALLBACK_STAGES.map((s) => (
-        <option key={s} value={s}>
-          {s}
-        </option>
-      ))}
-    </select>
-  );
 }
 
 export default function PipelinePage({ params }: { params: { id: string } }) {
@@ -68,7 +42,6 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
   const undoToast = useUndoToast();
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [stageOpen, setStageOpen] = useState(false);
-  const [pickedStage, setPickedStage] = useState<string>("");
 
   const { results, status, loadMore } = usePaginatedQuery(
     api.applications.getPipelineForJob,
@@ -247,57 +220,33 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
         onCancel={() => setConfirmRemove(false)}
       />
 
-      {/* Stage picker modal */}
-      {stageOpen && (
-        <div
-          className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center"
-          onClick={() => setStageOpen(false)}
-        >
-          <div
-            className="bg-surface border border-hairline rounded-lg shadow-elev-3 p-6 max-w-sm w-full"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-body font-semibold text-ink mb-3">Move {countN} to stage</h3>
-            <StagePicker value={pickedStage} onChange={setPickedStage} />
-            <div className="flex justify-end gap-2 mt-4">
-              <Button variant="ghost" size="md" onClick={() => setStageOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                size="md"
-                disabled={!pickedStage}
-                onClick={async () => {
-                  const args: any =
-                    sel.mode.kind === "ids"
-                      ? { ids: Array.from(sel.mode.selected), stage: pickedStage }
-                      : { matchAll: { jobId: params.id, filter }, stage: pickedStage };
-                  const r = await bulkSetStage(args);
-                  sel.clear();
-                  setStageOpen(false);
-                  const movedTo = pickedStage;
-                  setPickedStage("");
-                  undoToast.show({
-                    label: `Moved ${r.previousStages.length} to ${movedTo}`,
-                    onUndo: async () => {
-                      const byStage = new Map<string, any[]>();
-                      for (const { id, previousStage } of r.previousStages) {
-                        if (!byStage.has(previousStage)) byStage.set(previousStage, []);
-                        byStage.get(previousStage)!.push(id);
-                      }
-                      for (const [stage, idsArr] of byStage) {
-                        await bulkSetStage({ ids: idsArr, stage });
-                      }
-                    },
-                  });
-                }}
-              >
-                Move
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <StagePickerModal
+        open={stageOpen}
+        onClose={() => setStageOpen(false)}
+        count={countN}
+        onMove={async (picked) => {
+          const args: any =
+            sel.mode.kind === "ids"
+              ? { ids: Array.from(sel.mode.selected), stage: picked }
+              : { matchAll: { jobId: params.id, filter }, stage: picked };
+          const r = await bulkSetStage(args);
+          sel.clear();
+          setStageOpen(false);
+          undoToast.show({
+            label: `Moved ${r.previousStages.length} to ${picked}`,
+            onUndo: async () => {
+              const byStage = new Map<string, any[]>();
+              for (const { id, previousStage } of r.previousStages) {
+                if (!byStage.has(previousStage)) byStage.set(previousStage, []);
+                byStage.get(previousStage)!.push(id);
+              }
+              for (const [stage, idsArr] of byStage) {
+                await bulkSetStage({ ids: idsArr, stage });
+              }
+            },
+          });
+        }}
+      />
 
       {/* Undo toasts */}
       <div className="fixed top-6 right-6 z-50 space-y-2">
@@ -314,35 +263,3 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
   );
 }
 
-function JobTabs({ jobId, active }: { jobId: string; active: "overview" | "pipeline" | "sourcing" | "criteria" }) {
-  const tabs: Array<{ value: typeof active; label: string; href: string }> = [
-    { value: "overview", label: "Overview", href: `/dashboard/jobs/${jobId}` },
-    { value: "pipeline", label: "Pipeline", href: `/dashboard/jobs/${jobId}/pipeline` },
-    { value: "sourcing", label: "Sourcing", href: `/dashboard/jobs/${jobId}/sourcing` },
-    { value: "criteria", label: "Criteria", href: `/dashboard/jobs/${jobId}/criteria` },
-  ];
-  return (
-    <div role="tablist" className="flex gap-1 border-b border-hairline">
-      {tabs.map((t) => {
-        const a = t.value === active;
-        return (
-          <Link
-            key={t.value}
-            href={t.href}
-            role="tab"
-            aria-selected={a}
-            className={`relative px-3.5 py-2 text-body-s ${a ? "text-ink font-semibold" : "text-ink-secondary hover:text-ink"} transition-colors duration-fast`}
-          >
-            {t.label}
-            {a && (
-              <span
-                aria-hidden
-                className="absolute left-3.5 right-3.5 -bottom-px h-[2px] rounded-full bg-accent-grad"
-              />
-            )}
-          </Link>
-        );
-      })}
-    </div>
-  );
-}

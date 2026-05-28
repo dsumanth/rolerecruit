@@ -5,6 +5,7 @@ import schema from "../../convex/schema";
 import * as facetPromotion from "../../convex/facetPromotion";
 import * as candidates from "../../convex/candidates";
 import * as ai from "../../convex/ai";
+import * as aiCandidateParsing from "../../convex/ai_candidate_parsing";
 import * as embeddings from "../../convex/embeddings";
 import * as intake from "../../convex/intake";
 import * as authConfig from "../../convex/auth.config";
@@ -16,6 +17,7 @@ const modules = {
   "facetPromotion.ts": async () => facetPromotion,
   "candidates.ts": async () => candidates,
   "ai.ts": async () => ai,
+  "ai_candidate_parsing.ts": async () => aiCandidateParsing,
   "embeddings.ts": async () => embeddings,
   "intake.ts": async () => intake,
   "auth.config.ts": async () => authConfig,

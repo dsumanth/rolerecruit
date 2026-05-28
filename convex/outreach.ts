@@ -1,6 +1,8 @@
 import { mutation, query, internalMutation, internalAction } from "./_generated/server";
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
+import { OUTREACH_DRAFT_SYSTEM } from "./prompts/outreachDraft";
+import { getLlmClient, LLM_MODEL } from "./lib/llmClient";
 
 export const sendMessage = mutation({
   args: {
@@ -145,6 +147,30 @@ export const createDraft = internalMutation({
     });
   },
 });
+
+export async function draftOutreach(ctx: any, args: { candidate: any; school: any; role: any; outcome: string; primaryReasons: string[] }): Promise<string | null> {
+  const client = getLlmClient();
+  if (!client) return null;
+  const res = await client.chat.completions.create({
+    model: LLM_MODEL,
+    max_tokens: 512,
+    temperature: 0.4,
+    messages: [
+      { role: "system", content: OUTREACH_DRAFT_SYSTEM },
+      { role: "user", content: JSON.stringify({
+        candidateSummary: args.candidate?.candidateSummary ?? "",
+        candidateName: args.candidate?.name ?? "",
+        schoolName: args.school?.name ?? "",
+        schoolCity: args.school?.city ?? "",
+        roleTitle: args.role?.title ?? "",
+        type: args.outcome === "auto_shortlisted" ? "shortlist" : args.outcome === "auto_rejected" ? "rejection" : "cross_role_suggestion",
+        channel: "whatsapp",
+        primaryReasons: args.primaryReasons,
+      }) },
+    ],
+  });
+  return res.choices[0]?.message?.content ?? null;
+}
 
 // ============================================================================
 // Scheduled outreach dispatcher (cron target)

@@ -34,7 +34,7 @@ export const parseAndStoreCandidate = action({
   },
   handler: async (ctx, args): Promise<void> => {
     // 1. Parse facets + chunks + summary + relationships
-    let parsed: ParsedProfile = await ctx.runAction(api.ai.parseProfileFromText, { text: args.rawText });
+    let parsed: ParsedProfile = await ctx.runAction(api.ai_candidate_parsing.parseProfileFromText, { text: args.rawText });
 
     // 2. Filter out hallucinated/unsupported facets. We don't just *warn* — we
     //    actually drop items whose evidence quote isn't in any rawChunk, or

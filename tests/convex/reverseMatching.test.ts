@@ -3,6 +3,7 @@ import { convexTest } from "convex-test";
 import schema from "../../convex/schema";
 import * as reverseMatching from "../../convex/reverseMatching";
 import * as ai from "../../convex/ai";
+import * as aiCandidateParsing from "../../convex/ai_candidate_parsing";
 import * as embeddings from "../../convex/embeddings";
 import * as scoring from "../../convex/scoring";
 import * as candidates from "../../convex/candidates";
@@ -19,6 +20,7 @@ const modules = {
   "schema.ts": async () => ({ default: schema }),
   "reverseMatching.ts": async () => reverseMatching,
   "ai.ts": async () => ai,
+  "ai_candidate_parsing.ts": async () => aiCandidateParsing,
   "embeddings.ts": async () => embeddings,
   "scoring.ts": async () => scoring,
   "candidates.ts": async () => candidates,

@@ -5,6 +5,7 @@ import { PARSED_FACETS_VERSION } from "../../convex/versions";
 import schema from "../../convex/schema";
 import * as intake from "../../convex/intake";
 import * as ai from "../../convex/ai";
+import * as aiCandidateParsing from "../../convex/ai_candidate_parsing";
 import * as embeddings from "../../convex/embeddings";
 import * as candidates from "../../convex/candidates";
 import * as authConfig from "../../convex/auth.config";
@@ -15,6 +16,7 @@ const modules = {
   "schema.ts": async () => ({ default: schema }),
   "intake.ts": async () => intake,
   "ai.ts": async () => ai,
+  "ai_candidate_parsing.ts": async () => aiCandidateParsing,
   "embeddings.ts": async () => embeddings,
   "candidates.ts": async () => candidates,
   "auth.config.ts": async () => authConfig,

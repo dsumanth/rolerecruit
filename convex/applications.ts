@@ -2,7 +2,6 @@ import { mutation, query, internalMutation } from "./_generated/server";
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
-import { deleteApplicationChildren } from "./candidates";
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   sourced: ["screened", "rejected", "on_hold"],
@@ -437,6 +436,17 @@ export const undoBatchDelete = mutation({
     return { restored };
   },
 });
+
+// Shared cascade helper (also used by candidates.finalizeBatchDelete).
+export async function deleteApplicationChildren(ctx: any, applicationId: any) {
+  for (const table of ["evaluations", "outreachMessages", "calendarEvents", "triageDecisions", "bookingTokens"] as const) {
+    const rows = await ctx.db
+      .query(table)
+      .withIndex("by_applicationId", (q: any) => q.eq("applicationId", applicationId))
+      .collect();
+    for (const r of rows) await ctx.db.delete(r._id);
+  }
+}
 
 export const finalizeBatchDelete = internalMutation({
   args: { batchId: v.string() },

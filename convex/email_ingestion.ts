@@ -66,7 +66,7 @@ export const receiveEmail = httpAction(async (ctx, request) => {
 
   let parsed;
   try {
-    parsed = await ctx.runAction(api.ai.parseProfileFromText as any, { text: emailText.substring(0, 4000) });
+    parsed = await ctx.runAction(api.ai_candidate_parsing.parseProfileFromText as any, { text: emailText.substring(0, 4000) });
   } catch {
     parsed = {
       name: null, email: null, phone: null, location: null,

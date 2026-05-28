@@ -5,6 +5,7 @@ import * as backfill from "../../convex/backfill";
 import * as candidates from "../../convex/candidates";
 import * as intake from "../../convex/intake";
 import * as ai from "../../convex/ai";
+import * as aiCandidateParsing from "../../convex/ai_candidate_parsing";
 import * as embeddings from "../../convex/embeddings";
 import * as authConfig from "../../convex/auth.config";
 import * as server from "../../convex/_generated/server";
@@ -16,6 +17,7 @@ const modules = {
   "candidates.ts": async () => candidates,
   "intake.ts": async () => intake,
   "ai.ts": async () => ai,
+  "ai_candidate_parsing.ts": async () => aiCandidateParsing,
   "embeddings.ts": async () => embeddings,
   "auth.config.ts": async () => authConfig,
   "_generated/server.js": async () => server,

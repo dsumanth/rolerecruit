@@ -10,6 +10,7 @@ import * as jobs from "../../convex/jobs";
 import * as jobsAi from "../../convex/jobs_ai";
 import * as intake from "../../convex/intake";
 import * as ai from "../../convex/ai";
+import * as aiCandidateParsing from "../../convex/ai_candidate_parsing";
 import * as embeddings from "../../convex/embeddings";
 import * as scoring from "../../convex/scoring";
 import * as outreach from "../../convex/outreach";
@@ -28,6 +29,7 @@ const modules = {
   "jobs_ai.ts": async () => jobsAi,
   "intake.ts": async () => intake,
   "ai.ts": async () => ai,
+  "ai_candidate_parsing.ts": async () => aiCandidateParsing,
   "embeddings.ts": async () => embeddings,
   "scoring.ts": async () => scoring,
   "outreach.ts": async () => outreach,

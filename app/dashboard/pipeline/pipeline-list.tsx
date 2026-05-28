@@ -22,34 +22,7 @@ import type { SortMode } from "@/components/pipeline/pipeline-controls";
 import type { JobStatus } from "@/components/pipeline/status-tabs";
 import type { Application } from "@/components/pipeline/application-table";
 import { rowsToCsv, downloadCsv } from "@/lib/csv-export";
-
-const FALLBACK_STAGES = [
-  { id: "sourced", name: "Sourced" },
-  { id: "screened", name: "Screened" },
-  { id: "demo_scheduled", name: "Demo Scheduled" },
-  { id: "demo_completed", name: "Demo Completed" },
-  { id: "offer_sent", name: "Offer Sent" },
-  { id: "hired", name: "Hired" },
-  { id: "rejected", name: "Rejected" },
-  { id: "on_hold", name: "On Hold" },
-];
-
-function StagePicker({ value, onChange }: { value: string; onChange: (s: string) => void }) {
-  return (
-    <select
-      className="w-full px-3 py-2 rounded-sm bg-surface border border-hairline-strong text-ink text-body-s outline-none transition-all duration-fast ease-apple-out focus:border-accent focus:ring-2 focus:ring-accent-soft"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-    >
-      <option value="">Select a stage…</option>
-      {FALLBACK_STAGES.map((s) => (
-        <option key={s.id} value={s.id}>
-          {s.name}
-        </option>
-      ))}
-    </select>
-  );
-}
+import { StagePickerModal, FALLBACK_STAGES } from "@/components/pipeline/stage-picker-modal";
 
 export function PipelineList({ schoolId }: { schoolId: any }) {
   const [activeStatus, setActiveStatus] = useState<JobStatus>("active");
@@ -67,7 +40,6 @@ export function PipelineList({ schoolId }: { schoolId: any }) {
   const bulkSetStage = useMutation(api.applications.bulkSetStage);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [stageOpen, setStageOpen] = useState(false);
-  const [pickedStage, setPickedStage] = useState<string>("");
 
   // Load jobs for the sidebar (large page, no infinite scroll needed)
   const { results: allJobResults } = usePaginatedQuery(
@@ -349,57 +321,33 @@ export function PipelineList({ schoolId }: { schoolId: any }) {
         onCancel={() => setConfirmRemove(false)}
       />
 
-      {/* Stage picker modal */}
-      {stageOpen && (
-        <div
-          className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center"
-          onClick={() => setStageOpen(false)}
-        >
-          <div
-            className="bg-surface border border-hairline rounded-lg shadow-elev-3 p-6 max-w-sm w-full"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-body font-semibold text-ink mb-3">Move {countN} to stage</h3>
-            <StagePicker value={pickedStage} onChange={setPickedStage} />
-            <div className="flex justify-end gap-2 mt-4">
-              <Button variant="ghost" size="md" onClick={() => setStageOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                size="md"
-                disabled={!pickedStage}
-                onClick={async () => {
-                  const args: any =
-                    sel.mode.kind === "ids"
-                      ? { ids: Array.from(sel.mode.selected), stage: pickedStage }
-                      : { matchAll: { jobId: selectedJobId, filter: pipelineFilter }, stage: pickedStage };
-                  const r = await bulkSetStage(args);
-                  sel.clear();
-                  setStageOpen(false);
-                  const movedTo = pickedStage;
-                  setPickedStage("");
-                  undoToast.show({
-                    label: `Moved ${r.previousStages.length} to ${movedTo}`,
-                    onUndo: async () => {
-                      const byStage = new Map<string, any[]>();
-                      for (const { id, previousStage } of r.previousStages) {
-                        if (!byStage.has(previousStage)) byStage.set(previousStage, []);
-                        byStage.get(previousStage)!.push(id);
-                      }
-                      for (const [stage, idsArr] of byStage) {
-                        await bulkSetStage({ ids: idsArr, stage });
-                      }
-                    },
-                  });
-                }}
-              >
-                Move
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <StagePickerModal
+        open={stageOpen}
+        onClose={() => setStageOpen(false)}
+        count={countN}
+        onMove={async (picked) => {
+          const args: any =
+            sel.mode.kind === "ids"
+              ? { ids: Array.from(sel.mode.selected), stage: picked }
+              : { matchAll: { jobId: selectedJobId, filter: pipelineFilter }, stage: picked };
+          const r = await bulkSetStage(args);
+          sel.clear();
+          setStageOpen(false);
+          undoToast.show({
+            label: `Moved ${r.previousStages.length} to ${picked}`,
+            onUndo: async () => {
+              const byStage = new Map<string, any[]>();
+              for (const { id, previousStage } of r.previousStages) {
+                if (!byStage.has(previousStage)) byStage.set(previousStage, []);
+                byStage.get(previousStage)!.push(id);
+              }
+              for (const [stage, idsArr] of byStage) {
+                await bulkSetStage({ ids: idsArr, stage });
+              }
+            },
+          });
+        }}
+      />
 
       {/* Undo toasts */}
       <div className="fixed top-6 right-6 z-50 space-y-2">

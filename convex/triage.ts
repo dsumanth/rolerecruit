@@ -3,9 +3,8 @@ import { action, internalMutation, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
 import { TRIAGE_PROMPT_VERSION } from "./versions";
-import { OUTREACH_DRAFT_SYSTEM } from "./prompts/outreachDraft";
 import { DEFAULT_HYBRID_WEIGHTS } from "./types";
-import { getLlmClient, LLM_MODEL } from "./lib/llmClient";
+import { draftOutreach } from "./outreach";
 
 export const writeTriageDecision = internalMutation({
   args: {
@@ -171,30 +170,6 @@ export const runTriage = action({
     }
   },
 });
-
-async function draftOutreach(ctx: any, args: { candidate: any; school: any; role: any; outcome: string; primaryReasons: string[] }): Promise<string | null> {
-  const client = getLlmClient();
-  if (!client) return null;
-  const res = await client.chat.completions.create({
-    model: LLM_MODEL,
-    max_tokens: 512,
-    temperature: 0.4,
-    messages: [
-      { role: "system", content: OUTREACH_DRAFT_SYSTEM },
-      { role: "user", content: JSON.stringify({
-        candidateSummary: args.candidate?.candidateSummary ?? "",
-        candidateName: args.candidate?.name ?? "",
-        schoolName: args.school?.name ?? "",
-        schoolCity: args.school?.city ?? "",
-        roleTitle: args.role?.title ?? "",
-        type: args.outcome === "auto_shortlisted" ? "shortlist" : args.outcome === "auto_rejected" ? "rejection" : "cross_role_suggestion",
-        channel: "whatsapp",
-        primaryReasons: args.primaryReasons,
-      }) },
-    ],
-  });
-  return res.choices[0]?.message?.content ?? null;
-}
 
 export const getByApplicationId = query({
   args: { applicationId: v.id("applications") },

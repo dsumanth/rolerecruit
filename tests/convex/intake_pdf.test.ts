@@ -6,6 +6,7 @@ import schema from "../../convex/schema";
 import * as intake from "../../convex/intake";
 import * as intakePdf from "../../convex/intake_pdf";
 import * as ai from "../../convex/ai";
+import * as aiCandidateParsing from "../../convex/ai_candidate_parsing";
 import * as embeddings from "../../convex/embeddings";
 import * as candidates from "../../convex/candidates";
 import * as triage from "../../convex/triage";
@@ -73,6 +74,7 @@ const modules = {
   "intake.ts": async () => intake,
   "intake_pdf.ts": async () => intakePdf,
   "ai.ts": async () => ai,
+  "ai_candidate_parsing.ts": async () => aiCandidateParsing,
   "embeddings.ts": async () => embeddings,
   "candidates.ts": async () => candidates,
   "triage.ts": async () => triage,
