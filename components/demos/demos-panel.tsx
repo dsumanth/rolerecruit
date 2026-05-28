@@ -93,6 +93,10 @@ export function DemosPanel({
 
   const create = useMutation(api.demoSessions.create);
   const cancel = useMutation(api.demoSessions.cancel);
+  const activeRules = useQuery(
+    api.decisionRules.listActive,
+    schoolId ? { schoolId: schoolId as Id<"schools"> } : "skip",
+  );
 
   const [wizardOpen, setWizardOpen] = useState(false);
 
@@ -214,6 +218,7 @@ export function DemosPanel({
             prefillSource ? Date.now() + REDEMO_DEFAULT_LEAD_MS : undefined
           }
           parentDemoId={prefillSource ? (prefillSource.demo._id as string) : undefined}
+          activeRules={activeRules?.map((r) => ({ _id: r._id as string, name: r.name }))}
           onConfirm={async (data) => {
             await create({
               applicationId: data.applicationId as Id<"applications">,

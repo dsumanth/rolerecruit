@@ -114,11 +114,13 @@ export const listForUser = query({
  * expose to production traffic.
  */
 export const lastInviteForTest = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { index: v.optional(v.number()) },
+  handler: async (ctx, { index }) => {
     const rows = await ctx.db.query("evaluationInvites").collect();
     if (rows.length === 0) return null;
-    return rows.sort((a, b) => b.invitedAt - a.invitedAt)[0];
+    const sorted = rows.sort((a, b) => b.invitedAt - a.invitedAt);
+    const i = index ?? 0;
+    return sorted[i] ?? null;
   },
 });
 
