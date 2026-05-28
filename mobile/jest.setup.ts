@@ -36,6 +36,31 @@ jest.mock(
 // react-native-screens reaches into codegenNativeComponent which isn't
 // exposed by jest-expo's react-native mock. Stub the surface we use so
 // @react-navigation/native-stack can mount in tests.
+jest.mock("expo-speech-recognition", () => {
+  const React = require("react");
+  const listeners: Record<string, ((e: any) => void)[]> = {};
+  return {
+    ExpoSpeechRecognitionModule: {
+      requestPermissionsAsync: jest.fn().mockResolvedValue({ granted: true }),
+      start: jest.fn(),
+      stop: jest.fn(),
+    },
+    useSpeechRecognitionEvent: (name: string, cb: (e: any) => void) => {
+      React.useEffect(() => {
+        if (!listeners[name]) listeners[name] = [];
+        listeners[name].push(cb);
+        return () => {
+          listeners[name] = (listeners[name] ?? []).filter((l) => l !== cb);
+        };
+      }, [name, cb]);
+    },
+    __emit: (name: string, e: any) => (listeners[name] ?? []).forEach((cb) => cb(e)),
+    __reset: () => {
+      for (const k of Object.keys(listeners)) delete listeners[k];
+    },
+  };
+});
+
 jest.mock(
   "react-native-screens",
   () => {
