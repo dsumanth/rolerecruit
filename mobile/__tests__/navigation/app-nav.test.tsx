@@ -11,6 +11,16 @@ jest.mock("@/lib/auth-client", () => ({
 jest.mock("@/hooks/use-register-push-token", () => ({
   useRegisterPushToken: () => undefined,
 }));
+jest.mock("@/hooks/use-role-context", () => ({
+  useRoleContext: () => ({
+    loading: false,
+    isHR: false,
+    role: null,
+    permissions: [],
+    userProfileId: null,
+    schoolId: null,
+  }),
+}));
 
 describe("AppNav", () => {
   it("renders the sign-in screen when there is no session", () => {
