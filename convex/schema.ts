@@ -515,7 +515,9 @@ export default defineSchema({
     end: v.number(),
     attendees: v.array(v.string()),
     meetLink: v.optional(v.string()),
-  }).index("by_applicationId", ["applicationId"]),
+  })
+    .index("by_applicationId", ["applicationId"])
+    .index("by_schoolId_start", ["schoolId", "start"]),
 
   slotConfigs: defineTable({
     schoolId: v.id("schools"),
