@@ -3,7 +3,7 @@ import { describe, it, expect, vi, afterEach, beforeAll } from "vitest";
 import { convexTest } from "convex-test";
 import schema from "../../convex/schema";
 import { encryptSecret } from "../../convex/lib/crypto";
-import * as whatsappCloud from "../../convex/whatsappCloud";
+import * as whatsapp from "../../convex/whatsapp";
 import * as whatsappIntegration from "../../convex/whatsappIntegration";
 import * as outreach from "../../convex/outreach";
 import * as authConfig from "../../convex/auth.config";
@@ -12,7 +12,7 @@ import * as apiModule from "../../convex/_generated/api";
 
 const modules = {
   "schema.ts": async () => ({ default: schema }),
-  "whatsappCloud.ts": async () => whatsappCloud,
+  "whatsapp.ts": async () => whatsapp,
   "whatsappIntegration.ts": async () => whatsappIntegration,
   "outreach.ts": async () => outreach,
   "auth.config.ts": async () => authConfig,
@@ -50,7 +50,7 @@ describe("sendWhatsAppMessage (Cloud API)", () => {
     const t = convexTest(schema, modules);
     const { applicationId, candidateId } = await seedConnected(t, { markupPct: 25 });
 
-    const res = await t.action(apiModule.api.whatsappCloud.sendWhatsAppMessage, {
+    const res = await t.action(apiModule.api.whatsapp.sendWhatsAppMessage, {
       applicationId, candidateId, type: "shortlist", channel: "whatsapp", body: "Hello", phone: "+919876543210",
     });
     expect(res.success).toBe(true);
@@ -67,7 +67,7 @@ describe("sendWhatsAppMessage (Cloud API)", () => {
   it("fails gracefully and records a failed row when not connected", async () => {
     const t = convexTest(schema, modules);
     const { applicationId, candidateId } = await seedConnected(t, { status: "disconnected" });
-    const res = await t.action(apiModule.api.whatsappCloud.sendWhatsAppMessage, {
+    const res = await t.action(apiModule.api.whatsapp.sendWhatsAppMessage, {
       applicationId, candidateId, type: "shortlist", channel: "whatsapp", body: "Hi", phone: "+919876543210",
     });
     expect(res.success).toBe(false);
@@ -86,7 +86,7 @@ describe("sendWhatsAppTemplate (Cloud API)", () => {
     const t = convexTest(schema, modules);
     const { applicationId, candidateId } = await seedConnected(t);
 
-    const res = await t.action(apiModule.api.whatsappCloud.sendWhatsAppTemplate, {
+    const res = await t.action(apiModule.api.whatsapp.sendWhatsAppTemplate, {
       applicationId, candidateId, templateName: "shortlist_notification",
       templateParams: { name: "Asha", position: "TGT Math", school: "Greenfield" },
       phone: "+919876543210",
@@ -108,7 +108,7 @@ describe("sendWhatsAppTemplate (Cloud API)", () => {
     const t = convexTest(schema, modules);
     const { applicationId, candidateId } = await seedConnected(t);
     await expect(
-      t.action(apiModule.api.whatsappCloud.sendWhatsAppTemplate, {
+      t.action(apiModule.api.whatsapp.sendWhatsAppTemplate, {
         applicationId, candidateId, templateName: "nope", templateParams: {}, phone: "+919876543210",
       }),
     ).rejects.toThrow("Unknown template");

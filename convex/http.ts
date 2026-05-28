@@ -30,27 +30,6 @@ http.route({
 });
 
 http.route({
-  path: "/whatsapp/inbound",
-  method: "POST",
-  handler: httpAction(async (ctx, request) => {
-    let body: any;
-    try {
-      body = await request.json();
-    } catch {
-      return new Response(JSON.stringify({ error: "Invalid JSON" }), { status: 400 });
-    }
-    // Gupshup webhook shape: { type: "message", payload: { source: "+91...", payload: { text: "..." } } }
-    const fromPhone: string = body?.payload?.source ?? "";
-    const text: string = body?.payload?.payload?.text ?? body?.payload?.text ?? "";
-    if (!fromPhone || !text) {
-      return new Response(JSON.stringify({ success: true, ignored: true }), { status: 200 });
-    }
-    const result = await ctx.runAction(api.whatsapp.handleInboundMessage, { fromPhone, body: text });
-    return new Response(JSON.stringify({ success: true, ...result }), { status: 200 });
-  }),
-});
-
-http.route({
   path: "/whatsapp/webhook",
   method: "GET",
   handler: httpAction(async (_ctx, request) => {
