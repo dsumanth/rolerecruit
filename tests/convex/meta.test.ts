@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   exchangeCodeForToken,
+  exchangeForLongLivedToken,
   subscribeAppToWaba,
   fetchWabaDetails,
   sendCloudText,
@@ -46,6 +47,14 @@ describe("meta client", () => {
     const sent = JSON.parse((init as any).body);
     expect(sent.to).toBe("+919876543210");
     expect(sent.type).toBe("text");
+  });
+
+  it("exchanges a short-lived token for a long-lived one", async () => {
+    const f = mockFetchOnce(200, { access_token: "EAAG-long", token_type: "bearer", expires_in: 5184000 });
+    const token = await exchangeForLongLivedToken("EAAG-short");
+    expect(token).toBe("EAAG-long");
+    expect(f.mock.calls[0][0]).toContain("grant_type=fb_exchange_token");
+    expect(f.mock.calls[0][0]).toContain("fb_exchange_token=EAAG-short");
   });
 
   it("subscribes the app to a WABA", async () => {

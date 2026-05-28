@@ -36,6 +36,23 @@ export async function exchangeCodeForToken(code: string): Promise<string> {
   return json.access_token as string;
 }
 
+// Upgrade a freshly-exchanged token to a long-lived one. Embedded Signup
+// system-user tokens are usually already non-expiring; this is the documented
+// belt-and-suspenders step so stored tokens don't silently expire.
+export async function exchangeForLongLivedToken(token: string): Promise<string> {
+  const appId = process.env.META_APP_ID;
+  const appSecret = process.env.META_APP_SECRET;
+  if (!appId || !appSecret) throw new Error("META_APP_ID / META_APP_SECRET not set");
+  const url =
+    `${GRAPH}/${apiVersion()}/oauth/access_token` +
+    `?grant_type=fb_exchange_token` +
+    `&client_id=${encodeURIComponent(appId)}` +
+    `&client_secret=${encodeURIComponent(appSecret)}` +
+    `&fb_exchange_token=${encodeURIComponent(token)}`;
+  const json = await metaFetch(url);
+  return json.access_token as string;
+}
+
 export async function subscribeAppToWaba(wabaId: string, token: string): Promise<void> {
   await metaFetch(`${GRAPH}/${apiVersion()}/${wabaId}/subscribed_apps`, {
     method: "POST",

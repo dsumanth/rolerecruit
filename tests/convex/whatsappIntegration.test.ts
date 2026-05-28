@@ -107,6 +107,7 @@ describe("completeEmbeddedSignup", () => {
   it("exchanges code, subscribes, fetches details, stores encrypted token, sets active", async () => {
     const fetchSpy = vi.spyOn(global, "fetch")
       .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ access_token: "EAAG-live" }) } as any)
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ access_token: "EAAG-longlived" }) } as any)
       .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ success: true }) } as any)
       .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({
         name: "Greenfield",
@@ -122,7 +123,7 @@ describe("completeEmbeddedSignup", () => {
       schoolId, code: "auth-code", wabaId: "waba-1",
     });
     expect(res.ok).toBe(true);
-    expect(fetchSpy).toHaveBeenCalledTimes(3);
+    expect(fetchSpy).toHaveBeenCalledTimes(4);
 
     const row = await t.run(async (ctx) =>
       ctx.db.query("whatsappIntegrations").withIndex("by_schoolId", (q) => q.eq("schoolId", schoolId)).first(),

@@ -1,7 +1,7 @@
 import { query, mutation, internalQuery, internalMutation, action } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
-import { exchangeCodeForToken, subscribeAppToWaba, fetchWabaDetails } from "./lib/meta";
+import { exchangeCodeForToken, exchangeForLongLivedToken, subscribeAppToWaba, fetchWabaDetails } from "./lib/meta";
 import { encryptSecret } from "./lib/crypto";
 
 const DEFAULT_MARKUP_PCT = 20;
@@ -145,7 +145,16 @@ export const completeEmbeddedSignup = action({
   },
   handler: async (ctx, args): Promise<{ ok: boolean; error?: string }> => {
     try {
-      const token = await exchangeCodeForToken(args.code);
+      const shortToken = await exchangeCodeForToken(args.code);
+      // Best-effort upgrade to a long-lived token. Keep the original if the
+      // exchange doesn't apply (e.g. already a non-expiring system-user token)
+      // so connecting never breaks.
+      let token = shortToken;
+      try {
+        token = await exchangeForLongLivedToken(shortToken);
+      } catch (e: any) {
+        console.warn(`[whatsapp] long-lived token exchange skipped: ${e?.message ?? e}`);
+      }
       await subscribeAppToWaba(args.wabaId, token);
       const details = await fetchWabaDetails(args.wabaId, token);
       if (!details.phoneNumberId) throw new Error("WABA has no phone number");
