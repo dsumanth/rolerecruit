@@ -11,6 +11,7 @@ Run locally:
 maestro test mobile/.maestro/inbox-to-submit.yaml
 maestro test mobile/.maestro/dictation.yaml
 maestro test mobile/.maestro/hr-schedule-demo.yaml
+maestro test mobile/.maestro/hr-template-edit.yaml
 ```
 
 ## Flows
@@ -18,5 +19,6 @@ maestro test mobile/.maestro/hr-schedule-demo.yaml
 - `inbox-to-submit.yaml` - evaluator signs in, opens an invite, submits a score.
 - `dictation.yaml` - evaluator dictates a text response.
 - `hr-schedule-demo.yaml` - HR signs in, opens Candidates, picks a candidate, schedules a demo. Seeded environment required.
+- `hr-template-edit.yaml` - HR signs in, edits the Principal form template's first field label, saves. Seeded environment required.
 
 Skip-condition for CI: if `maestro --version` fails, skip the entire stage.

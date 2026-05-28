@@ -30,6 +30,7 @@ export function FieldRow({ field, onChange, onRemove, onMove }: Props) {
       <TextInput
         value={field.label}
         onChangeText={(t) => onChange({ ...field, label: t })}
+        testID="field-label-input"
         style={inputStyle}
       />
       <Text style={[labelStyle, { marginTop: space[3] }]}>Type</Text>

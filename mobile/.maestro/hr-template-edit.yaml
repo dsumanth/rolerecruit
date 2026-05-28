@@ -1,0 +1,20 @@
+appId: app.rolerecruit.mobile
+env:
+  SKIP_NOT_SEEDED: ${EXPO_SEED_EMAIL:-skip}
+---
+- runFlow:
+    when:
+      true: ${SKIP_NOT_SEEDED != "skip"}
+    commands:
+      - openLink: "rolerecruit://?token=${EXPO_SEED_SESSION_TOKEN}"
+      - tapOn: "Profile"
+      - tapOn: "Settings"
+      - tapOn: "Form templates"
+      - tapOn: "Principal"
+      - tapOn:
+          id: "field-label-input"
+          index: 0
+      - eraseText
+      - inputText: "Subject knowledge (revised)"
+      - tapOn: "Save"
+      - assertVisible: "Templates"
