@@ -111,3 +111,55 @@ describe("demoSessions.create", () => {
     ).rejects.toThrow(/past/i);
   });
 });
+
+describe("demoSessions.cancel", () => {
+  it("cancels the demo and all non-terminal invites", async () => {
+    const t = convexTest(schema, modules);
+    const { schoolId, appId, principalId, hodId } = await setup(t);
+    const demoId = await t.mutation("demoSessions:create" as any, {
+      applicationId: appId, schoolId,
+      scheduledAt: Date.now() + 86400000, durationMinutes: 30,
+      mode: "live", format: "classroom",
+      evaluators: [
+        { userId: principalId, role: "principal" },
+        { userId: hodId, role: "hod" },
+      ],
+      createdBy: principalId,
+    } as any);
+    await t.mutation("demoSessions:cancel" as any, { demoId, reason: "rescheduled" } as any);
+
+    const demo = await t.query("demoSessions:get" as any, { demoId } as any);
+    expect(demo.status).toBe("cancelled");
+    expect(demo.cancellationReason).toBe("rescheduled");
+
+    const inviteList = await t.query("evaluationInvites:listForDemo" as any, { demoId } as any);
+    for (const inv of inviteList) {
+      expect(inv.status).toBe("cancelled");
+    }
+  });
+});
+
+describe("demoSessions.listForSchool / listForCandidate", () => {
+  it("returns demos ordered by scheduledAt asc", async () => {
+    const t = convexTest(schema, modules);
+    const { schoolId, appId, principalId } = await setup(t);
+    const t1 = Date.now() + 86400000;
+    const t2 = Date.now() + 172800000;
+    const d2 = await t.mutation("demoSessions:create" as any, {
+      applicationId: appId, schoolId,
+      scheduledAt: t2, durationMinutes: 30,
+      mode: "live", format: "classroom",
+      evaluators: [{ userId: principalId, role: "principal" }],
+      createdBy: principalId,
+    } as any);
+    const d1 = await t.mutation("demoSessions:create" as any, {
+      applicationId: appId, schoolId,
+      scheduledAt: t1, durationMinutes: 30,
+      mode: "post", format: "mock",
+      evaluators: [{ userId: principalId, role: "principal" }],
+      createdBy: principalId,
+    } as any);
+    const list = await t.query("demoSessions:listForSchool" as any, { schoolId } as any);
+    expect(list.map((d: any) => d._id)).toEqual([d1, d2]);
+  });
+});

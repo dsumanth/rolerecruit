@@ -80,3 +80,49 @@ export const get = query({
     return d;
   },
 });
+
+export const cancel = mutation({
+  args: { demoId: v.id("demoSessions"), reason: v.optional(v.string()) },
+  handler: async (ctx, { demoId, reason }) => {
+    const demo = await ctx.db.get(demoId);
+    if (!demo) throw new Error("Demo not found");
+    if (demo.status === "cancelled" || demo.status === "completed") {
+      throw new Error(`Cannot cancel a ${demo.status} demo`);
+    }
+    const now = Date.now();
+    await ctx.db.patch(demoId, {
+      status: "cancelled",
+      cancelledAt: now,
+      cancellationReason: reason,
+    });
+    const invites = await ctx.db
+      .query("evaluationInvites")
+      .withIndex("by_demoSessionId", (q) => q.eq("demoSessionId", demoId))
+      .collect();
+    for (const inv of invites) {
+      if (inv.status === "submitted" || inv.status === "declined" || inv.status === "cancelled") continue;
+      await ctx.db.patch(inv._id, { status: "cancelled", cancelledAt: now });
+    }
+  },
+});
+
+export const listForSchool = query({
+  args: { schoolId: v.id("schools") },
+  handler: async (ctx, { schoolId }) => {
+    const rows = await ctx.db
+      .query("demoSessions")
+      .withIndex("by_schoolId_scheduledAt", (q) => q.eq("schoolId", schoolId))
+      .collect();
+    return rows.sort((a, b) => a.scheduledAt - b.scheduledAt);
+  },
+});
+
+export const listForCandidate = query({
+  args: { applicationId: v.id("applications") },
+  handler: async (ctx, { applicationId }) => {
+    return await ctx.db
+      .query("demoSessions")
+      .withIndex("by_applicationId", (q) => q.eq("applicationId", applicationId))
+      .collect();
+  },
+});
