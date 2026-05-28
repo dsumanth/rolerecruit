@@ -3,8 +3,9 @@ import {
   evaluateRule,
   type RuleInput,
 } from "./lib/decisionRuleEngine";
+import { internal } from "./_generated/api";
 
-type DbCtx = { db: any };
+type DbCtx = { db: any; scheduler?: any };
 
 export async function maybeApplyDecision(
   ctx: DbCtx,
@@ -88,5 +89,9 @@ export async function maybeApplyDecision(
     await ctx.db.patch(demo.applicationId, { stage: "advanced" });
   } else if (action === "reject") {
     await ctx.db.patch(demo.applicationId, { stage: "rejected" });
+  }
+
+  if (ctx.scheduler) {
+    await ctx.scheduler.runAfter(0, internal.notifications.notifyDemoComplete, { demoId });
   }
 }

@@ -173,6 +173,15 @@ export const getByIdInternal = internalQuery({
   handler: async (ctx, { userId }) => await ctx.db.get(userId),
 });
 
+export const listSchoolStaffInternal = internalQuery({
+  args: { schoolId: v.id("schools") },
+  handler: async (ctx, { schoolId }) =>
+    await ctx.db
+      .query("userProfiles")
+      .withIndex("by_schoolId", (q) => q.eq("schoolId", schoolId))
+      .collect(),
+});
+
 export const registerExpoToken = mutation({
   args: { userId: v.id("userProfiles"), token: v.string() },
   handler: async (ctx, { userId, token }) => {

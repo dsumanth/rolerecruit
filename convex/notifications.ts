@@ -1,6 +1,7 @@
 import { internalAction } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
+import type { Doc } from "./_generated/dataModel";
 
 export function renderInviteEmail(args: {
   candidateName: string;
@@ -251,6 +252,28 @@ export const sendDemoEvent = internalAction({
       title,
       body,
       data: { demoId: args.demoId, event: args.event },
+    });
+  },
+});
+
+export const notifyDemoComplete = internalAction({
+  args: { demoId: v.id("demoSessions") },
+  handler: async (ctx, { demoId }) => {
+    const demo = await ctx.runQuery(internal.demoSessions.getInternal, { demoId });
+    if (!demo) return;
+    const profiles: Doc<"userProfiles">[] = await ctx.runQuery(
+      internal.users.listSchoolStaffInternal,
+      { schoolId: demo.schoolId },
+    );
+    const targets = profiles
+      .filter((p) => p.role === "hr_admin" || p.role === "principal")
+      .filter((p) => Array.isArray(p.expoPushTokens) && p.expoPushTokens.length > 0)
+      .map((p) => p._id);
+    if (targets.length === 0) return;
+    await ctx.scheduler.runAfter(0, internal.notifications.sendDemoEvent, {
+      event: "demo_completed",
+      demoId,
+      targetUserIds: targets,
     });
   },
 });

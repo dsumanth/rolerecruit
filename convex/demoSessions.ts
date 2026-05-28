@@ -1,4 +1,4 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { generateToken } from "./lib/tokenGen";
 import { EVALUATOR_ROLE_UNION } from "./types";
@@ -96,6 +96,11 @@ export const get = query({
   },
 });
 
+export const getInternal = internalQuery({
+  args: { demoId: v.id("demoSessions") },
+  handler: async (ctx, { demoId }) => await ctx.db.get(demoId),
+});
+
 export const cancel = mutation({
   args: { demoId: v.id("demoSessions"), reason: v.optional(v.string()) },
   handler: async (ctx, { demoId, reason }) => {
@@ -184,6 +189,9 @@ export const applyDecision = mutation({
         stage: args.action === "advance" ? "advanced" : "rejected",
       });
     }
+    await ctx.scheduler.runAfter(0, internal.notifications.notifyDemoComplete, {
+      demoId: args.demoId,
+    });
     return args.action;
   },
 });
