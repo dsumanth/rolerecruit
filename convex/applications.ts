@@ -384,18 +384,14 @@ function makeBatchId() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }
 
-const removeManyAppsArgs = v.union(
-  v.object({ ids: v.array(v.id("applications")) }),
-  v.object({
-    matchAll: v.object({
+export const removeManyApplications = mutation({
+  args: {
+    ids: v.optional(v.array(v.id("applications"))),
+    matchAll: v.optional(v.object({
       jobId: v.union(v.id("jobPostings"), v.null()),
       filter: v.optional(v.any()),
-    }),
-  }),
-);
-
-export const removeManyApplications = mutation({
-  args: removeManyAppsArgs,
+    })),
+  },
   handler: async (ctx, args) => {
     const a = args as { ids?: string[]; matchAll?: { jobId: any; filter?: any } };
     let ids: any[] = [];
@@ -461,19 +457,15 @@ export const finalizeBatchDelete = internalMutation({
 // Bulk stage change: bulkSetStage (Task 7.2)
 // ============================================================================
 
-const bulkSetStageArgs = v.union(
-  v.object({ ids: v.array(v.id("applications")), stage: v.string() }),
-  v.object({
-    matchAll: v.object({
+export const bulkSetStage = mutation({
+  args: {
+    ids: v.optional(v.array(v.id("applications"))),
+    matchAll: v.optional(v.object({
       jobId: v.union(v.id("jobPostings"), v.null()),
       filter: v.optional(v.any()),
-    }),
+    })),
     stage: v.string(),
-  }),
-);
-
-export const bulkSetStage = mutation({
-  args: bulkSetStageArgs,
+  },
   handler: async (ctx, args) => {
     const a = args as { ids?: string[]; matchAll?: { jobId: any; filter?: any }; stage: string };
     let ids: any[] = [];

@@ -370,13 +370,14 @@ export const listAllActive = query({
   },
 });
 
-const removeManyJobsArgs = v.union(
-  v.object({ ids: v.array(v.id("jobPostings")) }),
-  v.object({ matchAll: v.object({ schoolId: v.id("schools"), filter: v.optional(v.any()) }) }),
-);
-
 export const removeMany = mutation({
-  args: removeManyJobsArgs,
+  args: {
+    ids: v.optional(v.array(v.id("jobPostings"))),
+    matchAll: v.optional(v.object({
+      schoolId: v.id("schools"),
+      filter: v.optional(v.any()),
+    })),
+  },
   handler: async (ctx, args) => {
     const a = args as { ids?: string[]; matchAll?: { schoolId: any; filter?: any } };
     let ids: any[] = [];
@@ -450,13 +451,15 @@ export const finalizeBatchDelete = internalMutation({
   },
 });
 
-const bulkSetStatusArgs = v.union(
-  v.object({ ids: v.array(v.id("jobPostings")), status: v.string() }),
-  v.object({ matchAll: v.object({ schoolId: v.id("schools"), filter: v.optional(v.any()) }), status: v.string() }),
-);
-
 export const bulkSetStatus = mutation({
-  args: bulkSetStatusArgs,
+  args: {
+    ids: v.optional(v.array(v.id("jobPostings"))),
+    matchAll: v.optional(v.object({
+      schoolId: v.id("schools"),
+      filter: v.optional(v.any()),
+    })),
+    status: v.string(),
+  },
   handler: async (ctx, args) => {
     const a = args as { ids?: string[]; matchAll?: { schoolId: any; filter?: any }; status: string };
     let ids: any[] = [];

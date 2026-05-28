@@ -574,18 +574,14 @@ function makeBatchId() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }
 
-const removeManyArgs = v.union(
-  v.object({ ids: v.array(v.id("candidates")) }),
-  v.object({
-    matchAll: v.object({
+export const removeMany = mutation({
+  args: {
+    ids: v.optional(v.array(v.id("candidates"))),
+    matchAll: v.optional(v.object({
       schoolId: v.id("schools"),
       filter: v.optional(v.any()),
-    }),
-  }),
-);
-
-export const removeMany = mutation({
-  args: removeManyArgs,
+    })),
+  },
   handler: async (ctx, args) => {
     const a = args as { ids?: string[]; matchAll?: { schoolId: any; filter?: any } };
     let ids: any[] = [];
