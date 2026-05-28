@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { EVALUATOR_ROLE_UNION } from "./types";
 
 const evidenceValidator = v.object({
   quote: v.string(),
@@ -375,28 +376,152 @@ export default defineSchema({
     .index("by_schoolId_aiMatchScore", ["schoolId", "aiMatchScore"])
     .index("by_jobPostingId_aiMatchScore", ["jobPostingId", "aiMatchScore"]),
 
-  evaluations: defineTable({
+  demoSessions: defineTable({
     applicationId: v.id("applications"),
-    evaluatorUserId: v.string(),
-    evaluatorRole: v.union(
-      v.literal("principal"),
-      v.literal("hod"),
-      v.literal("hr_admin")
+    schoolId: v.id("schools"),
+    parentDemoId: v.optional(v.id("demoSessions")),
+    scheduledAt: v.number(),
+    durationMinutes: v.number(),
+    mode: v.union(v.literal("live"), v.literal("post"), v.literal("async")),
+    format: v.union(v.literal("classroom"), v.literal("mock"), v.literal("recorded")),
+    location: v.optional(v.string()),
+    videoUrl: v.optional(v.string()),
+    status: v.union(
+      v.literal("scheduled"),
+      v.literal("in_progress"),
+      v.literal("completed"),
+      v.literal("cancelled"),
     ),
-    token: v.string(),
-    submitted: v.boolean(),
-    subjectKnowledge: v.optional(v.number()),
-    classroomManagement: v.optional(v.number()),
-    communication: v.optional(v.number()),
-    overallFit: v.optional(v.number()),
-    comments: v.optional(v.string()),
-    recommendation: v.optional(
-      v.union(v.literal("hire"), v.literal("maybe"), v.literal("reject"))
-    ),
-    submittedAt: v.optional(v.number()),
+    formOpenWindowMinutes: v.optional(v.number()),
+    formCloseDueDays: v.optional(v.number()),
+    decisionRuleId: v.optional(v.id("decisionRules")),
+    appliedDecision: v.optional(v.object({
+      action: v.union(
+        v.literal("advance"),
+        v.literal("reject"),
+        v.literal("redemo"),
+        v.literal("manual"),
+      ),
+      appliedAt: v.number(),
+      appliedBy: v.optional(v.id("userProfiles")),
+      note: v.optional(v.string()),
+    })),
+    createdBy: v.id("userProfiles"),
+    createdAt: v.number(),
+    cancelledAt: v.optional(v.number()),
+    cancellationReason: v.optional(v.string()),
   })
     .index("by_applicationId", ["applicationId"])
+    .index("by_schoolId_scheduledAt", ["schoolId", "scheduledAt"])
+    .index("by_status_scheduledAt", ["status", "scheduledAt"]),
+
+  evaluationInvites: defineTable({
+    demoSessionId: v.id("demoSessions"),
+    evaluatorUserId: v.id("userProfiles"),
+    evaluatorRole: EVALUATOR_ROLE_UNION,
+    formTemplateId: v.id("formTemplates"),
+    status: v.union(
+      v.literal("invited"),
+      v.literal("viewed"),
+      v.literal("in_progress"),
+      v.literal("submitted"),
+      v.literal("declined"),
+      v.literal("cancelled"),
+    ),
+    token: v.string(),
+    invitedAt: v.number(),
+    viewedAt: v.optional(v.number()),
+    submittedAt: v.optional(v.number()),
+    declinedAt: v.optional(v.number()),
+    declineReason: v.optional(v.string()),
+    cancelledAt: v.optional(v.number()),
+    replacedBy: v.optional(v.id("evaluationInvites")),
+  })
+    .index("by_demoSessionId", ["demoSessionId"])
+    .index("by_evaluatorUserId_status", ["evaluatorUserId", "status"])
     .index("by_token", ["token"]),
+
+  formTemplates: defineTable({
+    schoolId: v.optional(v.id("schools")),
+    role: EVALUATOR_ROLE_UNION,
+    name: v.string(),
+    fields: v.array(v.object({
+      key: v.string(),
+      label: v.string(),
+      type: v.union(
+        v.literal("score_1_5"),
+        v.literal("score_1_10"),
+        v.literal("text"),
+        v.literal("choice"),
+      ),
+      choices: v.optional(v.array(v.string())),
+      weight: v.optional(v.number()),
+      allowDictation: v.optional(v.boolean()),
+      required: v.optional(v.boolean()),
+    })),
+    isActive: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_schoolId_role", ["schoolId", "role"])
+    .index("by_isActive", ["isActive"]),
+
+  decisionRules: defineTable({
+    schoolId: v.id("schools"),
+    name: v.string(),
+    branches: v.array(v.object({
+      condition: v.object({
+        minHire: v.optional(v.number()),
+        maxReject: v.optional(v.number()),
+        minAverage: v.optional(v.object({
+          fieldKey: v.string(),
+          minValue: v.number(),
+        })),
+        requiredRoles: v.optional(v.array(v.string())),
+      }),
+      action: v.union(
+        v.literal("advance"),
+        v.literal("reject"),
+        v.literal("redemo"),
+        v.literal("manual"),
+      ),
+    })),
+    fallback: v.union(
+      v.literal("advance"),
+      v.literal("reject"),
+      v.literal("redemo"),
+      v.literal("manual"),
+    ),
+    isActive: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("by_schoolId", ["schoolId"]),
+
+  evaluations: defineTable({
+    inviteId: v.id("evaluationInvites"),
+    formTemplateId: v.id("formTemplates"),
+    responses: v.record(v.string(), v.union(v.number(), v.string())),
+    recommendation: v.optional(v.union(
+      v.literal("hire"),
+      v.literal("maybe"),
+      v.literal("reject"),
+    )),
+    voiceInputs: v.optional(v.array(v.object({
+      fieldKey: v.string(),
+      transcript: v.string(),
+      summaryPoints: v.array(v.string()),
+      language: v.string(),
+      durationSec: v.number(),
+      processedAt: v.number(),
+    }))),
+    submittedAt: v.number(),
+    submittedFromPlatform: v.union(
+      v.literal("mobile_ios"),
+      v.literal("mobile_android"),
+      v.literal("web"),
+    ),
+  })
+    .index("by_inviteId", ["inviteId"]),
 
   outreachMessages: defineTable({
     applicationId: v.id("applications"),

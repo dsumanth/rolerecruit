@@ -80,18 +80,35 @@ describe("candidates.removeMany", () => {
       candidateId, schoolId, skipTriage: true,
     });
 
-    await t.run(async (ctx: any) => {
-      await ctx.db.insert("evaluations", {
-        applicationId: appId, evaluatorUserId: "u1", evaluatorRole: "principal",
-        token: "tok", submitted: false,
+    const { demoId, inviteId, evalId } = await t.run(async (ctx: any) => {
+      const tplId = await ctx.db.insert("formTemplates", {
+        schoolId, role: "principal", name: "P", fields: [],
+        isActive: true, createdAt: Date.now(), updatedAt: Date.now(),
       });
-      // candidatePools entry — use any pool id since we're just testing the cascade walks the index
+      const userId = await ctx.db.insert("userProfiles", {
+        userId: "u-cascade-c", name: "P", email: "p@x.com", schoolId, role: "principal",
+      });
+      const demoId = await ctx.db.insert("demoSessions", {
+        applicationId: appId, schoolId,
+        scheduledAt: Date.now() + 86400000, durationMinutes: 30,
+        mode: "live", format: "classroom", status: "scheduled",
+        createdBy: userId, createdAt: Date.now(),
+      });
+      const inviteId = await ctx.db.insert("evaluationInvites", {
+        demoSessionId: demoId, evaluatorUserId: userId, evaluatorRole: "principal",
+        formTemplateId: tplId, status: "invited", token: "t-cascade-c", invitedAt: Date.now(),
+      });
+      const evalId = await ctx.db.insert("evaluations", {
+        inviteId, formTemplateId: tplId, responses: {},
+        submittedAt: Date.now(), submittedFromPlatform: "web",
+      });
       const poolId = await ctx.db.insert("pools", {
         schoolId, name: "P", createdBy: "ai", tags: [], createdAt: Date.now(),
       });
       await ctx.db.insert("candidatePools", {
         candidateId, poolId, confidence: 0.5, createdAt: Date.now(),
       });
+      return { demoId, inviteId, evalId };
     });
 
     vi.useFakeTimers();
@@ -103,10 +120,13 @@ describe("candidates.removeMany", () => {
     expect(candAfter).toBeNull();
     const appAfter = await t.run(async (ctx: any) => ctx.db.get(appId));
     expect(appAfter).toBeNull();
-    const evals = await t.run(async (ctx: any) =>
-      ctx.db.query("evaluations").withIndex("by_applicationId", (q: any) => q.eq("applicationId", appId)).collect()
-    );
-    expect(evals.length).toBe(0);
+    // Cascade through demos -> invites -> evaluations.
+    const demoAfter = await t.run(async (ctx: any) => ctx.db.get(demoId));
+    const inviteAfter = await t.run(async (ctx: any) => ctx.db.get(inviteId));
+    const evalAfter = await t.run(async (ctx: any) => ctx.db.get(evalId));
+    expect(demoAfter).toBeNull();
+    expect(inviteAfter).toBeNull();
+    expect(evalAfter).toBeNull();
     const pools = await t.run(async (ctx: any) =>
       ctx.db.query("candidatePools").withIndex("by_candidateId", (q: any) => q.eq("candidateId", candidateId)).collect()
     );

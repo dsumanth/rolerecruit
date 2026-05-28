@@ -1,117 +1,96 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
-function generateToken(): string {
-  const chars =
-    "abcdefghijklmnopqrstuvwxyz0123456789";
-  let token = "";
-  for (let i = 0; i < 32; i++) {
-    token += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return token;
+const VOICE_INPUT_VALIDATOR = v.array(v.object({
+  fieldKey: v.string(),
+  transcript: v.string(),
+  summaryPoints: v.array(v.string()),
+  language: v.string(),
+  durationSec: v.number(),
+  processedAt: v.number(),
+}));
+
+const RESPONSES_VALIDATOR = v.record(v.string(), v.union(v.number(), v.string()));
+
+const RECOMMENDATION_VALIDATOR = v.optional(v.union(
+  v.literal("hire"), v.literal("maybe"), v.literal("reject"),
+));
+
+const PLATFORM_VALIDATOR = v.union(
+  v.literal("mobile_ios"),
+  v.literal("mobile_android"),
+  v.literal("web"),
+);
+
+async function persistSubmission(
+  ctx: any,
+  inviteId: any,
+  responses: any,
+  recommendation: any,
+  voiceInputs: any,
+  platform: any,
+) {
+  const inv = await ctx.db.get(inviteId);
+  if (!inv) throw new Error("Invite not found");
+  if (inv.status === "submitted") throw new Error("Already submitted");
+  if (inv.status === "cancelled") throw new Error("Invite was cancelled");
+  if (inv.status === "declined") throw new Error("Invite was declined");
+
+  const now = Date.now();
+  await ctx.db.insert("evaluations", {
+    inviteId,
+    formTemplateId: inv.formTemplateId,
+    responses,
+    recommendation,
+    voiceInputs: voiceInputs ?? undefined,
+    submittedAt: now,
+    submittedFromPlatform: platform,
+  });
+  await ctx.db.patch(inviteId, { status: "submitted", submittedAt: now });
 }
 
-export const create = mutation({
+export const submit = mutation({
   args: {
-    applicationId: v.id("applications"),
-    evaluatorRole: v.union(
-      v.literal("principal"),
-      v.literal("hod"),
-      v.literal("hr_admin")
-    ),
+    inviteId: v.id("evaluationInvites"),
+    responses: RESPONSES_VALIDATOR,
+    recommendation: RECOMMENDATION_VALIDATOR,
+    voiceInputs: v.optional(VOICE_INPUT_VALIDATOR),
+    submittedFromPlatform: PLATFORM_VALIDATOR,
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    const token = generateToken();
-
-    const id = await ctx.db.insert("evaluations", {
-      applicationId: args.applicationId,
-      evaluatorUserId: identity?.subject ?? "anonymous",
-      evaluatorRole: args.evaluatorRole,
-      token,
-      submitted: false,
-    });
-
-    return { _id: id, token };
+    await persistSubmission(
+      ctx, args.inviteId, args.responses, args.recommendation,
+      args.voiceInputs, args.submittedFromPlatform,
+    );
   },
 });
 
-export const submitFeedback = mutation({
+export const submitByToken = mutation({
   args: {
     token: v.string(),
-    subjectKnowledge: v.number(),
-    classroomManagement: v.number(),
-    communication: v.number(),
-    overallFit: v.number(),
-    comments: v.optional(v.string()),
-    recommendation: v.union(
-      v.literal("hire"),
-      v.literal("maybe"),
-      v.literal("reject")
-    ),
+    responses: RESPONSES_VALIDATOR,
+    recommendation: RECOMMENDATION_VALIDATOR,
+    voiceInputs: v.optional(VOICE_INPUT_VALIDATOR),
+    submittedFromPlatform: PLATFORM_VALIDATOR,
   },
   handler: async (ctx, args) => {
-    const evaluation = await ctx.db
-      .query("evaluations")
+    const inv = await ctx.db
+      .query("evaluationInvites")
       .withIndex("by_token", (q) => q.eq("token", args.token))
       .first();
-
-    if (!evaluation) throw new Error("Invalid feedback link");
-    if (evaluation.submitted) throw new Error("Feedback already submitted");
-
-    return await ctx.db.patch(evaluation._id, {
-      subjectKnowledge: args.subjectKnowledge,
-      classroomManagement: args.classroomManagement,
-      communication: args.communication,
-      overallFit: args.overallFit,
-      comments: args.comments,
-      recommendation: args.recommendation,
-      submitted: true,
-      submittedAt: Date.now(),
-    });
+    if (!inv) throw new Error("Invite not found for token");
+    await persistSubmission(
+      ctx, inv._id, args.responses, args.recommendation,
+      args.voiceInputs, args.submittedFromPlatform,
+    );
   },
 });
 
-export const getByApplication = query({
-  args: { applicationId: v.id("applications") },
-  handler: async (ctx, args) => {
-    return await ctx.db
+export const listForInvite = query({
+  args: { inviteId: v.id("evaluationInvites") },
+  handler: async (ctx, { inviteId }) =>
+    await ctx.db
       .query("evaluations")
-      .withIndex("by_applicationId", (q) =>
-        q.eq("applicationId", args.applicationId)
-      )
-      .collect();
-  },
-});
-
-export const getByToken = query({
-  args: { token: v.string() },
-  handler: async (ctx, args) => {
-    const evaluation = await ctx.db
-      .query("evaluations")
-      .withIndex("by_token", (q) => q.eq("token", args.token))
-      .first();
-
-    if (!evaluation) return null;
-
-    const application = await ctx.db.get(evaluation.applicationId);
-    if (!application) return null;
-
-    const candidate = await ctx.db.get(application.candidateId);
-
-    return {
-      _id: evaluation._id,
-      submitted: evaluation.submitted,
-      evaluatorRole: evaluation.evaluatorRole,
-      application: {
-        stage: application.stage,
-      },
-      candidate: candidate
-        ? {
-            name: candidate.name,
-            subjects: candidate.subjects,
-          }
-        : null,
-    };
-  },
+      .withIndex("by_inviteId", (q) => q.eq("inviteId", inviteId))
+      .collect(),
 });

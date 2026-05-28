@@ -3,7 +3,7 @@ import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
 import { PARSED_FACETS_VERSION, EMBEDDING_VERSION } from "./versions";
-import { deleteApplicationChildren } from "./applications";
+import { deleteApplicationChildren, evaluationsForApplication } from "./applications";
 
 export const getRejectionHistory = query({
   args: {
@@ -21,20 +21,15 @@ export const getRejectionHistory = query({
     for (const app of apps) {
       if (args.excludeApplicationId && app._id === args.excludeApplicationId) continue;
 
-      const evaluations = await ctx.db
-        .query("evaluations")
-        .withIndex("by_applicationId", (q) => q.eq("applicationId", app._id))
-        .filter((q) => q.eq(q.field("submitted"), true))
-        .collect();
-
-      const hasReject = evaluations.some((e: any) => e.recommendation === "reject");
+      const rows = await evaluationsForApplication(ctx, app._id);
+      const hasReject = rows.some((r) => r.evaluation.recommendation === "reject");
       if (app.stage !== "rejected" && !hasReject) continue;
 
       const job = app.jobPostingId ? await ctx.db.get(app.jobPostingId) : null;
-      const evalSubmitted = evaluations
-        .filter((e: any) => e.recommendation != null)
-        .map((e: any) => e.submittedAt ?? 0);
-      const rejectedAt = Math.max(app._creationTime, ...(evalSubmitted.length ? evalSubmitted : [0]));
+      const submittedTimestamps = rows
+        .filter((r) => r.evaluation.recommendation != null)
+        .map((r) => r.evaluation.submittedAt ?? 0);
+      const rejectedAt = Math.max(app._creationTime, ...(submittedTimestamps.length ? submittedTimestamps : [0]));
 
       result.push({
         applicationId: app._id,
@@ -43,17 +38,17 @@ export const getRejectionHistory = query({
         jobSubject: (job as any)?.subject,
         jobLevel: (job as any)?.level,
         rejectedAt,
-        evaluations: evaluations.map((e: any) => ({
-          evaluatorRole: e.evaluatorRole,
-          recommendation: e.recommendation,
-          comments: e.comments,
+        evaluations: rows.map((r) => ({
+          evaluatorRole: r.invite.evaluatorRole,
+          recommendation: r.evaluation.recommendation,
+          comments: r.evaluation.responses?.comments ?? undefined,
           scores: {
-            subjectKnowledge: e.subjectKnowledge,
-            classroomManagement: e.classroomManagement,
-            communication: e.communication,
-            overallFit: e.overallFit,
+            subjectKnowledge: r.evaluation.responses?.subjectKnowledge,
+            classroomManagement: r.evaluation.responses?.classroomManagement,
+            communication: r.evaluation.responses?.communication,
+            overallFit: r.evaluation.responses?.overallFit,
           },
-          submittedAt: e.submittedAt,
+          submittedAt: r.evaluation.submittedAt,
         })),
       });
     }

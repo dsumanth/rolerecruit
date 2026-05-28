@@ -10,7 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "seed:eval-demo": "bun ./scripts/seed-eval-demo.ts"
   },
   "dependencies": {
     "@convex-dev/better-auth": "^0.12.2",

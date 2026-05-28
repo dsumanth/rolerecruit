@@ -41,6 +41,15 @@ export const getBySchool = query({
   },
 });
 
+export const listSchoolStaff = query({
+  args: { schoolId: v.id("schools") },
+  handler: async (ctx, { schoolId }) =>
+    await ctx.db
+      .query("userProfiles")
+      .withIndex("by_schoolId", (q) => q.eq("schoolId", schoolId))
+      .collect(),
+});
+
 export const createProfile = mutation({
   args: {
     userId: v.string(),
