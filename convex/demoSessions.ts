@@ -126,3 +126,70 @@ export const listForCandidate = query({
       .collect();
   },
 });
+
+export const aggregate = query({
+  args: { demoId: v.id("demoSessions") },
+  handler: async (ctx, { demoId }) => {
+    const demo = await ctx.db.get(demoId);
+    if (!demo) throw new Error("Demo not found");
+    const invites = await ctx.db
+      .query("evaluationInvites")
+      .withIndex("by_demoSessionId", (q) => q.eq("demoSessionId", demoId))
+      .collect();
+
+    const invitesByStatus: Record<string, number> = {
+      invited: 0, viewed: 0, in_progress: 0, submitted: 0, declined: 0, cancelled: 0,
+    };
+    for (const inv of invites) invitesByStatus[inv.status] = (invitesByStatus[inv.status] ?? 0) + 1;
+
+    const recommendationTally: Record<string, number> = { hire: 0, maybe: 0, reject: 0 };
+    const weightedSums: Record<string, number> = {};
+    const totalWeights: Record<string, number> = {};
+    const perEvaluator: any[] = [];
+
+    for (const inv of invites) {
+      if (inv.status !== "submitted") continue;
+      const evals = await ctx.db
+        .query("evaluations")
+        .withIndex("by_inviteId", (q) => q.eq("inviteId", inv._id))
+        .collect();
+      const ev = evals[0];
+      if (!ev) continue;
+      const template = await ctx.db.get(ev.formTemplateId);
+      if (!template) continue;
+      const evaluator = await ctx.db.get(inv.evaluatorUserId);
+
+      if (ev.recommendation) recommendationTally[ev.recommendation] += 1;
+
+      for (const field of template.fields) {
+        if (field.type !== "score_1_5" && field.type !== "score_1_10") continue;
+        const value = ev.responses[field.key];
+        if (typeof value !== "number") continue;
+        const w = field.weight ?? 1;
+        weightedSums[field.key] = (weightedSums[field.key] ?? 0) + value * w;
+        totalWeights[field.key] = (totalWeights[field.key] ?? 0) + w;
+      }
+
+      perEvaluator.push({
+        invite: inv,
+        evaluation: ev,
+        template,
+        evaluatorName: evaluator?.name ?? "Unknown",
+        evaluatorRole: inv.evaluatorRole,
+      });
+    }
+
+    const dimensionAverages: Record<string, number> = {};
+    for (const key of Object.keys(weightedSums)) {
+      dimensionAverages[key] = weightedSums[key] / totalWeights[key];
+    }
+
+    return {
+      demo,
+      invitesByStatus,
+      recommendationTally,
+      dimensionAverages,
+      perEvaluator,
+    };
+  },
+});

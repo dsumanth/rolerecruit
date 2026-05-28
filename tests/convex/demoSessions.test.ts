@@ -9,6 +9,7 @@ import * as users from "../../convex/users";
 import * as formTemplates from "../../convex/formTemplates";
 import * as demoSessions from "../../convex/demoSessions";
 import * as invites from "../../convex/evaluationInvites";
+import * as evaluations from "../../convex/evaluations";
 import * as server from "../../convex/_generated/server";
 import * as api from "../../convex/_generated/api";
 
@@ -22,6 +23,7 @@ const modules = {
   "formTemplates.ts": async () => formTemplates,
   "demoSessions.ts": async () => demoSessions,
   "evaluationInvites.ts": async () => invites,
+  "evaluations.ts": async () => evaluations,
   "_generated/server.js": async () => server,
   "_generated/api.js": async () => api,
 };
@@ -136,6 +138,46 @@ describe("demoSessions.cancel", () => {
     for (const inv of inviteList) {
       expect(inv.status).toBe("cancelled");
     }
+  });
+});
+
+describe("demoSessions.aggregate", () => {
+  it("rolls up per-dimension averages weighted by template weights", async () => {
+    const t = convexTest(schema, modules);
+    const { schoolId, appId, principalId, hodId } = await setup(t);
+    const demoId = await t.mutation("demoSessions:create" as any, {
+      applicationId: appId, schoolId,
+      scheduledAt: Date.now() + 86400000, durationMinutes: 30,
+      mode: "live", format: "classroom",
+      evaluators: [
+        { userId: principalId, role: "principal" },
+        { userId: hodId, role: "hod" },
+      ],
+      createdBy: principalId,
+    } as any);
+    const invs = await t.query("evaluationInvites:listForDemo" as any, { demoId } as any);
+    const pInv = invs.find((i: any) => i.evaluatorRole === "principal");
+    const hInv = invs.find((i: any) => i.evaluatorRole === "hod");
+
+    await t.mutation("evaluations:submit" as any, {
+      inviteId: pInv._id,
+      responses: { subjectKnowledge: 4, classroomManagement: 5, communication: 4, overallFit: 4, comments: "good" },
+      recommendation: "hire",
+      submittedFromPlatform: "web",
+    } as any);
+    await t.mutation("evaluations:submit" as any, {
+      inviteId: hInv._id,
+      responses: { subjectKnowledge: 5, pedagogy: 5, curriculumAlignment: 4, communication: 4, comments: "great" },
+      recommendation: "hire",
+      submittedFromPlatform: "web",
+    } as any);
+
+    const agg = await t.query("demoSessions:aggregate" as any, { demoId } as any);
+    expect(agg.demo._id).toBe(demoId);
+    expect(agg.invitesByStatus.submitted).toBe(2);
+    expect(agg.recommendationTally).toEqual({ hire: 2, maybe: 0, reject: 0 });
+    expect(agg.dimensionAverages.subjectKnowledge).toBeCloseTo(14 / 3, 3);
+    expect(agg.dimensionAverages.communication).toBeCloseTo(4.0, 3);
   });
 });
 
