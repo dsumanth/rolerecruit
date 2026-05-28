@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { InlineExpansion } from "@/components/pipeline/inline-expansion";
 import { PoolOriginBadge } from "@/components/shared/pool-origin-badge";
+import { RejectionHistoryIndicator } from "@/components/pipeline/rejection-history-indicator";
 
 type BadgeVariant = "neutral" | "info" | "success" | "warning" | "danger";
 
@@ -51,6 +52,10 @@ interface ApplicationTableProps {
   showScoreAs?: "match" | "global";
   showPoolBadges?: boolean;
   onRowClick?: (app: Application) => void;
+  loadMoreRef?: (node: HTMLElement | null) => void;
+  selected?: (id: string) => boolean;
+  onToggleRow?: (id: string, shiftKey: boolean) => void;
+  onToggleAll?: (loadedIds: string[]) => void;
 }
 
 const STAGE_LABELS: Record<string, string> = {
@@ -76,6 +81,10 @@ export function ApplicationTable({
   showScoreAs = "match",
   showPoolBadges = false,
   onRowClick,
+  loadMoreRef,
+  selected,
+  onToggleRow,
+  onToggleAll,
 }: ApplicationTableProps) {
   const [expandedAppId, setExpandedAppId] = useState<string | null>(null);
   const parentRef = useRef<HTMLDivElement>(null);
@@ -116,7 +125,15 @@ export function ApplicationTable({
 
   return (
     <Card padding="none" elevation={1} className="overflow-hidden">
-      <div className="grid grid-cols-[1fr_80px_140px_1fr_80px_120px] gap-4 px-5 py-2.5 border-b border-hairline bg-surface-canvas text-micro font-medium text-ink-secondary uppercase tracking-wider">
+      <div className="grid grid-cols-[40px_1fr_80px_140px_1fr_80px_120px] gap-4 px-5 py-2.5 border-b border-hairline bg-surface-canvas text-micro font-medium text-ink-secondary uppercase tracking-wider">
+        <div className="w-10 flex items-center">
+          <input
+            type="checkbox"
+            className="cursor-pointer"
+            checked={sorted.length > 0 && sorted.every((r) => selected?.(r._id))}
+            onChange={() => onToggleAll?.(sorted.map((r) => r._id))}
+          />
+        </div>
         <button
           onClick={() => onSortChange("name")}
           className={cn("text-left hover:text-ink transition-colors duration-fast", sortBy === "name" && "text-accent")}
@@ -162,8 +179,8 @@ export function ApplicationTable({
                   transform: `translateY(${virtualItem.start}px)`,
                 }}
               >
-                <button
-                  type="button"
+                <div
+                  role="row"
                   onClick={() => {
                     if (onRowClick) {
                       onRowClick(app);
@@ -172,14 +189,29 @@ export function ApplicationTable({
                     }
                   }}
                   className={cn(
-                    "w-full grid grid-cols-[1fr_80px_140px_1fr_80px_120px] gap-4 px-5 py-3 text-body-s text-left border-b border-hairline transition-colors duration-fast hover:bg-accent-soft",
+                    "w-full grid grid-cols-[40px_1fr_80px_140px_1fr_80px_120px] gap-4 px-5 py-3 text-body-s text-left border-b border-hairline transition-colors duration-fast cursor-pointer",
                     isExpanded && "bg-accent-soft border-l-2 border-l-accent",
+                    selected?.(app._id) ? "bg-accent-soft" : "hover:bg-accent-soft",
                   )}
                 >
+                  <div className="w-10 flex items-center" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      className="cursor-pointer"
+                      checked={selected?.(app._id) ?? false}
+                      onChange={(e) => onToggleRow?.(app._id, (e.nativeEvent as MouseEvent).shiftKey)}
+                    />
+                  </div>
                   <div>
-                    <p className="font-medium text-ink">
-                      {app.candidate?.name ?? "Unknown"}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-ink">{app.candidate?.name ?? "Unknown"}</span>
+                      {(app as any).priorRejectCount > 0 && (
+                        <RejectionHistoryIndicator
+                          count={(app as any).priorRejectCount}
+                          onClick={() => onRowClick?.(app)}
+                        />
+                      )}
+                    </div>
                     <PoolOriginBadge source={app.source} />
                     {showPoolBadges && app.poolNames && app.poolNames.length > 0 && (
                       <div className="flex gap-1 mt-1 flex-wrap">
@@ -221,13 +253,14 @@ export function ApplicationTable({
                   <div className="text-ink-secondary truncate">
                     {app.candidate?.location ?? "—"}
                   </div>
-                </button>
+                </div>
 
                 {isExpanded && <InlineExpansion app={app} />}
               </div>
             );
           })}
         </div>
+        {loadMoreRef && <div ref={loadMoreRef} style={{ height: 1 }} />}
       </div>
 
       {sorted.length === 0 && (

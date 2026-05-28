@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "convex/react";
+import { usePaginatedQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 import { Card, Badge, EmptyState, Icon, Skeleton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
@@ -11,6 +13,17 @@ type StatusFilter = "all" | "active" | "draft" | "paused" | "filled" | "closed";
 
 interface Props {
   schoolId: string;
+  loadMoreRef?: (node: HTMLElement | null) => void;
+  // Controlled filter/sort (optional — falls back to internal state if not provided)
+  filter?: StatusFilter;
+  onFilterChange?: (f: StatusFilter) => void;
+  sort?: "newest" | "title";
+  // Selection props
+  selected?: (id: string) => boolean;
+  onToggleRow?: (id: string, shiftKey: boolean) => void;
+  onToggleAll?: (ids: string[]) => void;
+  // Callback so parent can sync loaded IDs
+  onResultsChange?: (results: Job[]) => void;
 }
 
 interface Job {
@@ -36,16 +49,47 @@ function formatDate(ts: number): string {
   return new Date(ts).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" });
 }
 
-export function JobsList({ schoolId }: Props) {
-  const jobs = useQuery(api.jobs.listBySchool, { schoolId: schoolId as any }) as Job[] | undefined;
+export function JobsList({
+  schoolId,
+  loadMoreRef,
+  filter: externalFilter,
+  onFilterChange,
+  sort,
+  selected,
+  onToggleRow,
+  onToggleAll,
+  onResultsChange,
+}: Props) {
+  const [internalFilter, setInternalFilter] = useState<StatusFilter>("all");
+  const filter = externalFilter ?? internalFilter;
+  const setFilter = onFilterChange ?? setInternalFilter;
+
+  const { results, status, loadMore } = usePaginatedQuery(
+    api.jobs.listBySchool,
+    {
+      schoolId: schoolId as any,
+      filter: filter !== "all" ? { status: filter as any } : undefined,
+      sort: sort,
+    },
+    { initialNumItems: 100 },
+  );
+
+  const sentinelRef = useInfiniteScroll({ status, loadMore, loadCount: 100 });
+
   const pipelineStats = useQuery(
     api.jobs.hiredCountsForSchool,
     { schoolId: schoolId as any },
   ) as Record<string, number> | undefined;
-  const [filter, setFilter] = useState<StatusFilter>("all");
 
+  const jobs = results as Job[];
+
+  // Notify parent of results changes
+  useEffect(() => {
+    onResultsChange?.(jobs);
+  }, [jobs]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Count by status across currently loaded results (for chip badges)
   const counts = useMemo(() => {
-    if (!jobs) return { all: 0, active: 0, draft: 0, paused: 0, filled: 0, closed: 0 };
     return {
       all: jobs.length,
       active: jobs.filter((j) => j.status === "active").length,
@@ -56,13 +100,12 @@ export function JobsList({ schoolId }: Props) {
     };
   }, [jobs]);
 
-  const filtered = useMemo(() => {
-    if (!jobs) return [];
-    if (filter === "all") return jobs;
-    return jobs.filter((j) => j.status === filter);
-  }, [jobs, filter]);
+  const selectionEnabled = !!(selected || onToggleRow || onToggleAll);
+  const allIds = jobs.map((j) => j._id);
+  const allSelected = selectionEnabled && allIds.length > 0 && allIds.every((id) => selected?.(id) ?? false);
+  const someSelected = selectionEnabled && allIds.some((id) => selected?.(id) ?? false);
 
-  if (!jobs) {
+  if (status === "LoadingFirstPage") {
     return (
       <div className="space-y-3">
         {[1, 2, 3].map((i) => <Skeleton key={i} className="h-16 w-full" />)}
@@ -70,7 +113,7 @@ export function JobsList({ schoolId }: Props) {
     );
   }
 
-  if (jobs.length === 0) {
+  if (jobs.length === 0 && filter === "all") {
     return (
       <Card padding="lg" elevation={1}>
         <EmptyState
@@ -95,37 +138,91 @@ export function JobsList({ schoolId }: Props) {
         <FilterChip label="Closed"  count={counts.closed}  active={filter === "closed"}  onClick={() => setFilter("closed")} />
       </div>
 
-      <Card padding="none" elevation={1}>
-        <div className="grid grid-cols-[1.4fr_0.8fr_140px_100px_24px] gap-4 px-5 py-3 border-b border-hairline">
-          <div className="text-micro text-ink-secondary">Role</div>
-          <div className="text-micro text-ink-secondary">Posted</div>
-          <div className="text-micro text-ink-secondary">Hires / Positions</div>
-          <div className="text-micro text-ink-secondary">Status</div>
-          <div />
-        </div>
-        {filtered.map((job) => {
-          const positions = job.positions ?? 1;
-          const hired = pipelineStats?.[job._id] ?? 0;
-          return (
-            <Link key={job._id} href={`/dashboard/jobs/${job._id}`}>
-              <div className="grid grid-cols-[1.4fr_0.8fr_140px_100px_24px] gap-4 items-center px-5 py-4 border-b border-hairline last:border-b-0 hover:bg-accent-soft transition-colors duration-fast">
-                <div className="min-w-0">
-                  <div className="text-body-s font-semibold text-ink truncate">{job.title}</div>
-                  <div className="text-caption text-ink-secondary truncate">
-                    {[job.subject, job.level, job.board].filter(Boolean).join(" · ")}
-                  </div>
-                </div>
-                <div className="text-caption text-ink-secondary">{formatDate(job._creationTime)}</div>
-                <div className="text-body-s text-ink tabular-nums">
-                  {hired} / {positions}
-                </div>
-                <div>{jobBadge(job.status)}</div>
-                <Icon name="ChevronRight" size={14} color="var(--ink-3)" />
+      {jobs.length === 0 ? (
+        <Card padding="lg" elevation={1}>
+          <EmptyState
+            title="No jobs found"
+            description="No jobs match the selected filter."
+          />
+        </Card>
+      ) : (
+        <Card padding="none" elevation={1}>
+          <div className={cn(
+            "gap-4 px-5 py-3 border-b border-hairline",
+            selectionEnabled
+              ? "grid grid-cols-[32px_1.4fr_0.8fr_140px_100px_24px]"
+              : "grid grid-cols-[1.4fr_0.8fr_140px_100px_24px]",
+          )}>
+            {selectionEnabled && (
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = !allSelected && someSelected;
+                  }}
+                  onChange={() => onToggleAll?.(allIds)}
+                  className="w-4 h-4 rounded border-hairline text-accent cursor-pointer"
+                  aria-label="Select all jobs"
+                />
               </div>
-            </Link>
-          );
-        })}
-      </Card>
+            )}
+            <div className="text-micro text-ink-secondary">Role</div>
+            <div className="text-micro text-ink-secondary">Posted</div>
+            <div className="text-micro text-ink-secondary">Hires / Positions</div>
+            <div className="text-micro text-ink-secondary">Status</div>
+            <div />
+          </div>
+          {jobs.map((job) => {
+            const positions = job.positions ?? 1;
+            const hired = pipelineStats?.[job._id] ?? 0;
+            const isSelected = selected?.(job._id) ?? false;
+            return (
+              <div
+                key={job._id}
+                className={cn(
+                  "border-b border-hairline last:border-b-0 transition-colors duration-fast",
+                  isSelected ? "bg-accent-soft ring-2 ring-inset ring-accent/30" : "hover:bg-accent-soft",
+                )}
+              >
+                <div className={cn(
+                  "gap-4 items-center px-5 py-4",
+                  selectionEnabled
+                    ? "grid grid-cols-[32px_1.4fr_0.8fr_140px_100px_24px]"
+                    : "grid grid-cols-[1.4fr_0.8fr_140px_100px_24px]",
+                )}>
+                  {selectionEnabled && (
+                    <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={(e) => onToggleRow?.(job._id, (e.nativeEvent as MouseEvent).shiftKey)}
+                        className="w-4 h-4 rounded border-hairline text-accent cursor-pointer"
+                        aria-label={`Select job ${job.title}`}
+                      />
+                    </div>
+                  )}
+                  <Link href={`/dashboard/jobs/${job._id}`} className="contents">
+                    <div className="min-w-0">
+                      <div className="text-body-s font-semibold text-ink truncate">{job.title}</div>
+                      <div className="text-caption text-ink-secondary truncate">
+                        {[job.subject, job.level, job.board].filter(Boolean).join(" · ")}
+                      </div>
+                    </div>
+                    <div className="text-caption text-ink-secondary">{formatDate(job._creationTime)}</div>
+                    <div className="text-body-s text-ink tabular-nums">
+                      {hired} / {positions}
+                    </div>
+                    <div>{jobBadge(job.status)}</div>
+                    <Icon name="ChevronRight" size={14} color="var(--ink-3)" />
+                  </Link>
+                </div>
+              </div>
+            );
+          })}
+          <div ref={loadMoreRef ?? sentinelRef} style={{ height: 1 }} />
+        </Card>
+      )}
     </div>
   );
 }

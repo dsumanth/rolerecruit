@@ -187,9 +187,12 @@ export default defineSchema({
       leadership: v.array(v.float64()),
     })),
     roleEmbeddingVersion: v.optional(v.string()),
+    pendingDeleteAt: v.optional(v.number()),
+    pendingDeleteBatchId: v.optional(v.string()),
   })
     .index("by_schoolId", ["schoolId"])
-    .index("by_status", ["status"]),
+    .index("by_status", ["status"])
+    .index("by_schoolId_title", ["schoolId", "title"]),
 
   candidates: defineTable({
     // existing fields
@@ -287,6 +290,8 @@ export default defineSchema({
       v.literal("failed"),
     )),
     parseError: v.optional(v.string()),
+    pendingDeleteAt: v.optional(v.number()),
+    pendingDeleteBatchId: v.optional(v.string()),
   })
     .index("by_origin", ["origin"])
     .index("by_parsedVersion", ["parsedVersion"])
@@ -352,6 +357,8 @@ export default defineSchema({
     )),
     triageDecisionId: v.optional(v.id("triageDecisions")),
     matchReasons: v.optional(v.array(v.string())),
+    pendingDeleteAt: v.optional(v.number()),
+    pendingDeleteBatchId: v.optional(v.string()),
   })
     .index("by_jobPostingId", ["jobPostingId"])
     .index("by_candidateId", ["candidateId"])
@@ -359,7 +366,9 @@ export default defineSchema({
     .index("by_stage", ["stage"])
     .index("by_trackingToken", ["trackingToken"])
     .index("by_schoolId_triageOutcome", ["schoolId", "triageOutcome"])
-    .index("by_source", ["source"]),
+    .index("by_source", ["source"])
+    .index("by_schoolId_aiMatchScore", ["schoolId", "aiMatchScore"])
+    .index("by_jobPostingId_aiMatchScore", ["jobPostingId", "aiMatchScore"]),
 
   evaluations: defineTable({
     applicationId: v.id("applications"),
@@ -469,7 +478,8 @@ export default defineSchema({
     schoolId: v.id("schools"),
     expiresAt: v.number(),
     used: v.boolean(),
-  }).index("by_token", ["token"]),
+  }).index("by_token", ["token"])
+    .index("by_applicationId", ["applicationId"]),
 
   calendarEvents: defineTable({
     applicationId: v.id("applications"),

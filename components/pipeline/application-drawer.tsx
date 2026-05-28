@@ -12,6 +12,10 @@ import { MessageComposer } from "@/components/outreach/message-composer";
 import { DemoScheduler } from "@/components/outreach/demo-scheduler";
 import { PoolOriginBadge } from "@/components/shared/pool-origin-badge";
 import { EvidencePopover } from "@/components/shared/evidence-popover";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { UndoToast } from "@/components/ui/undo-toast";
+import { useUndoToast } from "@/hooks/use-undo-toast";
+import { PreviousOutcomesSection } from "@/components/pipeline/previous-outcomes-section";
 
 interface TabItem {
   value: string;
@@ -144,6 +148,11 @@ export function ApplicationDrawer({ app: incomingApp, schoolName, onClose }: Pro
     app.candidateId ? { candidateId: app.candidateId as any } : "skip",
   );
 
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const removeCandidate = useMutation(api.candidates.remove);
+  const undo = useMutation(api.candidates.undoBatchDelete);
+  const undoToast = useUndoToast();
+
   const candidateName = candidate?.name ?? "Candidate";
   const candidatePhone = candidate?.phone ?? "";
 
@@ -205,7 +214,49 @@ export function ApplicationDrawer({ app: incomingApp, schoolName, onClose }: Pro
           )}
 
           {tab === "evaluate" && <EvaluateTab applicationId={app._id} />}
+
+          {candidate?._id && app._id && (
+            <PreviousOutcomesSection
+              candidateId={candidate._id}
+              currentApplicationId={app._id}
+            />
+          )}
+
+          <div className="border-t border-hairline p-4 mt-4">
+            <button
+              onClick={() => setConfirmOpen(true)}
+              className="text-body-s text-red-600 hover:text-red-700 font-medium"
+            >
+              Delete candidate
+            </button>
+          </div>
         </div>
+      </div>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title={`Delete ${candidate?.name ?? "candidate"}?`}
+        body="This removes their resume, every application across roles, and all evaluations. You can undo within 10 seconds."
+        confirmLabel="Delete"
+        onConfirm={async () => {
+          if (!candidate?._id) return;
+          setConfirmOpen(false);
+          const r = await removeCandidate({ candidateId: candidate._id as any });
+          if (typeof onClose === "function") onClose();
+          if (r.batchId) {
+            undoToast.show({
+              label: `Deleted ${candidate.name ?? "candidate"}`,
+              onUndo: async () => { await undo({ batchId: r.batchId }); },
+            });
+          }
+        }}
+        onCancel={() => setConfirmOpen(false)}
+      />
+
+      <div className="fixed top-6 right-6 z-50 space-y-2">
+        {undoToast.toasts.map((t) => (
+          <UndoToast key={t.id} label={t.label} onUndo={() => undoToast.undo(t.id)} onDismiss={() => undoToast.dismiss(t.id)} />
+        ))}
       </div>
     </>
   );

@@ -1,11 +1,19 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { useQuery } from "convex/react";
+import { useEffect, useState } from "react";
+import { useQuery, useMutation } from "convex/react";
+import { usePaginatedQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { authClient } from "@/lib/auth-client";
+import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
+import { useTableSelection } from "@/hooks/use-table-selection";
+import { useUndoToast } from "@/hooks/use-undo-toast";
 import { Button, Card, PageHeader } from "@/components/ui";
 import { EmptyState } from "@/components/ui/empty-state";
+import { BulkActionBar } from "@/components/ui/bulk-action-bar";
+import { SelectAllMatchingBanner } from "@/components/ui/select-all-matching-banner";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { UndoToast } from "@/components/ui/undo-toast";
 import { TalentControls } from "@/components/talent/talent-controls";
 import { PoolSelector } from "@/components/talent/pool-selector";
 import { GlobalCriteriaPanel } from "@/components/talent/global-criteria-panel";
@@ -14,6 +22,7 @@ import { ApplicationTable } from "@/components/pipeline/application-table";
 import { ApplicationDrawer } from "@/components/pipeline/application-drawer";
 import type { Application } from "@/components/pipeline/application-table";
 import { NlSearchBar } from "@/components/talent/nl-search-bar";
+import { rowsToCsv, downloadCsv } from "@/lib/csv-export";
 
 export default function TalentBankPage() {
   const { data: session } = authClient.useSession();
@@ -21,88 +30,75 @@ export default function TalentBankPage() {
   const profile = useQuery(api.users.getByClerkId, user?.id ? { userId: user.id } : "skip");
   const schoolId = profile?.schoolId;
 
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchText, setSearchText] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedPoolId, setSelectedPoolId] = useState<string | "all">("all");
   const [selectedStages, setSelectedStages] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<"newest" | "score" | "name">("newest");
   const [showPoolManager, setShowPoolManager] = useState(false);
   const [showCriteriaPanel, setShowCriteriaPanel] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [nlResults, setNlResults] = useState<any[] | null>(null);
   const [nlIntent, setNlIntent] = useState("");
   const [selectedApp, setSelectedApp] = useState<any>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  // Bulk selection
+  const sel = useTableSelection<string, { schoolId: any; filter: any }>();
+  const undoToast = useUndoToast();
+  const removeMany = useMutation(api.candidates.removeMany);
+  const undoRemove = useMutation(api.candidates.undoBatchDelete);
 
   const handleSearchChange = (query: string) => {
-    setSearchQuery(query);
+    setSearchText(query);
     const timer = setTimeout(() => setDebouncedSearch(query), 300);
     return () => clearTimeout(timer);
   };
 
   const pools = useQuery(api.pools.listForSchool, schoolId ? { schoolId } : "skip") ?? [];
 
-  const candidates = useQuery(
+  const { results, status, loadMore } = usePaginatedQuery(
     api.candidates.listForSchool,
-    schoolId
+    schoolId ? {
+      schoolId,
+      filter: {
+        poolId: selectedPoolId === "all" ? undefined : (selectedPoolId as any),
+        stages: selectedStages.length > 0 ? selectedStages : undefined,
+        search: debouncedSearch || undefined,
+      },
+      sort: sortBy,
+    } : "skip",
+    { initialNumItems: 100 },
+  );
+
+  const sentinelRef = useInfiniteScroll({ status, loadMore, loadCount: 100 });
+
+  const totalCountQuery = useQuery(
+    api.candidates.countForSchool,
+    profile?.schoolId
       ? {
-          schoolId,
-          poolId: selectedPoolId === "all" ? undefined : selectedPoolId,
-        } as any
-      : "skip"
-  ) ?? [];
-
-  const searchFiltered = useMemo(() => {
-    if (!debouncedSearch.trim()) return candidates;
-    const q = debouncedSearch.toLowerCase();
-    return candidates.filter(
-      (c: any) =>
-        c.name?.toLowerCase().includes(q) ||
-        c.email?.toLowerCase().includes(q) ||
-        c.location?.toLowerCase().includes(q) ||
-        c.subjects?.some((s: string) => s.toLowerCase().includes(q))
-    );
-  }, [candidates, debouncedSearch]);
-
-  const stageFiltered = useMemo(() => {
-    if (selectedStages.length === 0) return searchFiltered;
-    return searchFiltered.filter((c: any) => selectedStages.includes(c.stage));
-  }, [searchFiltered, selectedStages]);
-
-  const sorted = useMemo(() => {
-    const apps = [...stageFiltered];
-    switch (sortBy) {
-      case "score":
-        return apps.sort((a: any, b: any) => (b.globalScore ?? 0) - (a.globalScore ?? 0));
-      case "name":
-        return apps.sort((a: any, b: any) =>
-          (a.name ?? "").localeCompare(b.name ?? "")
-        );
-      case "newest":
-      default:
-        return apps;
-    }
-  }, [stageFiltered, sortBy]);
-
-  const stageCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const c of searchFiltered) {
-      counts[c.stage] = (counts[c.stage] ?? 0) + 1;
-    }
-    return counts;
-  }, [searchFiltered]);
-
-  const poolCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const c of candidates) {
-      if (c.poolIds) {
-        for (const pid of c.poolIds) {
-          counts[pid] = (counts[pid] ?? 0) + 1;
+          schoolId: profile.schoolId,
+          filter: {
+            poolId: selectedPoolId === "all" ? undefined : (selectedPoolId as any),
+            stages: selectedStages.length > 0 ? selectedStages : undefined,
+            search: debouncedSearch || undefined,
+          },
         }
-      }
-    }
-    return counts;
-  }, [candidates]);
+      : "skip",
+  );
 
+  // Keep loadedIds in sync with rendered results
+  useEffect(() => {
+    sel.setLoadedIds(results.map((r: any) => r.applicationId));
+  }, [results]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Clear selection on filter/sort change
+  useEffect(() => {
+    sel.clear();
+  }, [selectedPoolId, selectedStages, searchText, sortBy]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const poolCounts: Record<string, number> = {};
+  // Pool counts are not available in the enriched shape; show 0 for now
   const poolsWithCounts = pools.map((p: any) => ({
     _id: p._id,
     name: p.name,
@@ -111,58 +107,69 @@ export default function TalentBankPage() {
     candidateCount: poolCounts[p._id] ?? 0,
   }));
 
-  const tableApplications: Application[] = sorted.map((c: any) => ({
-    _id: c.applicationId ?? c._id,
-    candidateId: c._id,
-    stage: c.stage,
-    aiMatchScore: c.aiMatchScore,
-    globalScore: c.globalScore,
-    poolNames: c.poolNames,
+  const stageCounts: Record<string, number> = {};
+  for (const row of results) {
+    const s = (row as any).stage;
+    if (s) stageCounts[s] = (stageCounts[s] ?? 0) + 1;
+  }
+
+  // Map enriched rows to Application shape for ApplicationTable
+  const tableApplications: Application[] = results.map((row: any) => ({
+    _id: row.applicationId,
+    candidateId: row.candidateId,
+    stage: row.stage,
+    aiMatchScore: row.aiMatchScore,
+    globalScore: undefined,
+    poolNames: undefined,
     candidate: {
-      _id: c._id,
-      name: c.name,
-      phone: c.phone,
-      email: c.email,
-      location: c.location,
-      qualifications: c.qualifications,
-      certifications: c.certifications,
-      boardExperience: c.boardExperience,
-      subjects: c.subjects,
-      yearsExperience: c.yearsExperience,
-      currentSchool: c.currentSchool,
-      resumeUrl: c.resumeUrl,
+      _id: row.candidateId,
+      name: row.name,
+      phone: row.phone,
+      email: row.email,
+      location: row.location,
+      qualifications: [],
+      certifications: [],
+      boardExperience: [],
+      subjects: row.subjects ?? [],
+      yearsExperience: row.yearsExperience,
+      currentSchool: undefined,
+      resumeUrl: undefined,
     },
   }));
 
   const nlTableApplications: Application[] | null = nlResults
-    ? nlResults.map((c: any) => ({
-        _id: c.applicationId ?? c._id,
-        candidateId: c._id,
-        stage: c.stage,
-        aiMatchScore: c.aiMatchScore,
-        globalScore: c.globalScore,
-        poolNames: c.poolNames,
+    ? nlResults.map((row: any) => ({
+        _id: row.applicationId ?? row._id,
+        candidateId: row.candidateId ?? row._id,
+        stage: row.stage,
+        aiMatchScore: row.aiMatchScore,
+        globalScore: undefined,
+        poolNames: undefined,
         candidate: {
-          _id: c._id,
-          name: c.name,
-          phone: c.phone,
-          email: c.email,
-          location: c.location,
-          qualifications: c.qualifications,
-          certifications: c.certifications,
-          boardExperience: c.boardExperience,
-          subjects: c.subjects,
-          yearsExperience: c.yearsExperience,
-          currentSchool: c.currentSchool,
-          resumeUrl: c.resumeUrl,
+          _id: row.candidateId ?? row._id,
+          name: row.name,
+          phone: row.phone,
+          email: row.email,
+          location: row.location,
+          qualifications: [],
+          certifications: [],
+          boardExperience: [],
+          subjects: row.subjects ?? [],
+          yearsExperience: row.yearsExperience,
+          currentSchool: undefined,
+          resumeUrl: undefined,
         },
       }))
     : null;
 
   const displayApplications = nlTableApplications ?? tableApplications;
 
-  const isLoading = candidates === undefined;
-  const total = candidates.length;
+  const isLoading = status === "LoadingFirstPage";
+  const total = results.length;
+
+  const totalCount = totalCountQuery?.total ?? 0;
+  const countN = sel.count.kind === "all-matching" ? totalCount : sel.count.n;
+  const hasSelection = sel.count.kind === "ids" ? sel.count.n > 0 : true;
 
   return (
     <div className="p-6">
@@ -227,7 +234,7 @@ export default function TalentBankPage() {
       )}
 
       <TalentControls
-        searchQuery={searchQuery}
+        searchQuery={searchText}
         onSearchChange={handleSearchChange}
         selectedPoolId={selectedPoolId}
         onPoolChange={setSelectedPoolId}
@@ -241,8 +248,8 @@ export default function TalentBankPage() {
         stageCounts={stageCounts}
         sortBy={sortBy}
         onSortChange={setSortBy}
-        totalCount={candidates.length}
-        filteredCount={stageFiltered.length}
+        totalCount={total}
+        filteredCount={total}
       />
 
       {isLoading ? (
@@ -261,7 +268,7 @@ export default function TalentBankPage() {
             description={
               nlResults
                 ? "No candidates matched your search. Try different keywords."
-                : searchQuery || selectedPoolId !== "all" || selectedStages.length > 0
+                : searchText || selectedPoolId !== "all" || selectedStages.length > 0
                   ? "Try adjusting your search or filters."
                   : "Candidates will appear here when you source them from jobs, email ingestion, or the careers portal."
             }
@@ -276,6 +283,10 @@ export default function TalentBankPage() {
             showScoreAs="global"
             showPoolBadges={true}
             onRowClick={setSelectedApp}
+            loadMoreRef={sentinelRef}
+            selected={(id) => sel.isSelected(id as any)}
+            onToggleRow={(id, shift) => sel.toggle(id as any, shift)}
+            onToggleAll={(ids) => sel.toggleAllLoaded(ids as any)}
           />
         </Card>
       )}
@@ -286,6 +297,117 @@ export default function TalentBankPage() {
           onClose={() => setSelectedApp(null)}
         />
       )}
+
+      {/* Bulk action bar */}
+      {hasSelection && (
+        <BulkActionBar
+          count={countN}
+          countLabel="candidates"
+          onClear={() => sel.clear()}
+          banner={
+            sel.mode.kind === "ids" &&
+            sel.count.n === results.length &&
+            results.length > 0 &&
+            totalCount > results.length ? (
+              <SelectAllMatchingBanner
+                loadedCount={results.length}
+                totalCount={totalCount}
+                entityLabel="candidates"
+                onSelectAllMatching={() =>
+                  sel.selectAllMatching({
+                    schoolId: profile!.schoolId,
+                    filter: {
+                      poolId: selectedPoolId === "all" ? undefined : (selectedPoolId as any),
+                      stages: selectedStages.length > 0 ? selectedStages : undefined,
+                      search: debouncedSearch || undefined,
+                    },
+                  })
+                }
+              />
+            ) : undefined
+          }
+        >
+          <button
+            className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded text-body-s"
+            onClick={() => setConfirmDelete(true)}
+          >
+            Delete
+          </button>
+          {sel.mode.kind === "ids" && (
+            <button
+              className="bg-surface text-ink px-3 py-1.5 rounded text-body-s border border-hairline"
+              onClick={() => {
+                const selectedRows = sel.mode.kind === "ids"
+                  ? results.filter((r: any) => sel.isSelected(r.applicationId))
+                  : [];
+                if (selectedRows.length === 0) return;
+                const csv = rowsToCsv(selectedRows, [
+                  { key: "name", label: "Name" },
+                  { key: "email", label: "Email" },
+                  { key: "phone", label: "Phone" },
+                  { key: "yearsExperience", label: "Years Experience" },
+                  { key: "subjects", label: "Subjects" },
+                  { key: "createdAt", label: "Created At" },
+                ]);
+                const today = new Date().toISOString().slice(0, 10);
+                downloadCsv(`talent-${today}.csv`, csv);
+              }}
+            >
+              Export CSV
+            </button>
+          )}
+        </BulkActionBar>
+      )}
+
+      {/* Confirm delete dialog */}
+      <ConfirmDialog
+        open={confirmDelete}
+        title={`Delete ${countN} ${countN === 1 ? "candidate" : "candidates"}?`}
+        body="This removes their resumes, every application across roles, and all evaluations. You can undo within 10 seconds."
+        confirmLabel="Delete"
+        onConfirm={async () => {
+          setConfirmDelete(false);
+          const args: any =
+            sel.mode.kind === "ids"
+              ? {
+                  ids: results
+                    .filter((r: any) => sel.isSelected(r.applicationId))
+                    .map((r: any) => r.candidateId),
+                }
+              : {
+                  matchAll: {
+                    schoolId: profile!.schoolId,
+                    filter: {
+                      poolId: selectedPoolId === "all" ? undefined : (selectedPoolId as any),
+                      stages: selectedStages.length > 0 ? selectedStages : undefined,
+                      search: debouncedSearch || undefined,
+                    },
+                  },
+                };
+          const r = await removeMany(args);
+          sel.clear();
+          if (r.batchId) {
+            const batchId = r.batchId;
+            undoToast.show({
+              label: `Deleted ${r.count} ${r.count === 1 ? "candidate" : "candidates"}`,
+              onUndo: async () => { await undoRemove({ batchId }); },
+            });
+          }
+        }}
+        onCancel={() => setConfirmDelete(false)}
+      />
+
+      {/* Undo toasts */}
+      <div className="fixed top-6 right-6 z-50 space-y-2">
+        {undoToast.toasts.map((t) => (
+          <UndoToast
+            key={t.id}
+            label={t.label}
+            onUndo={() => undoToast.undo(t.id)}
+            onDismiss={() => undoToast.dismiss(t.id)}
+          />
+        ))}
+      </div>
     </div>
   );
 }

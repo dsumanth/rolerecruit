@@ -66,9 +66,9 @@ describe("jobs", () => {
       naturalLanguageDescription: "Math teacher needed",
     });
 
-    const jobs_ = await t.query("jobs:listBySchool", { schoolId });
-    expect(jobs_).toHaveLength(1);
-    expect(jobs_[0].title).toBe("Math TGT");
+    const r = await t.query("jobs:listBySchool", { schoolId, paginationOpts: { cursor: null, numItems: 10 } });
+    expect(r.page).toHaveLength(1);
+    expect(r.page[0].title).toBe("Math TGT");
   });
 
   it("publishes a job", async () => {
@@ -151,12 +151,13 @@ describe("jobs", () => {
 
     await t.mutation("jobs:publish", { jobId: jobId1 });
 
-    const activeJobs = await t.query("jobs:listBySchool", {
+    const activeResult = await t.query("jobs:listBySchool", {
       schoolId,
-      status: "active",
+      paginationOpts: { cursor: null, numItems: 10 },
+      filter: { status: "active" },
     });
-    expect(activeJobs).toHaveLength(1);
-    expect(activeJobs[0].title).toBe("Active Job");
+    expect(activeResult.page).toHaveLength(1);
+    expect(activeResult.page[0].title).toBe("Active Job");
   });
 
   it("deletes a draft", async () => {

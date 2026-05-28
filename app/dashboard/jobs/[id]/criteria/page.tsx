@@ -6,8 +6,8 @@ import { useParams } from "next/navigation";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { PageHeader, Badge, Card } from "@/components/ui";
-import { AISuggestedCriteria } from "@/components/criteria/AISuggestedCriteria";
 import { ScoringRuleEditor } from "@/components/criteria/ScoringRuleEditor";
+import { CriteriaNaturalLanguageEditor } from "@/components/criteria/CriteriaNaturalLanguageEditor";
 
 function jobBadge(status: string) {
   if (status === "active") return <Badge dot variant="success">Active</Badge>;
@@ -21,6 +21,7 @@ export default function CriteriaPage() {
   const { id } = useParams<{ id: string }>();
   const job = useQuery(api.jobs.get, { jobId: id as any });
   const saveRules = useMutation(api.jobs.saveScoringRules as any);
+  const saveCriteriaText = useMutation(api.jobs.saveCriteriaText);
   const suggestCriteria = useAction(api.scoring.suggestCriteria);
   const [saving, setSaving] = useState(false);
   const [suggested, setSuggested] = useState<any>(null);
@@ -31,17 +32,6 @@ export default function CriteriaPage() {
     try {
       const result = await suggestCriteria({ jobId: id as any });
       if (result) setSuggested(result);
-    } catch {
-      setSuggested({
-        dimensions: [
-          { name: "qualifications", weight: 0.4, config: { required: job?.qualifications ?? [], preferred: [] } },
-          { name: "experience", weight: 0.3, config: { minYears: job?.minExperience ?? 0, idealYears: (job?.minExperience ?? 0) + 5 } },
-          { name: "subjectMatch", weight: 0.2, config: { subjects: [job?.subject ?? ""] } },
-          { name: "certifications", weight: 0.1, config: { required: [] } },
-        ],
-        minimumScore: 60,
-        autoRejectScore: 30,
-      });
     } finally {
       setLoadingSuggestions(false);
     }
@@ -52,42 +42,48 @@ export default function CriteriaPage() {
     try {
       await saveRules({
         jobId: id as any,
-        scoringRules: {
-          dimensions,
-          minimumScore,
-          autoRejectScore,
-          generatedBy: "manual",
-          version: 1,
-        },
+        scoringRules: { dimensions, minimumScore, autoRejectScore, generatedBy: "manual", version: 1 },
       });
     } finally {
       setSaving(false);
     }
   };
 
+  if (!job) return null;
+
   return (
     <div>
       <PageHeader
         back={{ href: "/dashboard/jobs", label: "Jobs" }}
-        title={job?.title ?? "Scoring criteria"}
-        subtitle={job ? [job.subject, job.level, job.board].filter(Boolean).join(" · ") : undefined}
-        status={job ? jobBadge(job.status) : undefined}
+        title={job.title ?? "Scoring criteria"}
+        subtitle={[job.subject, job.level, job.board].filter(Boolean).join(" · ")}
+        status={jobBadge(job.status)}
+        actions={
+          <button
+            onClick={handleGenerateSuggestions}
+            disabled={loadingSuggestions}
+            className="bg-accent text-white px-4 py-2 rounded text-body-s disabled:opacity-50"
+          >
+            {loadingSuggestions ? "Generating…" : "Generate with AI"}
+          </button>
+        }
       />
 
       <JobTabs jobId={id} active="criteria" />
 
       <div className="mt-7 space-y-5">
-        <AISuggestedCriteria
-          suggested={suggested}
-          loading={loadingSuggestions}
-          onAccept={() => setLoadingSuggestions(false)}
-          onGenerate={handleGenerateSuggestions}
-        />
+        <Card padding="md" elevation={1}>
+          <h3 className="text-body-s font-semibold text-ink mb-3">Criteria (natural language)</h3>
+          <CriteriaNaturalLanguageEditor
+            initialValue={(job as any).criteria ?? ""}
+            onSave={(text) => { saveCriteriaText({ jobId: id as any, text }); }}
+          />
+        </Card>
 
         <Card padding="md" elevation={1}>
-          <h3 className="text-body-s font-semibold text-ink mb-4">Current rules</h3>
+          <h3 className="text-body-s font-semibold text-ink mb-4">Scoring rules</h3>
           <ScoringRuleEditor
-            initialDimensions={suggested?.dimensions ?? []}
+            initialDimensions={suggested?.dimensions ?? (job as any).scoringRules?.dimensions ?? []}
             onSave={handleSave}
             saving={saving}
           />

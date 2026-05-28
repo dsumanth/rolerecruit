@@ -100,6 +100,11 @@
   }
 }
 
+@keyframes shrink-x {
+  from { width: 100%; }
+  to   { width: 0%; }
+}
+
 @layer utilities {
   /* Typography scale (also exposed as Tailwind utilities via config) */
   .text-display-xl { font-size: 56px; line-height: 60px; letter-spacing: -0.04em; font-weight: 700; }

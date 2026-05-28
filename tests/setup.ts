@@ -18,6 +18,20 @@ if (typeof window !== "undefined" && typeof window.localStorage === "undefined")
   });
 }
 
+// jsdom does not implement IntersectionObserver (used by useInfiniteScroll). Provide a no-op stub.
+if (typeof window !== "undefined" && typeof window.IntersectionObserver === "undefined") {
+  class IntersectionObserverStub {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+  Object.defineProperty(window, "IntersectionObserver", {
+    writable: true,
+    configurable: true,
+    value: IntersectionObserverStub,
+  });
+}
+
 // jsdom does not implement window.matchMedia. Provide a no-op stub so components
 // that call it during initialisation don't throw.
 if (typeof window !== "undefined" && typeof window.matchMedia === "undefined") {

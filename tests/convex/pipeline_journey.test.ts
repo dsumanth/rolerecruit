@@ -255,15 +255,16 @@ describe("Candidate Full Pipeline User Journey", () => {
     ).rejects.toThrow();
 
     // === 23. Verify pipeline view shows candidate in hired ===
-    const pipeline = await t.query("applications:getPipelineForJob", { jobId });
-    expect(pipeline.sourced).toHaveLength(0);
-    expect(pipeline.screened).toHaveLength(0);
-    expect(pipeline.demo_scheduled).toHaveLength(0);
-    expect(pipeline.demo_completed).toHaveLength(0);
-    expect(pipeline.offer_sent).toHaveLength(0);
-    expect(pipeline.hired).toHaveLength(1);
-    expect(pipeline.hired[0].candidate.name).toBe("Priya Sharma");
-    expect(pipeline.hired[0].aiMatchScore).toBe(88);
+    const r = await t.query("applications:getPipelineForJob", { jobId, paginationOpts: { cursor: null, numItems: 100 } });
+    const byStage = (stage: string) => r.page.filter((a: any) => a.stage === stage);
+    expect(byStage("sourced")).toHaveLength(0);
+    expect(byStage("screened")).toHaveLength(0);
+    expect(byStage("demo_scheduled")).toHaveLength(0);
+    expect(byStage("demo_completed")).toHaveLength(0);
+    expect(byStage("offer_sent")).toHaveLength(0);
+    expect(byStage("hired")).toHaveLength(1);
+    expect(byStage("hired")[0].name).toBe("Priya Sharma");
+    expect(byStage("hired")[0].aiMatchScore).toBe(88);
 
     // === 24. Message history has both auto + manual messages ===
     const finalHistory = await t.query("outreach:getMessageHistory", { applicationId: appId });
@@ -565,10 +566,10 @@ describe("Candidate Full Pipeline User Journey", () => {
       naturalLanguageDescription: "desc",
     });
 
-    const pipeline = await t.query("applications:getPipelineForJob", { jobId });
-    expect(pipeline.sourced).toEqual([]);
-    expect(pipeline.screened).toEqual([]);
-    expect(pipeline.hired).toEqual([]);
+    const r = await t.query("applications:getPipelineForJob", { jobId, paginationOpts: { cursor: null, numItems: 100 } });
+    expect(r.page.filter((a: any) => a.stage === "sourced")).toEqual([]);
+    expect(r.page.filter((a: any) => a.stage === "screened")).toEqual([]);
+    expect(r.page.filter((a: any) => a.stage === "hired")).toEqual([]);
   });
 
   it("expired booking token returns invalid", async () => {

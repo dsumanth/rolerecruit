@@ -1,6 +1,11 @@
 import { mutation, query, internalMutation, action } from "./_generated/server";
 import { v } from "convex/values";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
+import { paginationOptsValidator } from "convex/server";
+
+function makeBatchId() {
+  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+}
 
 export const create = mutation({
   args: {
@@ -148,28 +153,36 @@ export const get = query({
 export const listBySchool = query({
   args: {
     schoolId: v.id("schools"),
-    status: v.optional(
-      v.union(
-        v.literal("draft"),
-        v.literal("active"),
-        v.literal("paused"),
-        v.literal("filled"),
-        v.literal("closed")
-      )
-    ),
+    paginationOpts: paginationOptsValidator,
+    filter: v.optional(v.object({
+      status: v.optional(v.union(
+        v.literal("draft"), v.literal("active"), v.literal("paused"),
+        v.literal("filled"), v.literal("closed"),
+      )),
+      search: v.optional(v.string()),
+    })),
+    sort: v.optional(v.union(v.literal("newest"), v.literal("title"))),
   },
   handler: async (ctx, args) => {
-    if (args.status) {
-      return await ctx.db
-        .query("jobPostings")
-        .withIndex("by_schoolId", (q) => q.eq("schoolId", args.schoolId))
-        .filter((q) => q.eq(q.field("status"), args.status))
-        .collect();
+    // Sort note:
+    // - "newest" uses by_schoolId + _creationTime desc (Convex default).
+    // - "title" uses by_schoolId_title (asc alphabetical).
+    const indexName = args.sort === "title" ? "by_schoolId_title" : "by_schoolId";
+    const builder = ctx.db.query("jobPostings").withIndex(indexName as any, (q: any) => q.eq("schoolId", args.schoolId));
+    const filtered = builder.filter((q) => {
+      let expr = q.eq(q.field("pendingDeleteAt"), undefined);
+      if (args.filter?.status) expr = q.and(expr, q.eq(q.field("status"), args.filter.status));
+      return expr;
+    });
+    const ordered = args.sort === "title" ? filtered.order("asc") : filtered.order("desc");
+    const result = await ordered.paginate(args.paginationOpts);
+
+    let page = result.page;
+    if (args.filter?.search) {
+      const s = args.filter.search.toLowerCase();
+      page = page.filter((j) => (j.title ?? "").toLowerCase().includes(s));
     }
-    return await ctx.db
-      .query("jobPostings")
-      .withIndex("by_schoolId", (q) => q.eq("schoolId", args.schoolId))
-      .collect();
+    return { page, isDone: result.isDone, continueCursor: result.continueCursor };
   },
 });
 
@@ -265,6 +278,13 @@ export const saveScoringRules = mutation({
   },
 });
 
+export const saveCriteriaText = mutation({
+  args: { jobId: v.id("jobPostings"), text: v.string() },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.jobId, { criteria: args.text });
+  },
+});
+
 export const setRoleEmbeddings = mutation({
   args: {
     jobId: v.id("jobPostings"),
@@ -306,6 +326,32 @@ export const hiredCountsForSchool = query({
   },
 });
 
+export const countBySchool = query({
+  args: {
+    schoolId: v.id("schools"),
+    filter: v.optional(v.object({
+      status: v.optional(v.union(
+        v.literal("draft"), v.literal("active"), v.literal("paused"),
+        v.literal("filled"), v.literal("closed"),
+      )),
+      search: v.optional(v.string()),
+    })),
+  },
+  handler: async (ctx, args) => {
+    let q = ctx.db.query("jobPostings")
+      .withIndex("by_schoolId", (q) => q.eq("schoolId", args.schoolId))
+      .filter((q) => q.eq(q.field("pendingDeleteAt"), undefined));
+    if (args.filter?.status) q = q.filter((qb) => qb.eq(qb.field("status"), args.filter!.status));
+    const rows = await q.collect();
+    let filtered = rows;
+    if (args.filter?.search) {
+      const s = args.filter.search.toLowerCase();
+      filtered = filtered.filter((j) => (j.title ?? "").toLowerCase().includes(s));
+    }
+    return { total: filtered.length };
+  },
+});
+
 export const listOpenForSchool = query({
   args: { schoolId: v.id("schools") },
   handler: async (ctx, args) => {
@@ -321,6 +367,118 @@ export const listAllActive = query({
   args: {},
   handler: async (ctx) => {
     return await ctx.db.query("jobPostings").filter((q) => q.eq(q.field("status"), "active")).collect();
+  },
+});
+
+const removeManyJobsArgs = v.union(
+  v.object({ ids: v.array(v.id("jobPostings")) }),
+  v.object({ matchAll: v.object({ schoolId: v.id("schools"), filter: v.optional(v.any()) }) }),
+);
+
+export const removeMany = mutation({
+  args: removeManyJobsArgs,
+  handler: async (ctx, args) => {
+    const a = args as { ids?: string[]; matchAll?: { schoolId: any; filter?: any } };
+    let ids: any[] = [];
+    if (a.ids) {
+      ids = a.ids;
+    } else if (a.matchAll) {
+      const matchAll = a.matchAll;
+      if (matchAll.filter?.status && matchAll.filter.status !== "draft") {
+        throw new Error("Bulk delete only supports draft jobs");
+      }
+      const rows = await ctx.db.query("jobPostings")
+        .withIndex("by_schoolId", (q) => q.eq("schoolId", matchAll.schoolId))
+        .filter((q) => q.and(
+          q.eq(q.field("pendingDeleteAt"), undefined),
+          q.eq(q.field("status"), "draft"),
+        ))
+        .collect();
+      ids = rows.map((r) => r._id);
+    }
+
+    // Validate draft-only BEFORE marking anything.
+    for (const id of ids) {
+      const job = await ctx.db.get(id as any) as any;
+      if (!job) continue;
+      if (job.status !== "draft") {
+        throw new Error(`Job ${id} is not a draft; bulk delete denied`);
+      }
+    }
+
+    const batchId = makeBatchId();
+    let count = 0;
+    for (const id of ids) {
+      const job = await ctx.db.get(id as any) as any;
+      if (!job || job.pendingDeleteAt != null) continue;
+      await ctx.db.patch(id as any, { pendingDeleteAt: Date.now(), pendingDeleteBatchId: batchId });
+      count++;
+    }
+    await ctx.scheduler.runAfter(10_000, internal.jobs.finalizeBatchDelete, { batchId });
+    return { batchId, count };
+  },
+});
+
+export const undoBatchDelete = mutation({
+  args: { batchId: v.string() },
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("jobPostings")
+      .filter((q) => q.eq(q.field("pendingDeleteBatchId"), args.batchId))
+      .collect();
+    let restored = 0;
+    for (const r of rows) {
+      if (r.pendingDeleteAt == null) continue;
+      await ctx.db.patch(r._id, { pendingDeleteAt: undefined, pendingDeleteBatchId: undefined });
+      restored++;
+    }
+    return { restored };
+  },
+});
+
+export const finalizeBatchDelete = internalMutation({
+  args: { batchId: v.string() },
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("jobPostings")
+      .filter((q) => q.eq(q.field("pendingDeleteBatchId"), args.batchId))
+      .collect();
+    for (const r of rows) {
+      if (r.pendingDeleteAt == null) continue;
+      await ctx.db.delete(r._id);
+    }
+  },
+});
+
+const bulkSetStatusArgs = v.union(
+  v.object({ ids: v.array(v.id("jobPostings")), status: v.string() }),
+  v.object({ matchAll: v.object({ schoolId: v.id("schools"), filter: v.optional(v.any()) }), status: v.string() }),
+);
+
+export const bulkSetStatus = mutation({
+  args: bulkSetStatusArgs,
+  handler: async (ctx, args) => {
+    const a = args as { ids?: string[]; matchAll?: { schoolId: any; filter?: any }; status: string };
+    let ids: any[] = [];
+    if (a.ids) {
+      ids = a.ids;
+    } else if (a.matchAll) {
+      const matchAll = a.matchAll;
+      const rows = await ctx.db.query("jobPostings")
+        .withIndex("by_schoolId", (q) => q.eq("schoolId", matchAll.schoolId))
+        .filter((q) => q.eq(q.field("pendingDeleteAt"), undefined))
+        .collect();
+      ids = rows.map((r) => r._id);
+    }
+    const batchId = makeBatchId();
+    const previousStatuses: Array<{ id: any; previousStatus: string }> = [];
+    for (const id of ids) {
+      const j = await ctx.db.get(id as any) as any;
+      if (!j) continue;
+      previousStatuses.push({ id, previousStatus: j.status });
+      await ctx.db.patch(id as any, { status: a.status as any });
+    }
+    return { batchId, previousStatuses };
   },
 });
 

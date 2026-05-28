@@ -1,6 +1,8 @@
 import { mutation, query, internalMutation } from "./_generated/server";
+import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
+import { deleteApplicationChildren } from "./candidates";
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   sourced: ["screened", "rejected", "on_hold"],
@@ -29,6 +31,7 @@ export const create = mutation({
     schoolId: v.id("schools"),
     aiMatchScore: v.optional(v.number()),
     skipTriage: v.optional(v.boolean()),
+    stage: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const config = await ctx.db
@@ -36,9 +39,9 @@ export const create = mutation({
       .withIndex("by_schoolId", (q) => q.eq("schoolId", args.schoolId))
       .first();
 
-    const firstStage = config?.stages
+    const firstStage = args.stage ?? (config?.stages
       ?.sort((a, b) => a.order - b.order)
-      .find(s => !s.isTerminal)?.id ?? "sourced";
+      .find(s => !s.isTerminal)?.id ?? "sourced");
 
     const applicationId = await ctx.db.insert("applications", {
       candidateId: args.candidateId,
@@ -165,29 +168,113 @@ export const moveStage = mutation({
 });
 
 export const getPipelineForJob = query({
-  args: { jobId: v.id("jobPostings") },
+  args: {
+    jobId: v.id("jobPostings"),
+    paginationOpts: paginationOptsValidator,
+    filter: v.optional(v.object({
+      stage: v.optional(v.string()),
+      search: v.optional(v.string()),
+    })),
+    sort: v.optional(v.union(
+      v.literal("newest"), v.literal("score"), v.literal("name"),
+    )),
+  },
+  handler: async (ctx, args) => {
+    // Sort note:
+    // - "newest" uses by_jobPostingId + _creationTime desc.
+    // - "score" uses by_jobPostingId_aiMatchScore. Applications without aiMatchScore
+    //   are EXCLUDED from results (Convex sparse-index semantics).
+    // - "name" has no backing index today; falls back to "newest" order. The UI
+    //   sort label is misleading; follow-up will add by_jobPostingId_name when needed.
+    const indexName = args.sort === "score" ? "by_jobPostingId_aiMatchScore" : "by_jobPostingId";
+    const builder = ctx.db
+      .query("applications")
+      .withIndex(indexName as any, (q: any) => q.eq("jobPostingId", args.jobId));
+
+    const filtered = builder.filter((q) => {
+      let expr = q.eq(q.field("pendingDeleteAt"), undefined);
+      if (args.filter?.stage) {
+        expr = q.and(expr, q.eq(q.field("stage"), args.filter.stage));
+      }
+      return expr;
+    });
+
+    const result = await filtered.order("desc").paginate(args.paginationOpts);
+
+    const enriched: any[] = [];
+    for (const app of result.page) {
+      const candidate = await ctx.db.get(app.candidateId);
+      if (!candidate || candidate.pendingDeleteAt != null) continue;
+      if (args.filter?.search) {
+        const s = args.filter.search.toLowerCase();
+        const hay = `${candidate.name ?? ""} ${candidate.email ?? ""}`.toLowerCase();
+        if (!hay.includes(s)) continue;
+      }
+      const otherApps = await ctx.db
+        .query("applications")
+        .withIndex("by_candidateId", (q) => q.eq("candidateId", candidate._id))
+        .filter((q) => q.and(
+          q.eq(q.field("pendingDeleteAt"), undefined),
+          q.neq(q.field("_id"), app._id),
+        ))
+        .collect();
+      let priorRejectCount = 0;
+      for (const other of otherApps) {
+        if (other.stage === "rejected") { priorRejectCount++; continue; }
+        const evals = await ctx.db
+          .query("evaluations")
+          .withIndex("by_applicationId", (q) => q.eq("applicationId", other._id))
+          .filter((q) => q.eq(q.field("recommendation"), "reject"))
+          .collect();
+        if (evals.length > 0) priorRejectCount++;
+      }
+      enriched.push({
+        applicationId: app._id,
+        candidateId: candidate._id,
+        name: candidate.name,
+        email: candidate.email,
+        phone: candidate.phone,
+        stage: app.stage,
+        aiMatchScore: app.aiMatchScore,
+        subjects: candidate.subjects ?? [],
+        yearsExperience: candidate.yearsExperience,
+        location: candidate.location,
+        createdAt: app._creationTime,
+        priorRejectCount,
+      });
+    }
+
+    return { page: enriched, isDone: result.isDone, continueCursor: result.continueCursor };
+  },
+});
+
+export const countForJob = query({
+  args: {
+    jobId: v.id("jobPostings"),
+    filter: v.optional(v.object({
+      stage: v.optional(v.string()),
+      search: v.optional(v.string()),
+    })),
+  },
   handler: async (ctx, args) => {
     const apps = await ctx.db
       .query("applications")
       .withIndex("by_jobPostingId", (q) => q.eq("jobPostingId", args.jobId))
+      .filter((q) => q.eq(q.field("pendingDeleteAt"), undefined))
       .collect();
-
-    const result: Record<string, any[]> = {};
-    for (const stage of PIPELINE_STAGES) {
-      result[stage] = [];
-    }
-
+    let total = 0;
     for (const app of apps) {
-      if (result[app.stage]) {
-        const candidate = await ctx.db.get(app.candidateId);
-        result[app.stage].push({
-          ...app,
-          candidate: candidate ?? null,
-        });
+      if (args.filter?.stage && app.stage !== args.filter.stage) continue;
+      const cand = await ctx.db.get(app.candidateId);
+      if (!cand || cand.pendingDeleteAt != null) continue;
+      if (args.filter?.search) {
+        const s = args.filter.search.toLowerCase();
+        const hay = `${cand.name ?? ""} ${cand.email ?? ""}`.toLowerCase();
+        if (!hay.includes(s)) continue;
       }
+      total++;
     }
-
-    return result;
+    return { total };
   },
 });
 
@@ -286,5 +373,131 @@ export const generateAndAttachBookingLink = internalMutation({
     });
 
     return token;
+  },
+});
+
+// ============================================================================
+// Bulk delete: pending mark + undo (Task 7.1) + cascade finalize
+// ============================================================================
+
+function makeBatchId() {
+  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+}
+
+const removeManyAppsArgs = v.union(
+  v.object({ ids: v.array(v.id("applications")) }),
+  v.object({
+    matchAll: v.object({
+      jobId: v.union(v.id("jobPostings"), v.null()),
+      filter: v.optional(v.any()),
+    }),
+  }),
+);
+
+export const removeManyApplications = mutation({
+  args: removeManyAppsArgs,
+  handler: async (ctx, args) => {
+    const a = args as { ids?: string[]; matchAll?: { jobId: any; filter?: any } };
+    let ids: any[] = [];
+    if (a.ids) {
+      ids = a.ids;
+    } else if (a.matchAll) {
+      const matchAll = a.matchAll;
+      const builder = matchAll.jobId
+        ? ctx.db.query("applications").withIndex("by_jobPostingId", (q) => q.eq("jobPostingId", matchAll.jobId))
+        : ctx.db.query("applications");
+      const apps = await (builder as any)
+        .filter((q: any) => q.eq(q.field("pendingDeleteAt"), undefined))
+        .collect();
+      ids = apps.map((row: any) => row._id);
+    }
+
+    const batchId = makeBatchId();
+    let count = 0;
+    for (const id of ids) {
+      const row = await ctx.db.get(id as any) as any;
+      if (!row || row.pendingDeleteAt != null) continue;
+      await ctx.db.patch(id as any, { pendingDeleteAt: Date.now(), pendingDeleteBatchId: batchId });
+      count++;
+    }
+    await ctx.scheduler.runAfter(10_000, internal.applications.finalizeBatchDelete, { batchId });
+    return { batchId, count };
+  },
+});
+
+export const undoBatchDelete = mutation({
+  args: { batchId: v.string() },
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("applications")
+      .filter((q) => q.eq(q.field("pendingDeleteBatchId"), args.batchId))
+      .collect();
+    let restored = 0;
+    for (const row of rows) {
+      if (row.pendingDeleteAt == null) continue;
+      await ctx.db.patch(row._id, { pendingDeleteAt: undefined, pendingDeleteBatchId: undefined });
+      restored++;
+    }
+    return { restored };
+  },
+});
+
+export const finalizeBatchDelete = internalMutation({
+  args: { batchId: v.string() },
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("applications")
+      .filter((q) => q.eq(q.field("pendingDeleteBatchId"), args.batchId))
+      .collect();
+    for (const row of rows) {
+      if (row.pendingDeleteAt == null) continue;
+      await deleteApplicationChildren(ctx, row._id);
+      await ctx.db.delete(row._id);
+    }
+  },
+});
+
+// ============================================================================
+// Bulk stage change: bulkSetStage (Task 7.2)
+// ============================================================================
+
+const bulkSetStageArgs = v.union(
+  v.object({ ids: v.array(v.id("applications")), stage: v.string() }),
+  v.object({
+    matchAll: v.object({
+      jobId: v.union(v.id("jobPostings"), v.null()),
+      filter: v.optional(v.any()),
+    }),
+    stage: v.string(),
+  }),
+);
+
+export const bulkSetStage = mutation({
+  args: bulkSetStageArgs,
+  handler: async (ctx, args) => {
+    const a = args as { ids?: string[]; matchAll?: { jobId: any; filter?: any }; stage: string };
+    let ids: any[] = [];
+    if (a.ids) {
+      ids = a.ids;
+    } else if (a.matchAll) {
+      const matchAll = a.matchAll;
+      const builder = matchAll.jobId
+        ? ctx.db.query("applications").withIndex("by_jobPostingId", (q) => q.eq("jobPostingId", matchAll.jobId))
+        : ctx.db.query("applications");
+      const apps = await (builder as any)
+        .filter((q: any) => q.eq(q.field("pendingDeleteAt"), undefined))
+        .collect();
+      ids = apps.map((r: any) => r._id);
+    }
+
+    const batchId = makeBatchId();
+    const previousStages: Array<{ id: any; previousStage: string }> = [];
+    for (const id of ids) {
+      const row = await ctx.db.get(id as any) as any;
+      if (!row) continue;
+      previousStages.push({ id, previousStage: row.stage });
+      await ctx.db.patch(id as any, { stage: a.stage });
+    }
+    return { batchId, previousStages };
   },
 });

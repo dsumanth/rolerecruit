@@ -1,7 +1,66 @@
 import { action, mutation, query, internalMutation, internalAction } from "./_generated/server";
+import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
 import { PARSED_FACETS_VERSION, EMBEDDING_VERSION } from "./versions";
+
+export const getRejectionHistory = query({
+  args: {
+    candidateId: v.id("candidates"),
+    excludeApplicationId: v.optional(v.id("applications")),
+  },
+  handler: async (ctx, args) => {
+    const apps = await ctx.db
+      .query("applications")
+      .withIndex("by_candidateId", (q) => q.eq("candidateId", args.candidateId))
+      .filter((q) => q.eq(q.field("pendingDeleteAt"), undefined))
+      .collect();
+
+    const result: any[] = [];
+    for (const app of apps) {
+      if (args.excludeApplicationId && app._id === args.excludeApplicationId) continue;
+
+      const evaluations = await ctx.db
+        .query("evaluations")
+        .withIndex("by_applicationId", (q) => q.eq("applicationId", app._id))
+        .filter((q) => q.eq(q.field("submitted"), true))
+        .collect();
+
+      const hasReject = evaluations.some((e: any) => e.recommendation === "reject");
+      if (app.stage !== "rejected" && !hasReject) continue;
+
+      const job = app.jobPostingId ? await ctx.db.get(app.jobPostingId) : null;
+      const evalSubmitted = evaluations
+        .filter((e: any) => e.recommendation != null)
+        .map((e: any) => e.submittedAt ?? 0);
+      const rejectedAt = Math.max(app._creationTime, ...(evalSubmitted.length ? evalSubmitted : [0]));
+
+      result.push({
+        applicationId: app._id,
+        jobId: app.jobPostingId,
+        jobTitle: (job as any)?.title ?? "(deleted role)",
+        jobSubject: (job as any)?.subject,
+        jobLevel: (job as any)?.level,
+        rejectedAt,
+        evaluations: evaluations.map((e: any) => ({
+          evaluatorRole: e.evaluatorRole,
+          recommendation: e.recommendation,
+          comments: e.comments,
+          scores: {
+            subjectKnowledge: e.subjectKnowledge,
+            classroomManagement: e.classroomManagement,
+            communication: e.communication,
+            overallFit: e.overallFit,
+          },
+          submittedAt: e.submittedAt,
+        })),
+      });
+    }
+
+    result.sort((a, b) => b.rejectedAt - a.rejectedAt);
+    return result;
+  },
+});
 
 export const create = mutation({
   args: {
@@ -69,49 +128,133 @@ export const updateScore = internalMutation({
 export const listForSchool = query({
   args: {
     schoolId: v.id("schools"),
-    sourceChannel: v.optional(v.string()),
-    poolId: v.optional(v.id("pools")),
+    paginationOpts: paginationOptsValidator,
+    filter: v.optional(v.object({
+      poolId: v.optional(v.union(v.id("pools"), v.literal("all"))),
+      stages: v.optional(v.array(v.string())),
+      search: v.optional(v.string()),
+    })),
+    sort: v.optional(v.union(
+      v.literal("newest"), v.literal("score"), v.literal("name"),
+    )),
+  },
+  handler: async (ctx, args) => {
+    // Sort note:
+    // - "newest" uses by_schoolId + _creationTime desc (Convex default).
+    // - "score" uses by_schoolId_aiMatchScore. Applications without aiMatchScore
+    //   are EXCLUDED from results (Convex sparse-index semantics) — un-scored
+    //   candidates won't appear under this sort.
+    // - "name" has no backing index today; falls back to "newest" order. The UI
+    //   sort label is misleading; this will be fixed in a follow-up when a
+    //   by_schoolId_name index is added.
+    const indexName =
+      args.sort === "score" ? "by_schoolId_aiMatchScore" : "by_schoolId";
+
+    const builder = ctx.db
+      .query("applications")
+      .withIndex(indexName as any, (q: any) => q.eq("schoolId", args.schoolId));
+
+    const filtered = builder.filter((q) => {
+      let expr = q.eq(q.field("pendingDeleteAt"), undefined);
+      if (args.filter?.stages && args.filter.stages.length > 0) {
+        const stageExprs = args.filter.stages.map((s) => q.eq(q.field("stage"), s));
+        expr = q.and(expr, q.or(...stageExprs));
+      }
+      return expr;
+    });
+
+    const ordered = filtered.order("desc");
+    const result = await ordered.paginate(args.paginationOpts);
+
+    const enriched: any[] = [];
+    const seen = new Set<string>();
+    for (const app of result.page) {
+      if (seen.has(app.candidateId)) continue;
+      seen.add(app.candidateId);
+      const candidate = await ctx.db.get(app.candidateId);
+      if (!candidate) continue;
+      if (candidate.pendingDeleteAt != null) continue;
+
+      if (args.filter?.search) {
+        const s = args.filter.search.toLowerCase();
+        const haystack = `${candidate.name ?? ""} ${candidate.email ?? ""}`.toLowerCase();
+        if (!haystack.includes(s)) continue;
+      }
+
+      if (args.filter?.poolId && args.filter.poolId !== "all") {
+        const poolMember = await ctx.db
+          .query("candidatePools")
+          .withIndex("by_candidateId", (q) => q.eq("candidateId", candidate._id))
+          .filter((q) => q.eq(q.field("poolId"), args.filter!.poolId))
+          .first();
+        if (!poolMember) continue;
+      }
+
+      enriched.push({
+        applicationId: app._id,
+        candidateId: candidate._id,
+        name: candidate.name,
+        email: candidate.email,
+        phone: candidate.phone,
+        stage: app.stage,
+        aiMatchScore: app.aiMatchScore,
+        subjects: candidate.subjects ?? [],
+        yearsExperience: candidate.yearsExperience,
+        location: candidate.location,
+        sourceChannel: candidate.sourceChannel,
+        createdAt: app._creationTime,
+      });
+    }
+
+    return {
+      page: enriched,
+      isDone: result.isDone,
+      continueCursor: result.continueCursor,
+    };
+  },
+});
+
+export const countForSchool = query({
+  args: {
+    schoolId: v.id("schools"),
+    filter: v.optional(v.object({
+      poolId: v.optional(v.union(v.id("pools"), v.literal("all"))),
+      stages: v.optional(v.array(v.string())),
+      search: v.optional(v.string()),
+    })),
   },
   handler: async (ctx, args) => {
     const apps = await ctx.db
       .query("applications")
       .withIndex("by_schoolId", (q) => q.eq("schoolId", args.schoolId))
+      .filter((q) => q.eq(q.field("pendingDeleteAt"), undefined))
       .collect();
-
-    const candidateMap = new Map<string, any>();
     const seen = new Set<string>();
-
+    let total = 0;
     for (const app of apps) {
       if (seen.has(app.candidateId)) continue;
       seen.add(app.candidateId);
-      const candidate = await ctx.db.get(app.candidateId);
-      if (!candidate) continue;
-      if (args.sourceChannel && candidate.sourceChannel !== args.sourceChannel) continue;
 
-      const poolIds = candidate.poolIds ?? [];
-      const poolNames: string[] = [];
-      for (const pId of poolIds) {
-        const pool = await ctx.db.get(pId);
-        if (pool) poolNames.push(pool.name);
+      if (args.filter?.stages && args.filter.stages.length > 0
+          && !args.filter.stages.includes(app.stage)) continue;
+      const cand = await ctx.db.get(app.candidateId);
+      if (!cand || cand.pendingDeleteAt != null) continue;
+      if (args.filter?.search) {
+        const s = args.filter.search.toLowerCase();
+        const hay = `${cand.name ?? ""} ${cand.email ?? ""}`.toLowerCase();
+        if (!hay.includes(s)) continue;
       }
-
-      if (args.poolId) {
-        if (!poolIds.includes(args.poolId)) continue;
+      if (args.filter?.poolId && args.filter.poolId !== "all") {
+        const member = await ctx.db
+          .query("candidatePools")
+          .withIndex("by_candidateId", (q) => q.eq("candidateId", cand._id))
+          .filter((q) => q.eq(q.field("poolId"), args.filter!.poolId))
+          .first();
+        if (!member) continue;
       }
-
-      candidateMap.set(candidate._id, {
-        ...candidate,
-        applicationId: app._id,
-        stage: app.stage,
-        aiMatchScore: app.aiMatchScore,
-        globalScore: app.globalScore,
-        scoringResult: app.scoringResult,
-        poolIds,
-        poolNames,
-      });
+      total++;
     }
-
-    return Array.from(candidateMap.values());
+    return { total };
   },
 });
 
@@ -420,5 +563,137 @@ export const reparse = action({
       originalName: candidate.resumeOriginalName,
     });
     return { ok: true };
+  },
+});
+
+// ============================================================================
+// Soft-delete: pending mark + undo (Task 6.1) + cascade finalize (Task 6.2)
+// ============================================================================
+
+function makeBatchId() {
+  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+}
+
+const removeManyArgs = v.union(
+  v.object({ ids: v.array(v.id("candidates")) }),
+  v.object({
+    matchAll: v.object({
+      schoolId: v.id("schools"),
+      filter: v.optional(v.any()),
+    }),
+  }),
+);
+
+export const removeMany = mutation({
+  args: removeManyArgs,
+  handler: async (ctx, args) => {
+    const a = args as { ids?: string[]; matchAll?: { schoolId: any; filter?: any } };
+    let ids: any[] = [];
+    if (a.ids) {
+      ids = a.ids;
+    } else if (a.matchAll) {
+      // matchAll: resolve via applications under the school, collect unique candidateIds.
+      const matchAll = a.matchAll;
+      const apps = await ctx.db
+        .query("applications")
+        .withIndex("by_schoolId", (q) => q.eq("schoolId", matchAll.schoolId))
+        .filter((q) => q.eq(q.field("pendingDeleteAt"), undefined))
+        .collect();
+      const candIds = new Set<string>();
+      for (const app of apps) candIds.add(app.candidateId);
+      ids = Array.from(candIds);
+    }
+
+    const batchId = makeBatchId();
+    let count = 0;
+    for (const id of ids) {
+      const cand = await ctx.db.get(id as any);
+      if (!cand || (cand as any).pendingDeleteAt != null) continue;
+      await ctx.db.patch(id as any, { pendingDeleteAt: Date.now(), pendingDeleteBatchId: batchId });
+      count++;
+    }
+    await ctx.scheduler.runAfter(10_000, internal.candidates.finalizeBatchDelete, { batchId });
+    return { batchId, count };
+  },
+});
+
+export const remove = mutation({
+  args: { candidateId: v.id("candidates") },
+  handler: async (ctx, args) => {
+    const doc = await ctx.db.get(args.candidateId);
+    if (!doc || doc.pendingDeleteAt != null) {
+      return { batchId: "", count: 0 as const };
+    }
+    const batchId = makeBatchId();
+    await ctx.db.patch(args.candidateId, { pendingDeleteAt: Date.now(), pendingDeleteBatchId: batchId });
+    await ctx.scheduler.runAfter(10_000, internal.candidates.finalizeBatchDelete, { batchId });
+    return { batchId, count: 1 as const };
+  },
+});
+
+export const undoBatchDelete = mutation({
+  args: { batchId: v.string() },
+  handler: async (ctx, args) => {
+    const cands = await ctx.db
+      .query("candidates")
+      .filter((q) => q.eq(q.field("pendingDeleteBatchId"), args.batchId))
+      .collect();
+    let restored = 0;
+    for (const c of cands) {
+      if (c.pendingDeleteAt == null) continue;
+      await ctx.db.patch(c._id, { pendingDeleteAt: undefined, pendingDeleteBatchId: undefined });
+      restored++;
+    }
+    return { restored };
+  },
+});
+
+// Shared cascade helper (also used by applications.finalizeBatchDelete in Task 7.1).
+export async function deleteApplicationChildren(ctx: any, applicationId: any) {
+  for (const table of ["evaluations", "outreachMessages", "calendarEvents", "triageDecisions", "bookingTokens"] as const) {
+    const rows = await ctx.db
+      .query(table)
+      .withIndex("by_applicationId", (q: any) => q.eq("applicationId", applicationId))
+      .collect();
+    for (const r of rows) await ctx.db.delete(r._id);
+  }
+}
+
+export const finalizeBatchDelete = internalMutation({
+  args: { batchId: v.string() },
+  handler: async (ctx, args) => {
+    const cands = await ctx.db
+      .query("candidates")
+      .filter((q) => q.eq(q.field("pendingDeleteBatchId"), args.batchId))
+      .collect();
+
+    for (const cand of cands) {
+      if (cand.pendingDeleteAt == null) continue;
+
+      // 1. Walk applications
+      const apps = await ctx.db
+        .query("applications")
+        .withIndex("by_candidateId", (q) => q.eq("candidateId", cand._id))
+        .collect();
+      for (const app of apps) {
+        await deleteApplicationChildren(ctx, app._id);
+        await ctx.db.delete(app._id);
+      }
+
+      // 2. candidatePools (by_candidateId)
+      const pools = await ctx.db
+        .query("candidatePools")
+        .withIndex("by_candidateId", (q) => q.eq("candidateId", cand._id))
+        .collect();
+      for (const p of pools) await ctx.db.delete(p._id);
+
+      // 3. Resume file (idempotent)
+      if (cand.resumeStorageId) {
+        try { await ctx.storage.delete(cand.resumeStorageId as any); } catch {}
+      }
+
+      // 4. The candidate itself
+      await ctx.db.delete(cand._id);
+    }
   },
 });

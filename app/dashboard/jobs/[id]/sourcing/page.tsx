@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useQuery, useAction } from "convex/react";
+import { useQuery, useAction, usePaginatedQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { PageHeader, Badge, Button, Card } from "@/components/ui";
 
@@ -35,7 +35,11 @@ export default function SourcingPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const job = useQuery(api.jobs.get, { jobId: params.id as any });
   const sourcingRuns = useQuery(api.sourcing.getRunsForJob, { jobId: params.id as any });
-  const pipeline = useQuery(api.applications.getPipelineForJob, { jobId: params.id as any });
+  const { results: pipelineResults } = usePaginatedQuery(
+    api.applications.getPipelineForJob,
+    { jobId: params.id as any },
+    { initialNumItems: 100 },
+  );
   const runSourcing = useAction(api.sourcing_actions.runSourcing);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState("");
@@ -53,9 +57,7 @@ export default function SourcingPage({ params }: { params: { id: string } }) {
     }
   };
 
-  const totalPipeline = pipeline
-    ? Object.values(pipeline).flat().length
-    : 0;
+  const totalPipeline = pipelineResults.length;
 
   return (
     <div>

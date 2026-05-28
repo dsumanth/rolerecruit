@@ -244,8 +244,10 @@ describe("applications", () => {
       newStage: "screened",
     });
 
-    const pipeline = await t.query("applications:getPipelineForJob", { jobId });
-    expect(pipeline.sourced).toHaveLength(1);
-    expect(pipeline.screened).toHaveLength(1);
+    const r = await t.query("applications:getPipelineForJob", { jobId, paginationOpts: { cursor: null, numItems: 100 } });
+    const sourced = r.page.filter((a: any) => a.stage === "sourced");
+    const screened = r.page.filter((a: any) => a.stage === "screened");
+    expect(sourced).toHaveLength(1);
+    expect(screened).toHaveLength(1);
   });
 });
