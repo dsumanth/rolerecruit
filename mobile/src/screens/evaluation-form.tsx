@@ -6,6 +6,7 @@ import { ScoreField } from "@/components/evaluations/form-field-score";
 import { TextField } from "@/components/evaluations/form-field-text";
 import { ChoiceField } from "@/components/evaluations/form-field-choice";
 import { RecommendationButtons } from "@/components/evaluations/recommendation-buttons";
+import { DictationOverlay } from "@/components/evaluations/dictation-overlay";
 import { PressableButton } from "@/components/ui/pressable-button";
 import { colors, space } from "@/theme";
 
@@ -53,6 +54,12 @@ export function EvaluationFormScreen({
 
   function update(key: string, value: number | string) {
     setResponses((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function handleDictationResult(field: FieldDef, capture: VoiceCapture) {
+    setVoiceInputs((prev) => [...prev.filter((v) => v.fieldKey !== field.key), capture]);
+    setResponses((prev) => ({ ...prev, [field.key]: capture.summaryPoints.join("\n") }));
+    setDictationField(null);
   }
 
   async function onSubmit() {
@@ -145,20 +152,13 @@ export function EvaluationFormScreen({
         </PressableButton>
       </View>
 
-      {/* DictationOverlay is mounted in T26. For now the mic button no-ops if no overlay is rendered. */}
       {dictationField && (
-        <View
-          style={{
-            position: "absolute", inset: 0,
-            backgroundColor: "rgba(0,0,0,0.6)",
-            alignItems: "center", justifyContent: "center",
-          }}
-        >
-          <View style={{ backgroundColor: colors.surface, padding: space[4], borderRadius: 12 }}>
-            <Text style={{ color: colors.ink, marginBottom: space[3] }}>Dictation overlay (mounted in T26)</Text>
-            <PressableButton variant="ghost" onPress={() => setDictationField(null)}>Close</PressableButton>
-          </View>
-        </View>
+        <DictationOverlay
+          fieldKey={dictationField.key}
+          language="en-IN"
+          onComplete={(capture) => handleDictationResult(dictationField, capture)}
+          onCancel={() => setDictationField(null)}
+        />
       )}
     </View>
   );

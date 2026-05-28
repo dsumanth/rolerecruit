@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react-native";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { EvaluationFormScreen } from "@/screens/evaluation-form";
 
@@ -13,6 +13,7 @@ const mockTemplate = {
 const mockInvite = { _id: "i1", formTemplateId: "tpl1", demoSessionId: "d1", evaluatorRole: "principal" };
 
 const mockSubmitMutation = jest.fn().mockResolvedValue(undefined);
+const mockSummarize = jest.fn().mockResolvedValue({ summaryPoints: ["a", "b", "c"], language: "en-IN" });
 
 jest.mock("convex/react", () => ({
   useQuery: jest.fn().mockImplementation((q: any) => {
@@ -21,6 +22,7 @@ jest.mock("convex/react", () => ({
     return null;
   }),
   useMutation: () => mockSubmitMutation,
+  useAction: () => mockSummarize,
 }));
 
 jest.mock("@convex/_generated/api", () => ({
@@ -28,6 +30,7 @@ jest.mock("@convex/_generated/api", () => ({
     evaluationInvites: { get: "evaluationInvites:get" },
     formTemplates: { getById: "formTemplates:getById" },
     evaluations: { submit: "evaluations:submit" },
+    voiceProcessing: { summarizeTranscript: "voiceProcessing:summarizeTranscript" },
   },
 }));
 
@@ -69,5 +72,24 @@ describe("EvaluationFormScreen", () => {
         submittedFromPlatform: expect.stringMatching(/mobile_ios|mobile_android/),
       }),
     );
+  });
+});
+
+const speech = jest.requireMock("expo-speech-recognition") as any;
+
+describe("EvaluationFormScreen dictation", () => {
+  it("captures dictation result into the comments field", async () => {
+    render(withNav(
+      <EvaluationFormScreen
+        navigation={{ goBack: jest.fn(), reset: jest.fn(), navigate: jest.fn() } as any}
+        route={{ params: { inviteId: "i1", demoId: "d1" } } as any}
+      />,
+    ));
+    fireEvent.press(screen.getByLabelText("dictate"));
+    act(() => speech.__emit("result", { isFinal: true, results: [{ transcript: "Strong delivery." }] }));
+    fireEvent.press(screen.getByLabelText("stop-dictation"));
+    await waitFor(() => expect(screen.queryByLabelText("stop-dictation")).toBeNull());
+    // The comments TextInput now contains the joined summary bullets.
+    expect(screen.getByPlaceholderText("Type your notes...").props.value).toBe("a\nb\nc");
   });
 });
