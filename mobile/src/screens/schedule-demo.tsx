@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 import { useRoute, useNavigation } from "@react-navigation/native";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { EvaluatorRole } from "@convex/types";
 import {
@@ -47,6 +47,29 @@ export function ScheduleDemoScreen() {
   const { staff } = useStaffDirectory({ schoolId: role.schoolId });
   const { rules } = useActiveDecisionRules({ schoolId: role.schoolId });
   const createDemo = useMutation(api.demoSessions.create);
+
+  const parentInvites = useQuery(
+    api.evaluationInvites.listForDemoWithProfiles,
+    parentDemoId ? { demoId: parentDemoId as any } : "skip",
+  );
+
+  useEffect(() => {
+    if (!parentInvites || draft.evaluators.length > 0) return;
+    const evaluators = parentInvites
+      .filter((r: any) => r.invite.status !== "cancelled")
+      .map((r: any) => ({
+        userId: r.invite.evaluatorUserId,
+        role: r.invite.evaluatorRole,
+      }));
+    const inThreeDays = new Date(Date.now() + 3 * 86_400_000);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    setDraft((d) => ({
+      ...d,
+      evaluators,
+      date: `${inThreeDays.getFullYear()}-${pad(inThreeDays.getMonth() + 1)}-${pad(inThreeDays.getDate())}`,
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parentInvites]);
 
   const canAdvance =
     step === 1
