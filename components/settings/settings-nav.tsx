@@ -17,6 +17,7 @@ const ITEMS: NavItem[] = [
   { href: "/dashboard/settings", label: "General", icon: "Settings" },
   { href: "/dashboard/settings/calendar", label: "Calendar", icon: "Calendar" },
   { href: "/dashboard/settings/messaging", label: "Messaging", icon: "MessageSquare" },
+  { href: "/dashboard/settings/notifications", label: "Notifications", icon: "Bell", permission: "settings:manage" },
   { href: "/dashboard/settings/pipeline", label: "Pipeline stages", icon: "Kanban" },
   { href: "/dashboard/settings/triage", label: "Triage", icon: "ClipboardList" },
   { href: "/dashboard/settings/facets", label: "Facets", icon: "Tags" },
