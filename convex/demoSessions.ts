@@ -127,6 +127,39 @@ export const listForCandidate = query({
   },
 });
 
+export const applyDecision = mutation({
+  args: {
+    demoId: v.id("demoSessions"),
+    action: v.union(
+      v.literal("advance"),
+      v.literal("reject"),
+      v.literal("redemo"),
+      v.literal("manual"),
+    ),
+    appliedBy: v.optional(v.id("userProfiles")),
+    note: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const demo = await ctx.db.get(args.demoId);
+    if (!demo) throw new Error("Demo not found");
+    await ctx.db.patch(args.demoId, {
+      status: demo.status === "scheduled" ? "completed" : demo.status,
+      appliedDecision: {
+        action: args.action,
+        appliedAt: Date.now(),
+        appliedBy: args.appliedBy,
+        note: args.note,
+      },
+    });
+    if (args.action === "advance" || args.action === "reject") {
+      await ctx.db.patch(demo.applicationId, {
+        stage: args.action === "advance" ? "advanced" : "rejected",
+      });
+    }
+    return args.action;
+  },
+});
+
 export const aggregate = query({
   args: { demoId: v.id("demoSessions") },
   handler: async (ctx, { demoId }) => {
