@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePaginatedQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 
@@ -17,14 +17,21 @@ interface Options {
   pageSize?: number;
 }
 
+const SEARCH_DEBOUNCE_MS = 200;
+
 export function useCandidates({ schoolId, initialSearch = "", pageSize = 25 }: Options) {
   const [search, setSearch] = useState(initialSearch);
+  const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [search]);
   const { results, status, loadMore } = usePaginatedQuery(
     api.candidates.listForSchool,
     schoolId
       ? {
           schoolId: schoolId as any,
-          filter: { search: search || undefined },
+          filter: { search: debouncedSearch || undefined },
         }
       : "skip",
     { initialNumItems: pageSize },

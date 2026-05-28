@@ -1,4 +1,4 @@
-import { renderHook } from "@testing-library/react-native";
+import { act, renderHook } from "@testing-library/react-native";
 
 const mockUsePaginated = jest.fn();
 jest.mock("convex/react", () => ({
@@ -45,5 +45,43 @@ describe("useCandidates", () => {
     renderHook(() => useCandidates({ schoolId: null }));
     const [, args] = mockUsePaginated.mock.calls[0];
     expect(args).toBe("skip");
+  });
+
+  it("debounces search updates by 200ms before re-querying", () => {
+    jest.useFakeTimers();
+    try {
+      mockUsePaginated.mockReturnValue({
+        results: [],
+        status: "CanLoadMore",
+        loadMore: jest.fn(),
+      });
+      const { result } = renderHook(() =>
+        useCandidates({ schoolId: "s1", initialSearch: "" }),
+      );
+      const initialCallCount = mockUsePaginated.mock.calls.length;
+      const initialArgs = mockUsePaginated.mock.calls[initialCallCount - 1][1];
+      expect(initialArgs.filter?.search).toBeUndefined();
+
+      act(() => {
+        result.current.setSearch("p");
+      });
+      // Before 200ms: the underlying query args still reflect the previous search.
+      const beforeDebounce = mockUsePaginated.mock.calls.at(-1)![1];
+      expect(beforeDebounce.filter?.search).toBeUndefined();
+
+      act(() => {
+        jest.advanceTimersByTime(199);
+      });
+      const stillBefore = mockUsePaginated.mock.calls.at(-1)![1];
+      expect(stillBefore.filter?.search).toBeUndefined();
+
+      act(() => {
+        jest.advanceTimersByTime(1);
+      });
+      const afterDebounce = mockUsePaginated.mock.calls.at(-1)![1];
+      expect(afterDebounce.filter?.search).toBe("p");
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
