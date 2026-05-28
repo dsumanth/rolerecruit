@@ -232,6 +232,9 @@ export function DemosPanel({
               parentDemoId: data.parentDemoId
                 ? (data.parentDemoId as Id<"demoSessions">)
                 : undefined,
+              decisionRuleId: data.decisionRuleId
+                ? (data.decisionRuleId as Id<"decisionRules">)
+                : undefined,
             });
             setWizardOpen(false);
           }}

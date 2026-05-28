@@ -1,7 +1,10 @@
 "use client";
 
 import { useId, useState } from "react";
-import { Avatar, Badge, Button, Dialog, Input } from "@/components/ui";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
+import { Avatar, Badge, Button, Dialog, Input, Select } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 type StaffRole = "principal" | "hod" | "hr_admin" | "teacher";
@@ -20,6 +23,7 @@ type ConfirmPayload = {
   videoUrl?: string;
   evaluators: { userId: string; role: StaffRole }[];
   parentDemoId?: string;
+  decisionRuleId?: string;
 };
 
 interface Props {
@@ -116,6 +120,12 @@ export function ScheduleDemoWizard({
   const [picked, setPicked] = useState<Set<string>>(
     () => new Set(initialEvaluators?.map((e) => e.userId) ?? []),
   );
+  const [decisionRuleId, setDecisionRuleId] = useState<string>("");
+
+  const activeRules = useQuery(
+    api.decisionRules.listActive,
+    schoolId ? { schoolId: schoolId as Id<"schools"> } : "skip",
+  );
 
   const dateId = useId();
   const timeId = useId();
@@ -154,6 +164,7 @@ export function ScheduleDemoWizard({
       videoUrl: videoUrl || undefined,
       evaluators,
       parentDemoId,
+      decisionRuleId: decisionRuleId || undefined,
     });
   };
 
@@ -364,6 +375,23 @@ export function ScheduleDemoWizard({
                   );
                 })
               )}
+            </dd>
+          </div>
+          <div>
+            <dt className={SECTION_LABEL}>Decision rule (optional)</dt>
+            <dd className="mt-1">
+              <Select
+                aria-label="Decision rule"
+                value={decisionRuleId}
+                onChange={(value) => setDecisionRuleId(value)}
+                options={[
+                  { value: "", label: "None - manual decision" },
+                  ...(activeRules ?? []).map((r) => ({ value: r._id as string, label: r.name })),
+                ]}
+              />
+              <p className="text-caption text-ink-tertiary mt-1">
+                If set, the matching action is auto-applied when all invites resolve. Otherwise HR decides manually.
+              </p>
             </dd>
           </div>
         </dl>
