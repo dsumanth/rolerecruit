@@ -13,7 +13,7 @@ export function ProfileScreen() {
 
   useEffect(() => {
     (async () => {
-      const res = await Notifications.getPermissionsAsync();
+      const res = (await Notifications.getPermissionsAsync()) as { status: string };
       setPermission(res.status as "granted" | "denied" | "undetermined");
     })();
   }, []);
