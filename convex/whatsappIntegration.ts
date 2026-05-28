@@ -1,5 +1,8 @@
-import { query, mutation, internalQuery, internalMutation } from "./_generated/server";
+import { query, mutation, internalQuery, internalMutation, action } from "./_generated/server";
 import { v } from "convex/values";
+import { internal } from "./_generated/api";
+import { exchangeCodeForToken, subscribeAppToWaba, fetchWabaDetails } from "./lib/meta";
+import { encryptSecret } from "./lib/crypto";
 
 const DEFAULT_MARKUP_PCT = 20;
 
@@ -131,5 +134,39 @@ export const disconnect = mutation({
       phoneNumberId: undefined,
       wabaId: undefined,
     });
+  },
+});
+
+export const completeEmbeddedSignup = action({
+  args: {
+    schoolId: v.id("schools"),
+    code: v.string(),
+    wabaId: v.string(),
+  },
+  handler: async (ctx, args): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      const token = await exchangeCodeForToken(args.code);
+      await subscribeAppToWaba(args.wabaId, token);
+      const details = await fetchWabaDetails(args.wabaId, token);
+      if (!details.phoneNumberId) throw new Error("WABA has no phone number");
+      const { cipher, iv } = await encryptSecret(token);
+      await ctx.runMutation(internal.whatsappIntegration.upsertActiveIntegration, {
+        schoolId: args.schoolId,
+        wabaId: args.wabaId,
+        phoneNumberId: details.phoneNumberId,
+        displayPhoneNumber: details.displayPhoneNumber,
+        businessName: details.businessName,
+        verifiedName: details.verifiedName,
+        accessTokenCipher: cipher,
+        accessTokenIv: iv,
+      });
+      return { ok: true };
+    } catch (err: any) {
+      await ctx.runMutation(internal.whatsappIntegration.setIntegrationError, {
+        schoolId: args.schoolId,
+        message: err?.message ?? "Embedded Signup failed",
+      });
+      return { ok: false, error: err?.message };
+    }
   },
 });

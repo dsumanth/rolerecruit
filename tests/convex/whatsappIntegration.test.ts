@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeAll } from "vitest";
 import { convexTest } from "convex-test";
 import schema from "../../convex/schema";
 import * as whatsappIntegration from "../../convex/whatsappIntegration";
@@ -14,6 +14,14 @@ const modules = {
   "_generated/server.js": async () => server,
   "_generated/api.js": async () => apiModule,
 };
+
+beforeAll(() => {
+  process.env.META_APP_ID = "app-1";
+  process.env.META_APP_SECRET = "secret-1";
+  process.env.META_GRAPH_API_VERSION = "v22.0";
+  process.env.WHATSAPP_ENCRYPTION_KEY = Buffer.from(new Uint8Array(32).fill(9)).toString("base64");
+});
+afterEach(() => vi.restoreAllMocks());
 
 async function seedSchool(t: ReturnType<typeof convexTest>) {
   return await t.run(async (ctx) =>
@@ -92,5 +100,54 @@ describe("whatsappIntegration storage", () => {
     expect(row?.status).toBe("disconnected");
     expect(row?.accessTokenCipher).toBeUndefined();
     expect(row?.phoneNumberId).toBeUndefined();
+  });
+});
+
+describe("completeEmbeddedSignup", () => {
+  it("exchanges code, subscribes, fetches details, stores encrypted token, sets active", async () => {
+    const fetchSpy = vi.spyOn(global, "fetch")
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ access_token: "EAAG-live" }) } as any)
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ success: true }) } as any)
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({
+        name: "Greenfield",
+        phone_numbers: { data: [{ id: "111", display_phone_number: "+91 98765 43210", verified_name: "Greenfield Intl" }] },
+      }) } as any);
+
+    const t = convexTest(schema, modules);
+    const schoolId = await t.run(async (ctx) =>
+      ctx.db.insert("schools", { name: "S", board: "CBSE", city: "X", state: "X", planTier: "free" }),
+    );
+
+    const res = await t.action(apiModule.api.whatsappIntegration.completeEmbeddedSignup, {
+      schoolId, code: "auth-code", wabaId: "waba-1",
+    });
+    expect(res.ok).toBe(true);
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+
+    const row = await t.run(async (ctx) =>
+      ctx.db.query("whatsappIntegrations").withIndex("by_schoolId", (q) => q.eq("schoolId", schoolId)).first(),
+    );
+    expect(row?.status).toBe("active");
+    expect(row?.phoneNumberId).toBe("111");
+    expect(row?.accessTokenCipher).toBeTruthy();
+    expect(row?.accessTokenCipher).not.toContain("EAAG");
+    expect(row?.accessTokenIv).toBeTruthy();
+  });
+
+  it("records an error when token exchange fails", async () => {
+    vi.spyOn(global, "fetch").mockResolvedValueOnce({
+      ok: false, status: 400, json: async () => ({ error: { message: "bad code" } }),
+    } as any);
+    const t = convexTest(schema, modules);
+    const schoolId = await t.run(async (ctx) =>
+      ctx.db.insert("schools", { name: "S", board: "CBSE", city: "X", state: "X", planTier: "free" }),
+    );
+    const res = await t.action(apiModule.api.whatsappIntegration.completeEmbeddedSignup, {
+      schoolId, code: "bad", wabaId: "waba-1",
+    });
+    expect(res.ok).toBe(false);
+    const view = await t.query(apiModule.api.whatsappIntegration.getIntegration, { schoolId });
+    expect(view?.status).toBe("error");
+    expect(view?.lastErrorMessage).toContain("bad code");
   });
 });
