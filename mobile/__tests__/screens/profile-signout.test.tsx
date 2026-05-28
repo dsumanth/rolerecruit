@@ -1,4 +1,5 @@
 import { render, screen, fireEvent } from "@testing-library/react-native";
+import * as Notifications from "expo-notifications";
 import { ProfileScreen } from "@/screens/profile";
 
 const mockSignOut = jest.fn();
@@ -22,5 +23,13 @@ describe("ProfileScreen sign-out", () => {
     expect(screen.getByText("p@s.com")).toBeTruthy();
     fireEvent.press(screen.getByText("Sign out"));
     expect(mockSignOut).toHaveBeenCalled();
+  });
+});
+
+describe("ProfileScreen notification permission", () => {
+  it("shows 'Enabled' when expo-notifications reports granted", async () => {
+    (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValueOnce({ status: "granted" });
+    const { findByText } = render(<ProfileScreen />);
+    expect(await findByText("Enabled")).toBeTruthy();
   });
 });
