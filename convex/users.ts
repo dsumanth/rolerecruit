@@ -139,6 +139,34 @@ export const getById = query({
   },
 });
 
+export const getMobileRoleContext = query({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }) => {
+    const profile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .first();
+    if (!profile) return null;
+
+    const role = await ctx.db
+      .query("roles")
+      .withIndex("by_schoolId", (q) => q.eq("schoolId", profile.schoolId))
+      .filter((q) => q.eq(q.field("name"), profile.role))
+      .first();
+
+    const permissions = role?.permissions ?? [];
+    const isHR = profile.role === "hr_admin" || profile.role === "principal";
+
+    return {
+      userProfileId: profile._id,
+      schoolId: profile.schoolId,
+      role: profile.role,
+      permissions,
+      isHR,
+    };
+  },
+});
+
 export const getByIdInternal = internalQuery({
   args: { userId: v.id("userProfiles") },
   handler: async (ctx, { userId }) => await ctx.db.get(userId),
