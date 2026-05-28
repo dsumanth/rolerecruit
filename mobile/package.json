@@ -18,6 +18,8 @@
     "convex": "^1.17.0",
     "expo": "~51.0.0",
     "expo-constants": "^56.0.16",
+    "expo-device": "^56.0.4",
+    "expo-notifications": "^56.0.14",
     "expo-secure-store": "^56.0.4",
     "expo-status-bar": "~1.12.1",
     "react": "18.2.0",
