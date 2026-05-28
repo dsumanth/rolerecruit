@@ -1,6 +1,7 @@
 import { mutation, query, internalQuery, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
+import { BUILT_IN_TEMPLATES } from "./formTemplates.defaults";
 
 const DEFAULT_PIPELINE_STAGES = [
   { id: "sourced", name: "Sourced", order: 0, isTerminal: false, color: "#86868b" },
@@ -34,6 +35,7 @@ const DEFAULT_ROLES = [
   { name: "hr_admin", permissions: ["*"], isSystem: true },
   { name: "principal", permissions: ["dashboard", "jobs", "pipeline", "feedback", "talent"], isSystem: true },
   { name: "hod", permissions: ["pipeline", "feedback"], isSystem: true },
+  { name: "teacher", permissions: ["evaluation_submit"], isSystem: true },
   { name: "viewer", permissions: ["dashboard"], isSystem: true },
 ];
 
@@ -78,6 +80,20 @@ export const create = mutation({
 
     for (const r of DEFAULT_ROLES) {
       await ctx.db.insert("roles", { ...r, schoolId });
+    }
+
+    // Seed built-in evaluation form templates (one per evaluator role).
+    const now = Date.now();
+    for (const tpl of BUILT_IN_TEMPLATES) {
+      await ctx.db.insert("formTemplates", {
+        schoolId,
+        role: tpl.role,
+        name: tpl.name,
+        fields: tpl.fields,
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      });
     }
 
     return schoolId;
