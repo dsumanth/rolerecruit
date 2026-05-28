@@ -72,3 +72,37 @@ describe("recordStatus", () => {
     // no throw == pass
   });
 });
+
+describe("recordInbound", () => {
+  it("inserts an inbound reply linked to the candidate's latest outbound in that school", async () => {
+    const t = convexTest(schema, modules);
+    const { schoolId, candidateId, applicationId } = await t.run(async (ctx) => {
+      const schoolId = await ctx.db.insert("schools", { name: "S", board: "CBSE", city: "X", state: "X", planTier: "free" });
+      const candidateId = await ctx.db.insert("candidates", { name: "Asha", phone: "+919876543210", qualifications: [], certifications: [], boardExperience: [], subjects: [], talentBankFlag: false });
+      const jobId = await ctx.db.insert("jobPostings", { schoolId, title: "T", subject: "Math", level: "TGT", board: "CBSE", qualifications: ["B.Ed"], naturalLanguageDescription: "d", status: "active", createdAt: Date.now() });
+      const applicationId = await ctx.db.insert("applications", { candidateId, jobPostingId: jobId, schoolId, stage: "shortlisted", createdAt: Date.now() });
+      await ctx.db.insert("whatsappIntegrations", { schoolId, status: "active", wabaId: "w", phoneNumberId: "111", displayPhoneNumber: "+1", businessName: "B", verifiedName: "B", accessTokenCipher: "c", accessTokenIv: "i", markupPct: 20 });
+      await ctx.db.insert("outreachMessages", { applicationId, candidateId, schoolId, type: "shortlist", channel: "whatsapp", body: "Hi", status: "sent", direction: "outbound", sentAt: Date.now() });
+      return { schoolId, candidateId, applicationId };
+    });
+
+    const res = await t.mutation(apiModule.internal.whatsappWebhook.recordInbound, {
+      phoneNumberId: "111", fromPhone: "+919876543210", text: "Yes I am interested", metaMessageId: "wamid.IN",
+    });
+    expect(res.matched).toBe(true);
+
+    const inbound = await t.run(async (ctx) =>
+      (await ctx.db.query("outreachMessages").withIndex("by_applicationId", (q) => q.eq("applicationId", applicationId)).collect())
+        .find((m: any) => m.direction === "inbound"),
+    );
+    expect(inbound).toMatchObject({ type: "candidate_reply", channel: "whatsapp", body: "Yes I am interested", schoolId, candidateId, metaMessageId: "wamid.IN" });
+  });
+
+  it("returns matched:false for an unknown phoneNumberId", async () => {
+    const t = convexTest(schema, modules);
+    const res = await t.mutation(apiModule.internal.whatsappWebhook.recordInbound, {
+      phoneNumberId: "does-not-exist", fromPhone: "+919876543210", text: "hi", metaMessageId: "wamid.IN",
+    });
+    expect(res.matched).toBe(false);
+  });
+});

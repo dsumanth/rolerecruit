@@ -1,6 +1,7 @@
 import { internalMutation } from "./_generated/server";
 import { v } from "convex/values";
-import { countryFromPhone } from "./lib/phone";
+import { normalizeToE164, countryFromPhone } from "./lib/phone";
+import { internal } from "./_generated/api";
 import { lookupMetaCostUsd, computeBillableUsd, type MessageCategory } from "./lib/metaPricing";
 import { bumpUsage } from "./whatsappUsage";
 
@@ -61,5 +62,66 @@ export const recordStatus = internalMutation({
     }
 
     if (Object.keys(patch).length > 0) await ctx.db.patch(row._id, patch);
+  },
+});
+
+export const recordInbound = internalMutation({
+  args: {
+    phoneNumberId: v.string(),
+    fromPhone: v.string(),
+    text: v.string(),
+    metaMessageId: v.string(),
+  },
+  handler: async (ctx, args): Promise<{ matched: boolean }> => {
+    const integ = await ctx.db
+      .query("whatsappIntegrations")
+      .withIndex("by_phoneNumberId", (q) => q.eq("phoneNumberId", args.phoneNumberId))
+      .first();
+    if (!integ) {
+      console.log(`[whatsapp] inbound for unknown phoneNumberId ${args.phoneNumberId}`);
+      return { matched: false };
+    }
+    const target = normalizeToE164(args.fromPhone);
+    if (!target) return { matched: false };
+
+    const candidates = await ctx.db.query("candidates").collect();
+    const candidate = candidates.find((c) => normalizeToE164(c.phone) === target);
+    if (!candidate) {
+      console.log(`[whatsapp] inbound from unknown candidate ${args.fromPhone}`);
+      return { matched: false };
+    }
+
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const schoolMessages = await ctx.db
+      .query("outreachMessages")
+      .withIndex("by_schoolId_sentAt", (q) => q.eq("schoolId", integ.schoolId))
+      .collect();
+    const outbounds = schoolMessages
+      .filter((m) =>
+        m.candidateId === candidate._id &&
+        m.direction !== "inbound" &&
+        m.type !== "rejection" &&
+        typeof m.sentAt === "number" &&
+        (m.sentAt as number) >= cutoff,
+      )
+      .sort((a, b) => (b.sentAt as number) - (a.sentAt as number));
+    if (outbounds.length === 0) return { matched: false };
+    const parent = outbounds[0];
+
+    const inboundId = await ctx.db.insert("outreachMessages", {
+      applicationId: parent.applicationId,
+      candidateId: candidate._id,
+      schoolId: integ.schoolId,
+      type: "candidate_reply",
+      channel: "whatsapp",
+      body: args.text,
+      status: "sent",
+      direction: "inbound",
+      inReplyToMessageId: parent._id,
+      metaMessageId: args.metaMessageId,
+      sentAt: Date.now(),
+    });
+    await ctx.scheduler.runAfter(0, internal.conversation.handleInbound, { messageId: inboundId });
+    return { matched: true };
   },
 });
