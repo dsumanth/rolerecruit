@@ -6,7 +6,10 @@ import {
   StepWhen,
   type StepWhenValue,
 } from "@/components/demos/schedule-wizard/step-when";
+import { StepEvaluators } from "@/components/demos/schedule-wizard/step-evaluators";
 import { PressableButton } from "@/components/ui/pressable-button";
+import { useRoleContext } from "@/hooks/use-role-context";
+import { useStaffDirectory } from "@/hooks/use-staff-directory";
 import { colors, fonts, space } from "@/theme";
 
 export type Evaluator = { userId: string; role: EvaluatorRole };
@@ -39,6 +42,9 @@ export function ScheduleDemoScreen() {
   void applicationId;
   void parentDemoId;
 
+  const role = useRoleContext();
+  const { staff } = useStaffDirectory({ schoolId: role.schoolId });
+
   const canAdvance =
     step === 1
       ? mergeTimestamp(draft.date, draft.time) > Date.now() && draft.durationMinutes > 0
@@ -65,7 +71,21 @@ export function ScheduleDemoScreen() {
           />
         )}
         {step === 2 && (
-          <Text style={{ color: colors.ink }}>Evaluators (Task 11)</Text>
+          <StepEvaluators
+            format={draft.format}
+            location={draft.location ?? ""}
+            videoUrl={draft.videoUrl ?? ""}
+            staff={staff}
+            selected={draft.evaluators}
+            onChange={(patch) =>
+              setDraft({
+                ...draft,
+                ...(patch.location !== undefined ? { location: patch.location } : {}),
+                ...(patch.videoUrl !== undefined ? { videoUrl: patch.videoUrl } : {}),
+                ...(patch.evaluators !== undefined ? { evaluators: patch.evaluators } : {}),
+              })
+            }
+          />
         )}
         {step === 3 && (
           <Text style={{ color: colors.ink }}>Review (Task 12)</Text>
