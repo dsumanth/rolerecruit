@@ -1,27 +1,7 @@
 import { internalAction } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
-
-const GUPSHUP_API = "https://api.gupshup.io/wa/api/v1/msg";
-
-async function sendViaGupshup(phone: string, body: string): Promise<string | null> {
-  const apiKey = process.env.GUPSHUP_API_KEY;
-  const appName = process.env.GUPSHUP_APP_NAME;
-  const sourceNumber = process.env.GUPSHUP_SOURCE_NUMBER;
-  if (!apiKey || !appName || !sourceNumber) return null;
-
-  const response = await fetch(
-    `${GUPSHUP_API}?apikey=${apiKey}&source=${sourceNumber}&destination=${phone}&message=${encodeURIComponent(body)}&app_name=${appName}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    },
-  );
-
-  if (!response.ok) return null;
-  const json = await response.json();
-  return json.messageId ?? null;
-}
+import { cloudSend } from "./whatsapp";
 
 async function sendViaResend(to: string, subject: string, text: string): Promise<string | null> {
   const apiKey = process.env.RESEND_API_KEY;
@@ -61,36 +41,48 @@ export const sendMagicLink = internalAction({
       ? `Your application to ${args.schoolName} for ${args.jobTitle} has been received. Track your status: ${trackingUrl}`
       : `Your application to ${args.schoolName} has been received. Track your status: ${trackingUrl}`;
 
-    let channel: "whatsapp" | "email" = "email";
-    let externalId: string | null = null;
-
+    // Prefer the school's connected WhatsApp Cloud API number; fall back to email.
     if (args.whatsappEnabled && args.candidatePhone) {
-      const msgId = await sendViaGupshup(args.candidatePhone, messageBody);
-      if (msgId) {
-        channel = "whatsapp";
-        externalId = msgId;
+      try {
+        const { metaMessageId, markupPct, schoolId } = await cloudSend(ctx, {
+          applicationId: args.applicationId,
+          to: args.candidatePhone,
+          kind: "text",
+          body: messageBody,
+        });
+        await ctx.runMutation(internal.whatsapp.insertCloudSentMessage, {
+          applicationId: args.applicationId,
+          candidateId: args.candidateId,
+          schoolId,
+          type: "custom",
+          body: messageBody,
+          metaMessageId,
+          markupPct,
+        });
+        return { channel: "whatsapp" as const, success: true };
+      } catch {
+        // WhatsApp not connected or send failed - fall through to email.
       }
     }
 
-    if (!externalId && args.candidateEmail) {
+    if (args.candidateEmail) {
       const emailSubject = args.jobTitle
         ? `Application Received — ${args.schoolName} — ${args.jobTitle}`
         : `Application Received — ${args.schoolName}`;
       const emailId = await sendViaResend(args.candidateEmail, emailSubject, messageBody);
-      externalId = emailId;
+      if (emailId) {
+        await ctx.runMutation(internal.outreach.saveSentMessage as any, {
+          applicationId: args.applicationId,
+          candidateId: args.candidateId,
+          type: "custom",
+          channel: "email",
+          body: messageBody,
+          externalId: emailId,
+        });
+        return { channel: "email" as const, success: true };
+      }
     }
 
-    if (externalId) {
-      await ctx.runMutation(internal.outreach.saveSentMessage as any, {
-        applicationId: args.applicationId,
-        candidateId: args.candidateId,
-        type: "custom",
-        channel,
-        body: messageBody,
-        externalId,
-      });
-    }
-
-    return { channel: externalId ? channel : "none", success: !!externalId };
+    return { channel: "none" as const, success: false };
   },
 });
