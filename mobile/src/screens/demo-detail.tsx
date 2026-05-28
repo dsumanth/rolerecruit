@@ -5,6 +5,7 @@ import { api } from "@convex/_generated/api";
 import { Card } from "@/components/ui/card";
 import { PressableButton } from "@/components/ui/pressable-button";
 import { EvaluatorStatusRow } from "@/components/demos/evaluator-status-row";
+import { useRoleContext } from "@/hooks/use-role-context";
 import { colors, fonts, space } from "@/theme";
 
 type Params = { demoId: string; inviteId: string };
@@ -27,6 +28,7 @@ export function DemoDetailScreen({
   route: { params: Params };
 }) {
   const { demoId, inviteId } = route.params;
+  const role = useRoleContext();
   const demo = useQuery(api.demoSessions.get, { demoId: demoId as any });
   const application = useQuery(
     api.applications.getWithCandidateAndJob,
@@ -73,6 +75,17 @@ export function DemoDetailScreen({
           {demo.location ? ` - ${demo.location}` : ""}
         </Text>
       </Card>
+
+      {role.isHR && (
+        <View style={{ marginTop: space[3] }}>
+          <PressableButton
+            variant="secondary"
+            onPress={() => navigation.navigate("DemoSummary", { demoId })}
+          >
+            View summary
+          </PressableButton>
+        </View>
+      )}
 
       <Text style={{ marginTop: space[6], marginBottom: space[2], color: colors.inkSecondary, fontSize: fonts.size.sm, fontWeight: fonts.weight.semibold, textTransform: "uppercase", letterSpacing: 0.5 }}>
         Other evaluators

@@ -1,5 +1,11 @@
 import { render, screen, fireEvent } from "@testing-library/react-native";
 import { NavigationContainer } from "@react-navigation/native";
+
+const mockRole = jest.fn();
+jest.mock("@/hooks/use-role-context", () => ({
+  useRoleContext: () => mockRole(),
+}));
+
 import { DemoDetailScreen } from "@/screens/demo-detail";
 
 const mockInvite = { _id: "i_me", status: "invited", evaluatorUserId: "u_me", evaluatorRole: "principal" };
@@ -45,6 +51,10 @@ function withNav(node: React.ReactNode) {
 }
 
 describe("DemoDetailScreen", () => {
+  beforeEach(() => {
+    mockRole.mockReturnValue({ isHR: false, userProfileId: "u_me", schoolId: "s1" });
+  });
+
   it("shows the candidate name, location, and the sibling evaluator with only status (no scores)", () => {
     render(
       withNav(
@@ -73,5 +83,33 @@ describe("DemoDetailScreen", () => {
     const cta = screen.getByText("Start evaluation");
     fireEvent.press(cta);
     expect(navigate).toHaveBeenCalledWith("EvaluationForm", { inviteId: "i_me", demoId: "d1" });
+  });
+
+  it("hides View summary link for non-HR users", () => {
+    mockRole.mockReturnValue({ isHR: false, userProfileId: "u_me", schoolId: "s1" });
+    render(
+      withNav(
+        <DemoDetailScreen
+          navigation={{ navigate: jest.fn() } as any}
+          route={{ params: { demoId: "d1", inviteId: "i_me" } } as any}
+        />,
+      ),
+    );
+    expect(screen.queryByText("View summary")).toBeNull();
+  });
+
+  it("shows View summary link for HR users and navigates to DemoSummary", () => {
+    mockRole.mockReturnValue({ isHR: true, userProfileId: "u_hr", schoolId: "s1" });
+    const navigate = jest.fn();
+    render(
+      withNav(
+        <DemoDetailScreen
+          navigation={{ navigate } as any}
+          route={{ params: { demoId: "d1", inviteId: "i_me" } } as any}
+        />,
+      ),
+    );
+    fireEvent.press(screen.getByText("View summary"));
+    expect(navigate).toHaveBeenCalledWith("DemoSummary", { demoId: "d1" });
   });
 });

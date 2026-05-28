@@ -7,6 +7,7 @@ import { DemoDetailScreen } from "@/screens/demo-detail";
 import { EvaluationFormScreen } from "@/screens/evaluation-form";
 import { CandidateDetailScreen } from "@/screens/candidate-detail";
 import { ScheduleDemoScreen } from "@/screens/schedule-demo";
+import { DemoSummaryScreen } from "@/screens/demo-summary";
 import { DeclineModal } from "@/components/demos/decline-modal";
 import { useSession } from "@/hooks/use-session";
 import { useRoleContext } from "@/hooks/use-role-context";
@@ -21,6 +22,7 @@ export type RootStackParamList = {
   DeclineInvite: { inviteId: string };
   CandidateDetail: { candidateId: string };
   ScheduleDemo: { applicationId: string; parentDemoId?: string };
+  DemoSummary: { demoId: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -68,6 +70,11 @@ export function AppNav() {
               name="ScheduleDemo"
               component={ScheduleDemoScreen}
               options={{ presentation: "modal", headerShown: true, title: "Schedule demo" }}
+            />
+            <Stack.Screen
+              name="DemoSummary"
+              component={DemoSummaryScreen}
+              options={{ headerShown: true, title: "Summary" }}
             />
           </>
         ) : (
