@@ -129,3 +129,36 @@ export const getPermissions = query({
     return legacyPermissions[profile.role] ?? [];
   },
 });
+
+export const getById = query({
+  args: { userId: v.id("userProfiles") },
+  handler: async (ctx, { userId }) => {
+    const u = await ctx.db.get(userId);
+    if (!u) throw new Error("User profile not found");
+    return u;
+  },
+});
+
+export const registerExpoToken = mutation({
+  args: { userId: v.id("userProfiles"), token: v.string() },
+  handler: async (ctx, { userId, token }) => {
+    if (!token.trim()) throw new Error("Token cannot be empty");
+    const u = await ctx.db.get(userId);
+    if (!u) throw new Error("User profile not found");
+    const existing = u.expoPushTokens ?? [];
+    if (existing.includes(token)) return;
+    await ctx.db.patch(userId, { expoPushTokens: [...existing, token] });
+  },
+});
+
+export const unregisterExpoToken = mutation({
+  args: { userId: v.id("userProfiles"), token: v.string() },
+  handler: async (ctx, { userId, token }) => {
+    const u = await ctx.db.get(userId);
+    if (!u) throw new Error("User profile not found");
+    const existing = u.expoPushTokens ?? [];
+    const next = existing.filter((t) => t !== token);
+    if (next.length === existing.length) return;
+    await ctx.db.patch(userId, { expoPushTokens: next });
+  },
+});
