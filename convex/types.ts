@@ -1,3 +1,15 @@
+import { v } from "convex/values";
+
+export const evaluatorRoles = ["principal", "hod", "hr_admin", "teacher"] as const;
+export type EvaluatorRole = (typeof evaluatorRoles)[number];
+
+export const EVALUATOR_ROLE_UNION = v.union(
+  v.literal("principal"),
+  v.literal("hod"),
+  v.literal("hr_admin"),
+  v.literal("teacher"),
+);
+
 // Evidence span — quote must literally appear in rawChunks at offset
 export interface Evidence {
   quote: string;

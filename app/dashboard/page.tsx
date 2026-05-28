@@ -3,6 +3,7 @@ import { requireProfile } from "@/lib/auth";
 import { PageHeader, Button } from "@/components/ui";
 import { StatsBar } from "@/components/dashboard/stats-bar";
 import { RoleCards } from "@/components/dashboard/role-cards";
+import { MorningBriefWidget } from "@/components/dashboard/morning-brief-widget";
 
 export default async function DashboardPage() {
   const { profile } = await requireProfile();
@@ -22,6 +23,7 @@ export default async function DashboardPage() {
       />
 
       <div className="space-y-7">
+        <MorningBriefWidget schoolId={profile.schoolId} />
         <StatsBar schoolId={profile.schoolId} />
         <section>
           <div className="flex items-baseline justify-between mb-3">

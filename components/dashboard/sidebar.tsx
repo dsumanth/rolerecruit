@@ -2,6 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import { RoleGate } from "@/components/auth/role-gate";
 import { Avatar } from "@/components/ui/avatar";
 import { BrandMark } from "@/components/ui/brand-mark";
@@ -20,6 +23,7 @@ const PRIMARY_NAV: NavLinkItem[] = [
   { href: "/dashboard",            label: "Dashboard",   icon: "Home" },
   { href: "/dashboard/jobs",       label: "Jobs",        icon: "Briefcase" },
   { href: "/dashboard/pipeline",   label: "Pipeline",    icon: "Kanban" },
+  { href: "/dashboard/inbox",      label: "Inbox",       icon: "Inbox" },
   { href: "/dashboard/triage",     label: "Triage",      icon: "ClipboardList" },
   { href: "/dashboard/talent",     label: "Talent Bank", icon: "Users" },
   { href: "/dashboard/sourcing",   label: "Sourcing",    icon: "Network" },
@@ -28,10 +32,12 @@ const PRIMARY_NAV: NavLinkItem[] = [
 interface SidebarProps {
   userName: string;
   userRole?: string;
+  schoolId?: Id<"schools">;
 }
 
-export function Sidebar({ userName, userRole }: SidebarProps) {
+export function Sidebar({ userName, userRole, schoolId }: SidebarProps) {
   const pathname = usePathname();
+  const inboxCount = useQuery(api.inbox.countEscalated, schoolId ? { schoolId } : "skip");
 
   return (
     <aside className="w-[232px] shrink-0 bg-surface-chrome backdrop-blur-24 border-r border-chrome flex flex-col">
@@ -42,7 +48,12 @@ export function Sidebar({ userName, userRole }: SidebarProps) {
 
       <nav className="flex-1 px-3.5 flex flex-col gap-px">
         {PRIMARY_NAV.map((item) => (
-          <NavLink key={item.href} item={item} active={isActive(pathname, item.href)} />
+          <NavLink
+            key={item.href}
+            item={item}
+            active={isActive(pathname, item.href)}
+            badge={item.href === "/dashboard/inbox" && inboxCount && inboxCount > 0 ? inboxCount : undefined}
+          />
         ))}
 
         <RoleGate requiredAction="settings" fallback={null}>
@@ -90,7 +101,7 @@ export function Sidebar({ userName, userRole }: SidebarProps) {
   );
 }
 
-function NavLink({ item, active }: { item: NavLinkItem; active: boolean }) {
+function NavLink({ item, active, badge }: { item: NavLinkItem; active: boolean; badge?: number }) {
   return (
     <Link
       href={item.href}
@@ -103,7 +114,12 @@ function NavLink({ item, active }: { item: NavLinkItem; active: boolean }) {
       )}
     >
       <Icon name={item.icon} size={16} color={active ? "var(--accent)" : "var(--ink-2)"} />
-      {item.label}
+      <span className="flex-1">{item.label}</span>
+      {badge ? (
+        <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-accent text-white text-[10px] font-semibold leading-none">
+          {badge}
+        </span>
+      ) : null}
       {active && (
         <span
           aria-hidden

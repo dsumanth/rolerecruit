@@ -29,4 +29,11 @@ crons.interval(
   internal.vercelDomains.pollPendingDomains,
 );
 
+crons.daily(
+  "morning-brief",
+  { hourUTC: 2, minuteUTC: 30 },
+  internal.morningBrief.sendAllSchools,
+  {},
+);
+
 export default crons;

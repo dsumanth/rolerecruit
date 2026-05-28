@@ -84,6 +84,30 @@ export const create = mutation({
   },
 });
 
+export const updateBriefSettings = mutation({
+  args: {
+    schoolId: v.id("schools"),
+    recipientUserIds: v.array(v.string()),
+    enabled: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.schoolId, {
+      morningBriefRecipientUserIds: args.recipientUserIds,
+      morningBriefEnabled: args.enabled,
+    });
+  },
+});
+
+export const updateFaqContent = mutation({
+  args: {
+    schoolId: v.id("schools"),
+    faqContent: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.schoolId, { faqContent: args.faqContent });
+  },
+});
+
 export const get = query({
   args: { schoolId: v.id("schools") },
   handler: async (ctx, args) => {
