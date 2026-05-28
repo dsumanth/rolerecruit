@@ -1,4 +1,3 @@
-import { Text, View } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { SignInScreen } from "@/screens/sign-in";
@@ -7,11 +6,11 @@ import { HRTabs } from "@/navigation/hr-tabs";
 import { DemoDetailScreen } from "@/screens/demo-detail";
 import { EvaluationFormScreen } from "@/screens/evaluation-form";
 import { CandidateDetailScreen } from "@/screens/candidate-detail";
+import { ScheduleDemoScreen } from "@/screens/schedule-demo";
 import { DeclineModal } from "@/components/demos/decline-modal";
 import { useSession } from "@/hooks/use-session";
 import { useRoleContext } from "@/hooks/use-role-context";
 import { useRegisterPushToken } from "@/hooks/use-register-push-token";
-import { colors, space } from "@/theme";
 
 export type RootStackParamList = {
   SignIn: undefined;
@@ -28,14 +27,6 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 function DeclineInviteScreen({ route, navigation }: any) {
   return <DeclineModal inviteId={route.params.inviteId} onClose={() => navigation.goBack()} />;
-}
-
-function ScheduleDemoScreen() {
-  return (
-    <View style={{ flex: 1, padding: space[4], backgroundColor: colors.surfaceCanvas }}>
-      <Text style={{ color: colors.inkSecondary }}>Schedule demo wizard coming soon.</Text>
-    </View>
-  );
 }
 
 export function AppNav() {
@@ -76,7 +67,7 @@ export function AppNav() {
             <Stack.Screen
               name="ScheduleDemo"
               component={ScheduleDemoScreen}
-              options={{ headerShown: true, title: "Schedule demo" }}
+              options={{ presentation: "modal", headerShown: true, title: "Schedule demo" }}
             />
           </>
         ) : (
