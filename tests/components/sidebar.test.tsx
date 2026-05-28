@@ -12,6 +12,10 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/dashboard",
 }));
 
+vi.mock("convex/react", () => ({
+  useQuery: () => undefined,
+}));
+
 function wrap() {
   return render(
     <ThemeProvider>

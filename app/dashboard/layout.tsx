@@ -15,6 +15,7 @@ export default async function DashboardLayout({
         <Sidebar
           userName={profile.name ?? profile.email ?? "User"}
           userRole={profile.role}
+          schoolId={profile.schoolId}
         />
         <main className="flex-1 p-8 min-w-0">{children}</main>
       </div>
