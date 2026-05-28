@@ -56,8 +56,9 @@ describe("DemoSummaryScreen", () => {
       dimensionAverages: {},
       perEvaluator: [
         {
-          invite: { _id: "i1", evaluatorRole: "principal", status: "submitted" },
-          profile: { name: "Mrs Iyer" },
+          invite: { _id: "i1", status: "submitted" },
+          evaluatorName: "Mrs Iyer",
+          evaluatorRole: "principal",
           evaluation: { recommendation: "hire" },
         },
       ],

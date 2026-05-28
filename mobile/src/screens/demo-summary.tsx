@@ -18,10 +18,6 @@ function statusTone(status: string): "success" | "warning" | "danger" | "info" |
   return "info";
 }
 
-function evaluatorName(row: any): string {
-  return row.profile?.name ?? row.evaluatorName ?? "Unknown";
-}
-
 export function DemoSummaryScreen() {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
@@ -161,8 +157,8 @@ export function DemoSummaryScreen() {
       {(perEvaluator ?? []).map((row: any) => (
         <PerEvaluatorRow
           key={row.invite._id}
-          name={evaluatorName(row)}
-          role={row.invite.evaluatorRole}
+          name={row.evaluatorName ?? "Unknown"}
+          role={row.evaluatorRole}
           status={row.invite.status}
           recommendation={row.evaluation?.recommendation}
           bullets={row.evaluation?.voiceInputs?.[0]?.summaryPoints}
