@@ -1,4 +1,4 @@
-import { action } from "./_generated/server";
+import { action, internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 
@@ -97,6 +97,93 @@ const TEMPLATES: Record<string, (params: Record<string, string>) => string> = {
   rejection_notification: (p) =>
     `Dear ${p.name},\n\nThank you for your interest in the ${p.position} position at ${p.school}. After careful consideration, we have decided to move forward with another candidate. We appreciate your time and wish you the best.\n\nRegards,\n${p.school} HR`,
 };
+
+// ============================================================================
+// Inbound handler: route candidate replies into the conversation agent.
+// ============================================================================
+
+function normalizePhone(s: string): string {
+  return s.replace(/[^\d+]/g, "");
+}
+
+export const findCandidateLatestOutbound = internalQuery({
+  args: { fromPhone: v.string() },
+  handler: async (ctx, args) => {
+    const target = normalizePhone(args.fromPhone);
+    const allCandidates = await ctx.db.query("candidates").collect();
+    const candidate = allCandidates.find((c) => c.phone && normalizePhone(c.phone) === target);
+    if (!candidate) return null;
+
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const messages = await ctx.db.query("outreachMessages").collect();
+    const candidateOutbounds = messages
+      .filter((m) =>
+        m.candidateId === candidate._id &&
+        m.direction !== "inbound" &&
+        m.type !== "rejection" &&
+        typeof m.sentAt === "number" &&
+        (m.sentAt as number) >= cutoff,
+      )
+      .sort((a, b) => (b.sentAt as number) - (a.sentAt as number));
+    if (candidateOutbounds.length === 0) return null;
+    const parent = candidateOutbounds[0];
+    return {
+      candidateId: candidate._id,
+      applicationId: parent.applicationId,
+      schoolId: parent.schoolId,
+      parentMessageId: parent._id,
+    };
+  },
+});
+
+export const insertWhatsappInbound = internalMutation({
+  args: {
+    parentMessageId: v.id("outreachMessages"),
+    applicationId: v.id("applications"),
+    candidateId: v.id("candidates"),
+    schoolId: v.id("schools"),
+    body: v.string(),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.insert("outreachMessages", {
+      applicationId: args.applicationId,
+      candidateId: args.candidateId,
+      schoolId: args.schoolId,
+      type: "candidate_reply",
+      channel: "whatsapp",
+      body: args.body,
+      status: "sent",
+      direction: "inbound",
+      inReplyToMessageId: args.parentMessageId,
+      sentAt: Date.now(),
+    });
+  },
+});
+
+export const handleInboundMessage = action({
+  args: { fromPhone: v.string(), body: v.string() },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ matched: boolean; applicationId?: string }> => {
+    const match = await ctx.runQuery(internal.whatsapp.findCandidateLatestOutbound, {
+      fromPhone: args.fromPhone,
+    });
+    if (!match || !match.schoolId) {
+      console.log(`[whatsapp] dropped inbound from unknown/inactive phone: ${args.fromPhone}`);
+      return { matched: false };
+    }
+    const inboundId = await ctx.runMutation(internal.whatsapp.insertWhatsappInbound, {
+      parentMessageId: match.parentMessageId,
+      applicationId: match.applicationId,
+      candidateId: match.candidateId,
+      schoolId: match.schoolId,
+      body: args.body,
+    });
+    await ctx.scheduler.runAfter(0, internal.conversation.handleInbound, { messageId: inboundId });
+    return { matched: true, applicationId: match.applicationId };
+  },
+});
 
 export const sendWhatsAppTemplate = action({
   args: {
