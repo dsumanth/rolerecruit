@@ -40,6 +40,20 @@ export const decline = mutation({
   },
 });
 
+async function loadInviteContext(ctx: any, inv: any) {
+  const demo = await ctx.db.get(inv.demoSessionId);
+  if (!demo) return null;
+  const template = await ctx.db.get(inv.formTemplateId);
+  const application = await ctx.db.get(demo.applicationId);
+  const candidate = application ? await ctx.db.get(application.candidateId) : null;
+  return {
+    invite: inv,
+    demo,
+    template,
+    candidate: candidate ? { _id: candidate._id, name: candidate.name } : null,
+  };
+}
+
 export const getByToken = query({
   args: { token: v.string() },
   handler: async (ctx, { token }) => {
@@ -48,10 +62,7 @@ export const getByToken = query({
       .withIndex("by_token", (q) => q.eq("token", token))
       .first();
     if (!inv) return null;
-    const demo = await ctx.db.get(inv.demoSessionId);
-    if (!demo) return null;
-    const template = await ctx.db.get(inv.formTemplateId);
-    return { invite: inv, demo, template };
+    return await loadInviteContext(ctx, inv);
   },
 });
 
@@ -60,9 +71,7 @@ export const getById = query({
   handler: async (ctx, { inviteId }) => {
     const inv = await ctx.db.get(inviteId);
     if (!inv) return null;
-    const demo = await ctx.db.get(inv.demoSessionId);
-    const template = await ctx.db.get(inv.formTemplateId);
-    return { invite: inv, demo, template };
+    return await loadInviteContext(ctx, inv);
   },
 });
 

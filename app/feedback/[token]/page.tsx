@@ -1,12 +1,9 @@
-import { ConvexClientProvider } from "@/components/ConvexClientProvider";
-import { FeedbackForm } from "@/components/feedback/feedback-form";
+import { redirect } from "next/navigation";
 
-export default function FeedbackPage({ params }: { params: { token: string } }) {
-  return (
-    <div className="min-h-screen bg-surface-canvas flex items-center justify-center p-6">
-      <ConvexClientProvider>
-        <FeedbackForm token={params.token} />
-      </ConvexClientProvider>
-    </div>
-  );
+export default function LegacyFeedbackRedirect({
+  params,
+}: {
+  params: { token: string };
+}) {
+  redirect(`/evaluations/from-token?token=${encodeURIComponent(params.token)}`);
 }
