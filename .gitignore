@@ -11,3 +11,13 @@ tests/e2e/.auth/
 tests/e2e/.fixtures/
 playwright-report/
 test-results/
+
+# mobile (Expo)
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
+mobile/web-build/
+mobile/ios/
+mobile/android/
+mobile/*.log
+mobile/.maestro/.history/

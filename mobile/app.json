@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "Rolerecruit",
+    "slug": "rolerecruit",
+    "scheme": "rolerecruit",
+    "version": "0.0.1",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.rolerecruit.mobile",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Rolerecruit uses the microphone for on-device dictation of evaluation feedback. Audio is not recorded or uploaded.",
+        "NSSpeechRecognitionUsageDescription": "Rolerecruit transcribes spoken feedback on-device. Only the transcript text leaves your phone, never the audio."
+      }
+    },
+    "android": {
+      "package": "app.rolerecruit.mobile",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "permissions": ["RECORD_AUDIO"]
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-notifications"
+    ],
+    "extra": {
+      "convexUrl": "https://merry-ladybug-673.convex.cloud",
+      "betterAuthBaseUrl": "https://merry-ladybug-673.convex.site"
+    }
+  }
+}
