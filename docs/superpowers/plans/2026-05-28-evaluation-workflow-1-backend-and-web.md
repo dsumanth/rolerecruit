@@ -12,6 +12,40 @@
 
 ---
 
+## UI guidelines (applies to all UI tasks T14-T22)
+
+All components must use the existing design system in `components/ui/` and the design tokens defined in `tailwind.config.ts`. **Do not use raw Tailwind color/spacing utilities like `bg-blue-600`, `text-gray-500`, `rounded-2xl`, `border-gray-300`.** They will look out of place next to the rest of the polished UI.
+
+**Primitives (import from `@/components/ui`):**
+
+- `<Button variant size loading iconLeft iconRight />` — variants: `primary | secondary | danger | ghost | outline | gradient | ink`; sizes: `sm | md | lg`. Renders a pill-shaped button with apple-out easing.
+- `<Card surface elevation interactive padding />` — surfaces: `card | chrome | floating`; elevations: `floor | 1 | 2 | 3 | 4`; paddings: `none | sm | md | lg`.
+- `<Dialog open onOpenChange title description variant footer />` — variants: `center | drawer`. Provides backdrop, escape-to-close, body scroll lock, focus trap.
+- `<Badge variant dot />` — variants: `neutral | info | success | warning | danger`.
+- `<Avatar>`, `<Input>`, `<Select>`, `<Tabs>`, `<Skeleton>`, `<Tooltip>`, `<EmptyState>`, `<Dropdown>`, `<PageHeader>`, `<Icon name>`, `useToast()`.
+
+**Tokens (Tailwind):**
+
+| Concern | Token |
+|---|---|
+| Primary text | `text-ink` |
+| Secondary text | `text-ink-secondary` |
+| Tertiary/muted | `text-ink-tertiary` |
+| Brand color | `text-accent` / `bg-accent` |
+| Accent soft fill | `bg-accent-soft` |
+| Status | `text-success / text-warning / text-danger` (and soft equivalents via Badge variants) |
+| Card / panel bg | `bg-surface` |
+| Canvas bg | `bg-surface-canvas` |
+| Floating overlay | `bg-surface-floating backdrop-blur-20` |
+| Borders / dividers | `border-hairline` (default) / `border-hairline-strong` (emphasis) |
+| Shadow | `shadow-elev-1` (cards) / `shadow-elev-3` (menus, popovers) |
+| Radii | `rounded-apple` (0.625rem default) / `rounded-xs / sm / md / lg / xl` |
+| Motion | `transition-all duration-fast ease-apple-out` |
+
+**Pattern enforcement:** If a UI task in this plan shows raw Tailwind like `bg-blue-600`, treat that as an example structure only — substitute the design-system equivalent. Open `components/pipeline/`, `components/jobs/`, or `components/candidates/` for reference patterns in the existing codebase.
+
+---
+
 ## File map
 
 **New Convex modules**
