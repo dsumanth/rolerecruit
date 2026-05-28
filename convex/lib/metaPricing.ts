@@ -16,8 +16,15 @@ export function lookupMetaCostUsd(args: {
   category: MessageCategory;
 }): number {
   if (args.category === "service") return 0;
-  const country =
-    args.countryCode && META_PRICES_USD[args.countryCode] ? args.countryCode : FALLBACK_COUNTRY;
+  const known = Boolean(args.countryCode && META_PRICES_USD[args.countryCode]);
+  if (!known) {
+    // Observability for table drift: an unmapped country bills at US rates, which
+    // can mis-price. See docs/integrations/meta-pricing.md to add the country.
+    console.warn(
+      `[whatsapp] no price-table entry for country "${args.countryCode ?? "unknown"}"; billing at ${FALLBACK_COUNTRY} rates`,
+    );
+  }
+  const country = known ? (args.countryCode as string) : FALLBACK_COUNTRY;
   return META_PRICES_USD[country]?.[args.category] ?? META_PRICES_USD[FALLBACK_COUNTRY][args.category] ?? 0;
 }
 

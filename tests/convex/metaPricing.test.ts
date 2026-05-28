@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { lookupMetaCostUsd, computeBillableUsd } from "../../convex/lib/metaPricing";
 import { countryFromPhone } from "../../convex/lib/phone";
 
@@ -16,6 +16,21 @@ describe("metaPricing", () => {
   it("falls back to US prices for unknown countries", () => {
     expect(lookupMetaCostUsd({ countryCode: "ZZ", category: "utility" })).toBe(0.014);
     expect(lookupMetaCostUsd({ countryCode: undefined, category: "utility" })).toBe(0.014);
+  });
+
+  it("warns once on fallback for an unmapped country, but not for a known one", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      lookupMetaCostUsd({ countryCode: "ZZ", category: "utility" });
+      expect(warn).toHaveBeenCalledTimes(1);
+      lookupMetaCostUsd({ countryCode: "IN", category: "utility" });
+      expect(warn).toHaveBeenCalledTimes(1);
+      // service is free and country-agnostic, so it must not warn
+      lookupMetaCostUsd({ countryCode: "ZZ", category: "service" });
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it("computes billable with markup", () => {
