@@ -567,3 +567,14 @@ export const bulkSetStage = mutation({
     return { batchId, previousStages };
   },
 });
+
+export const listForCandidate = query({
+  args: { candidateId: v.id("candidates") },
+  handler: async (ctx, { candidateId }) => {
+    return await ctx.db
+      .query("applications")
+      .withIndex("by_candidateId", (q) => q.eq("candidateId", candidateId))
+      .filter((q) => q.eq(q.field("pendingDeleteAt"), undefined))
+      .collect();
+  },
+});
