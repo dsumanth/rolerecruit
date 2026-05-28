@@ -82,12 +82,24 @@ export const recordInbound = internalMutation({
       console.log(`[whatsapp] inbound for unknown phoneNumberId ${args.phoneNumberId}`);
       return { matched: false };
     }
+
+    // Meta retries webhooks; skip if we already recorded this inbound message.
+    const already = await ctx.db
+      .query("outreachMessages")
+      .withIndex("by_metaMessageId", (q) => q.eq("metaMessageId", args.metaMessageId))
+      .first();
+    if (already) return { matched: true };
+
     const target = normalizeToE164(args.fromPhone);
     if (!target) return { matched: false };
 
+    // One phone can map to several candidate rows (created per application, no cross-school dedup).
+    // Resolve within the receiving school: pick its most recent outbound to any phone-matching candidate row.
     const candidates = await ctx.db.query("candidates").collect();
-    const candidate = candidates.find((c) => normalizeToE164(c.phone) === target);
-    if (!candidate) {
+    const matchingIds = new Set(
+      candidates.filter((c) => normalizeToE164(c.phone) === target).map((c) => c._id),
+    );
+    if (matchingIds.size === 0) {
       console.log(`[whatsapp] inbound from unknown candidate ${args.fromPhone}`);
       return { matched: false };
     }
@@ -99,7 +111,7 @@ export const recordInbound = internalMutation({
       .collect();
     const outbounds = schoolMessages
       .filter((m) =>
-        m.candidateId === candidate._id &&
+        matchingIds.has(m.candidateId) &&
         m.direction !== "inbound" &&
         m.type !== "rejection" &&
         typeof m.sentAt === "number" &&
@@ -111,7 +123,7 @@ export const recordInbound = internalMutation({
 
     const inboundId = await ctx.db.insert("outreachMessages", {
       applicationId: parent.applicationId,
-      candidateId: candidate._id,
+      candidateId: parent.candidateId,
       schoolId: integ.schoolId,
       type: "candidate_reply",
       channel: "whatsapp",
