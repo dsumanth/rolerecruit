@@ -83,6 +83,25 @@ export const get = query({
   },
 });
 
+export const getWithCandidateAndJob = query({
+  args: { applicationId: v.id("applications") },
+  handler: async (ctx, args) => {
+    const application = await ctx.db.get(args.applicationId);
+    if (!application) return null;
+    const candidate = await ctx.db.get(application.candidateId);
+    const jobPosting = application.jobPostingId
+      ? await ctx.db.get(application.jobPostingId)
+      : null;
+    return {
+      ...application,
+      name: candidate?.name ?? "",
+      subject: jobPosting?.subject ?? "",
+      candidate,
+      jobPosting,
+    };
+  },
+});
+
 export const moveStage = mutation({
   args: {
     applicationId: v.id("applications"),

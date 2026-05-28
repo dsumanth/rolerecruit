@@ -124,6 +124,22 @@ export const lastInviteForTest = query({
   },
 });
 
+export const listForDemoWithProfiles = query({
+  args: { demoId: v.id("demoSessions") },
+  handler: async (ctx, { demoId }) => {
+    const invites = await ctx.db
+      .query("evaluationInvites")
+      .withIndex("by_demoSessionId", (q) => q.eq("demoSessionId", demoId))
+      .collect();
+    const out = [];
+    for (const i of invites) {
+      const profile = await ctx.db.get(i.evaluatorUserId);
+      out.push({ ...i, profile });
+    }
+    return out;
+  },
+});
+
 export const swap = mutation({
   args: {
     inviteId: v.id("evaluationInvites"),
