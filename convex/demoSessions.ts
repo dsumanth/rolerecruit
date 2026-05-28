@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { generateToken } from "./lib/tokenGen";
 import { EVALUATOR_ROLE_UNION } from "./types";
 import { maybeApplyDecision } from "./decisions";
+import { internal } from "./_generated/api";
 
 export const create = mutation({
   args: {
@@ -69,6 +70,19 @@ export const create = mutation({
         invitedAt: now,
       });
     }
+
+    const application = await ctx.db.get(args.applicationId);
+    const candidate = application ? await ctx.db.get(application.candidateId) : null;
+    const candidateName = candidate?.name;
+    const jobPosting = application?.jobPostingId ? await ctx.db.get(application.jobPostingId) : null;
+    const subject = jobPosting?.subject as string | undefined;
+
+    await ctx.scheduler.runAfter(0, internal.notifications.sendDemoEvent, {
+      event: "invite_created",
+      demoId,
+      targetUserIds: args.evaluators.map((e) => e.userId),
+      extra: { candidateName, subject },
+    });
     return demoId;
   },
 });
@@ -105,6 +119,18 @@ export const cancel = mutation({
       await ctx.db.patch(inv._id, { status: "cancelled", cancelledAt: now });
     }
     await maybeApplyDecision(ctx, demoId);
+
+    const invitesForCancel = await ctx.db
+      .query("evaluationInvites")
+      .withIndex("by_demoSessionId", (q) => q.eq("demoSessionId", demoId))
+      .collect();
+    const targets = invitesForCancel.map((i) => i.evaluatorUserId);
+
+    await ctx.scheduler.runAfter(0, internal.notifications.sendDemoEvent, {
+      event: "demo_cancelled",
+      demoId,
+      targetUserIds: targets,
+    });
   },
 });
 

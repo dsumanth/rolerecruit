@@ -182,6 +182,17 @@ export const swap = mutation({
       });
     }
 
+    await ctx.scheduler.runAfter(0, internal.notifications.sendDemoEvent, {
+      event: "evaluator_swap_in",
+      demoId: old.demoSessionId,
+      targetUserIds: [newEvaluatorUserId],
+    });
+    await ctx.scheduler.runAfter(0, internal.notifications.sendDemoEvent, {
+      event: "evaluator_swap_out",
+      demoId: old.demoSessionId,
+      targetUserIds: [old.evaluatorUserId],
+    });
+
     await maybeApplyDecision(ctx, old.demoSessionId);
     return newInviteId;
   },
