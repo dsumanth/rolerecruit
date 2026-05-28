@@ -74,6 +74,12 @@ function matchScoreVariant(score: number): BadgeVariant {
   return "neutral";
 }
 
+function toDisplayName(name: string): string {
+  return name
+    .toLocaleLowerCase()
+    .replace(/(^|[\s\-'.])(\p{L})/gu, (_, sep, char) => sep + char.toLocaleUpperCase());
+}
+
 export function ApplicationTable({
   applications,
   sortBy,
@@ -204,7 +210,9 @@ export function ApplicationTable({
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-ink">{app.candidate?.name ?? "Unknown"}</span>
+                      <span className="font-medium text-ink">
+                        {app.candidate?.name ? toDisplayName(app.candidate.name) : "Unknown"}
+                      </span>
                       {(app as any).priorRejectCount > 0 && (
                         <RejectionHistoryIndicator
                           count={(app as any).priorRejectCount}
