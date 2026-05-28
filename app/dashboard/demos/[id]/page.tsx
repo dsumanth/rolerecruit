@@ -32,7 +32,11 @@ export default function DemoDetailPage() {
         }
       />
 
-      <DemoSummary demoId={id} />
+      <DemoSummary
+        demoId={id}
+        onOverrideDecision={() => setDecisionOpen(true)}
+        onConfirmRedemo={() => router.push(`/dashboard/pipeline?fromDemo=${id}`)}
+      />
 
       {data && (
         <DecisionModal

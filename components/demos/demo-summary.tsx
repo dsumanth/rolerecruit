@@ -4,6 +4,7 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Avatar, Badge, Card } from "@/components/ui";
+import { AppliedDecisionBanner } from "./applied-decision-banner";
 
 const SECTION_LABEL = "text-caption font-semibold uppercase tracking-wide text-ink-tertiary mb-3";
 
@@ -24,7 +25,13 @@ function statusVariant(status: string): "success" | "warning" | "danger" | "info
   return "neutral";
 }
 
-export function DemoSummary({ demoId }: { demoId: string }) {
+interface DemoSummaryProps {
+  demoId: string;
+  onOverrideDecision?: () => void;
+  onConfirmRedemo?: () => void;
+}
+
+export function DemoSummary({ demoId, onOverrideDecision, onConfirmRedemo }: DemoSummaryProps) {
   const data = useQuery(api.demoSessions.aggregate, { demoId: demoId as Id<"demoSessions"> });
 
   if (!data) {
@@ -39,6 +46,13 @@ export function DemoSummary({ demoId }: { demoId: string }) {
 
   return (
     <section className="space-y-5">
+      {demo.appliedDecision && (
+        <AppliedDecisionBanner
+          applied={demo.appliedDecision}
+          onOverride={onOverrideDecision ?? (() => {})}
+          onConfirmRedemo={onConfirmRedemo ?? (() => {})}
+        />
+      )}
       <Card surface="card" elevation={1} padding="md">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="min-w-0">
