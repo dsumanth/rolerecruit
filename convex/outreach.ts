@@ -126,6 +126,15 @@ export const saveFailedMessage = internalMutation({
   },
 });
 
+function generateReplyToken(): string {
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  let token = "";
+  for (let i = 0; i < 32; i++) {
+    token += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return token;
+}
+
 export const createDraft = internalMutation({
   args: {
     applicationId: v.id("applications"),
@@ -140,10 +149,16 @@ export const createDraft = internalMutation({
     scheduledSendAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const app = await ctx.db.get(args.applicationId);
+    if (!app) throw new Error("Application not found");
+    const replyToken = args.channel === "email" ? generateReplyToken() : undefined;
     return await ctx.db.insert("outreachMessages", {
       ...args,
       status: args.scheduledSendAt ? "scheduled" : "draft_pending_approval",
       draftedBy: "triage_agent",
+      direction: "outbound",
+      schoolId: app.schoolId,
+      replyToken,
     });
   },
 });
