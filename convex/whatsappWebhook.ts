@@ -37,7 +37,11 @@ export const recordStatus = internalMutation({
     const mapped = mapStatus(args.status);
     if (mapped) patch.status = mapped;
 
-    // Record cost exactly once - when pricing first arrives and we haven't priced this row yet.
+    // Record cost exactly once. Meta sends multiple statuses (sent -> delivered -> read),
+    // sometimes concurrently. The `metaCostUsd === undefined` guard combined with Convex's
+    // serializable mutations makes this safe under concurrency: two recordStatus calls both
+    // read and write this row, so they conflict and Convex retries the loser, which then sees
+    // the cost already set and skips. Do not replace this guard with a non-transactional check.
     if (args.category && row.metaCostUsd === undefined) {
       const integ = await ctx.db
         .query("whatsappIntegrations")
