@@ -140,7 +140,6 @@ export const sendSwapOutEmail = internalAction({
   },
 });
 
-// Push notification stub. Real Expo push wiring lives in Plan 3.
 export const sendPushNotification = internalAction({
   args: {
     expoPushTokens: v.array(v.string()),
@@ -150,7 +149,25 @@ export const sendPushNotification = internalAction({
   },
   handler: async (_ctx, args) => {
     if (args.expoPushTokens.length === 0) return;
-    // TODO(Plan 3): POST to https://exp.host/--/api/v2/push/send
-    console.log("[push stub] would send:", args.title, "->", args.expoPushTokens.length, "tokens");
+    const messages = args.expoPushTokens.map((token) => ({
+      to: token,
+      sound: "default",
+      title: args.title,
+      body: args.body,
+      data: args.data,
+    }));
+    const res = await fetch("https://exp.host/--/api/v2/push/send", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Accept-encoding": "gzip, deflate",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(messages),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      console.error("Expo push send failed", res.status, text);
+    }
   },
 });
