@@ -1,15 +1,15 @@
 import { StatusBar } from "expo-status-bar";
-import { Text, View } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AppProviders } from "@/providers/app-providers";
-import { colors } from "@/theme";
+import { AppNav } from "@/navigation/app-nav";
 
 export default function App() {
   return (
-    <AppProviders>
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.surface }}>
-        <Text accessibilityLabel="smoke">Rolerecruit mobile boots.</Text>
+    <SafeAreaProvider>
+      <AppProviders>
+        <AppNav />
         <StatusBar style="auto" />
-      </View>
-    </AppProviders>
+      </AppProviders>
+    </SafeAreaProvider>
   );
 }

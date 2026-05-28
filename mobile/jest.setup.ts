@@ -32,3 +32,40 @@ jest.mock(
   }),
   { virtual: true },
 );
+
+// react-native-screens reaches into codegenNativeComponent which isn't
+// exposed by jest-expo's react-native mock. Stub the surface we use so
+// @react-navigation/native-stack can mount in tests.
+jest.mock(
+  "react-native-screens",
+  () => {
+    const RN = require("react-native");
+    const passthrough = ({ children }: { children?: unknown }) => children ?? null;
+    return {
+      __esModule: true,
+      enableScreens: jest.fn(),
+      enableFreeze: jest.fn(),
+      compatibilityFlags: {},
+      Screen: RN.View,
+      ScreenContainer: RN.View,
+      ScreenStack: RN.View,
+      ScreenStackItem: RN.View,
+      ScreenStackHeaderConfig: passthrough,
+      ScreenStackHeaderSubview: passthrough,
+      ScreenStackHeaderLeftView: passthrough,
+      ScreenStackHeaderRightView: passthrough,
+      ScreenStackHeaderCenterView: passthrough,
+      ScreenStackHeaderBackButtonImage: passthrough,
+      ScreenStackHeaderSearchBarView: passthrough,
+      SearchBar: RN.View,
+      FullWindowOverlay: RN.View,
+      NativeScreen: RN.View,
+      NativeScreenContainer: RN.View,
+      NativeScreenNavigationContainer: RN.View,
+      shouldUseActivityState: true,
+      screensEnabled: () => true,
+      isSearchBarAvailableForCurrentPlatform: false,
+    };
+  },
+  { virtual: true },
+);
