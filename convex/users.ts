@@ -139,6 +139,11 @@ export const getById = query({
   },
 });
 
+export const getByIdInternal = internalQuery({
+  args: { userId: v.id("userProfiles") },
+  handler: async (ctx, { userId }) => await ctx.db.get(userId),
+});
+
 export const registerExpoToken = mutation({
   args: { userId: v.id("userProfiles"), token: v.string() },
   handler: async (ctx, { userId, token }) => {
