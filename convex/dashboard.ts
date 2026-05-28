@@ -1,5 +1,6 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
+import { collectStatsHandler } from "./morningBrief_stats";
 
 export const getStats = query({
   args: { schoolId: v.id("schools") },
@@ -56,4 +57,9 @@ export const getPipelineBreakdown = query({
 
     return result;
   },
+});
+
+export const getMorningBriefStats = query({
+  args: { schoolId: v.id("schools") },
+  handler: async (ctx, args) => collectStatsHandler(ctx, args.schoolId),
 });
