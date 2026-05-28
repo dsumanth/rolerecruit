@@ -4,6 +4,7 @@ import { SignInScreen } from "@/screens/sign-in";
 import { EvaluatorTabs } from "@/navigation/evaluator-tabs";
 import { DemoDetailScreen } from "@/screens/demo-detail";
 import { EvaluationFormScreen } from "@/screens/evaluation-form";
+import { DeclineModal } from "@/components/demos/decline-modal";
 import { useSession } from "@/hooks/use-session";
 import { useRegisterPushToken } from "@/hooks/use-register-push-token";
 
@@ -12,9 +13,14 @@ export type RootStackParamList = {
   EvaluatorTabs: undefined;
   DemoDetail: { demoId: string; inviteId: string };
   EvaluationForm: { demoId: string; inviteId: string };
+  DeclineInvite: { inviteId: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+
+function DeclineInviteScreen({ route, navigation }: any) {
+  return <DeclineModal inviteId={route.params.inviteId} onClose={() => navigation.goBack()} />;
+}
 
 export function AppNav() {
   const { signedIn, loading } = useSession();
@@ -35,6 +41,11 @@ export function AppNav() {
               name="EvaluationForm"
               component={EvaluationFormScreen}
               options={{ headerShown: true, title: "Evaluate" }}
+            />
+            <Stack.Screen
+              name="DeclineInvite"
+              component={DeclineInviteScreen}
+              options={{ presentation: "modal", headerShown: true, title: "Decline invite" }}
             />
           </>
         ) : (
