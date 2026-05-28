@@ -47,6 +47,99 @@ export const sendInviteEmail = internalAction({
   },
 });
 
+export function renderSwapEmail(args: {
+  newEvaluatorName: string;
+  candidateName: string;
+  scheduledAt: number;
+  tokenUrl: string;
+}): { subject: string; html: string } {
+  const when = new Date(args.scheduledAt).toLocaleString("en-IN", {
+    weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit",
+  });
+  const subject = `You're now evaluating ${args.candidateName}`;
+  const html = `
+<!DOCTYPE html>
+<html><body style="font-family:system-ui,sans-serif;line-height:1.6;color:#111;">
+  <h2>You've been added as an evaluator</h2>
+  <p>Hi ${args.newEvaluatorName},</p>
+  <p>You've been added to evaluate <strong>${args.candidateName}</strong>'s demo on <strong>${when}</strong>.</p>
+  <p><a href="${args.tokenUrl}" style="display:inline-block;background:#0066ff;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none">Open the evaluation</a></p>
+</body></html>
+`.trim();
+  return { subject, html };
+}
+
+export function renderSwapOutEmail(args: {
+  oldEvaluatorName: string;
+  candidateName: string;
+  scheduledAt: number;
+}): { subject: string; html: string } {
+  const when = new Date(args.scheduledAt).toLocaleString("en-IN", {
+    weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit",
+  });
+  const subject = `You were swapped out of ${args.candidateName}'s demo`;
+  const html = `
+<!DOCTYPE html>
+<html><body style="font-family:system-ui,sans-serif;line-height:1.6;color:#111;">
+  <h2>You were swapped out</h2>
+  <p>Hi ${args.oldEvaluatorName},</p>
+  <p>You have been swapped out of the evaluation for <strong>${args.candidateName}</strong>'s demo on <strong>${when}</strong>. No action needed on your part.</p>
+</body></html>
+`.trim();
+  return { subject, html };
+}
+
+export const sendSwapEmail = internalAction({
+  args: {
+    to: v.string(),
+    newEvaluatorName: v.string(),
+    candidateName: v.string(),
+    scheduledAt: v.number(),
+    tokenUrl: v.string(),
+  },
+  handler: async (_ctx, args) => {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+      console.warn("RESEND_API_KEY not set; skipping swap email send");
+      return;
+    }
+    const { Resend } = await import("resend");
+    const resend = new Resend(apiKey);
+    const { subject, html } = renderSwapEmail(args);
+    await resend.emails.send({
+      from: process.env.RESEND_FROM ?? "no-reply@rolerecruit.app",
+      to: args.to,
+      subject,
+      html,
+    });
+  },
+});
+
+export const sendSwapOutEmail = internalAction({
+  args: {
+    to: v.string(),
+    oldEvaluatorName: v.string(),
+    candidateName: v.string(),
+    scheduledAt: v.number(),
+  },
+  handler: async (_ctx, args) => {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+      console.warn("RESEND_API_KEY not set; skipping swap-out email send");
+      return;
+    }
+    const { Resend } = await import("resend");
+    const resend = new Resend(apiKey);
+    const { subject, html } = renderSwapOutEmail(args);
+    await resend.emails.send({
+      from: process.env.RESEND_FROM ?? "no-reply@rolerecruit.app",
+      to: args.to,
+      subject,
+      html,
+    });
+  },
+});
+
 // Push notification stub. Real Expo push wiring lives in Plan 3.
 export const sendPushNotification = internalAction({
   args: {
