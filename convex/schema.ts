@@ -66,6 +66,11 @@ export default defineSchema({
       label: v.string(),
       description: v.string(),
     }))),
+
+    faqContent: v.optional(v.string()),
+    morningBriefRecipientUserIds: v.optional(v.array(v.string())),
+    conversationAgentEnabled: v.optional(v.boolean()),
+    morningBriefEnabled: v.optional(v.boolean()),
   })
     .index("by_trust", ["trustId"])
     .index("by_name", ["name"])
@@ -404,10 +409,12 @@ export default defineSchema({
       v.literal("rejection"),
       v.literal("custom"),
       v.literal("cross_role_suggestion"),
+      v.literal("candidate_reply"),
+      v.literal("agent_reply"),
     ),
     channel: v.union(v.literal("whatsapp"), v.literal("email")),
     body: v.string(),
-    sentAt: v.optional(v.number()),  // optional — drafts have none yet
+    sentAt: v.optional(v.number()),
     status: v.union(
       v.literal("draft_pending_approval"),
       v.literal("scheduled"),
@@ -418,13 +425,31 @@ export default defineSchema({
     draftedBy: v.optional(v.union(
       v.literal("triage_agent"),
       v.literal("reverse_match_agent"),
+      v.literal("conversation_agent"),
       v.literal("manual"),
     )),
     scheduledSendAt: v.optional(v.number()),
     externalId: v.optional(v.string()),
+    direction: v.optional(v.union(v.literal("outbound"), v.literal("inbound"))),
+    schoolId: v.optional(v.id("schools")),
+    replyToken: v.optional(v.string()),
+    inReplyToMessageId: v.optional(v.id("outreachMessages")),
+    intent: v.optional(v.union(
+      v.literal("faq"),
+      v.literal("reschedule"),
+      v.literal("negotiation"),
+      v.literal("unclear"),
+    )),
+    confidence: v.optional(v.number()),
+    escalated: v.optional(v.boolean()),
+    escalationReason: v.optional(v.string()),
+    resolvedAt: v.optional(v.number()),
+    processedAt: v.optional(v.number()),
   })
     .index("by_applicationId", ["applicationId"])
-    .index("by_status_scheduledSendAt", ["status", "scheduledSendAt"]),
+    .index("by_status_scheduledSendAt", ["status", "scheduledSendAt"])
+    .index("by_replyToken", ["replyToken"])
+    .index("by_schoolId_escalated", ["schoolId", "escalated"]),
 
   sourcingRuns: defineTable({
     jobPostingId: v.id("jobPostings"),
