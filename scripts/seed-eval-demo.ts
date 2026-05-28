@@ -69,9 +69,32 @@ async function main() {
     role: "principal",
   });
 
+  const hodId = await client.mutation(api.users.createProfile as any, {
+    userId: "e2e-hod",
+    name: "Test HOD",
+    email: "hod@e2e.test",
+    schoolId,
+    role: "hod",
+  });
+
+  const backupPrincipalId = await client.mutation(api.users.createProfile as any, {
+    userId: "e2e-backup-principal",
+    name: "Backup Principal",
+    email: "backup@e2e.test",
+    schoolId,
+    role: "principal",
+  });
+
+  const ruleId = await client.mutation(api.decisionRules.create as any, {
+    schoolId,
+    name: "Standard hire path",
+    branches: [{ condition: { minHire: 2, maxReject: 0 }, action: "advance" }],
+    fallback: "manual",
+  });
+
   console.log(
     JSON.stringify(
-      { schoolId, candidateId, jobId, appId, principalId },
+      { schoolId, candidateId, jobId, appId, principalId, hodId, backupPrincipalId, ruleId },
       null,
       2,
     ),

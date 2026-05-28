@@ -1,9 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { Avatar, Badge, Card } from "@/components/ui";
+import { Avatar, Badge, Button, Card } from "@/components/ui";
+import { AppliedDecisionBanner } from "./applied-decision-banner";
+import { SwapEvaluatorModal } from "./swap-evaluator-modal";
 
 const SECTION_LABEL = "text-caption font-semibold uppercase tracking-wide text-ink-tertiary mb-3";
 
@@ -24,8 +27,19 @@ function statusVariant(status: string): "success" | "warning" | "danger" | "info
   return "neutral";
 }
 
-export function DemoSummary({ demoId }: { demoId: string }) {
+interface DemoSummaryProps {
+  demoId: string;
+  onOverrideDecision?: () => void;
+  onConfirmRedemo?: () => void;
+}
+
+export function DemoSummary({ demoId, onOverrideDecision, onConfirmRedemo }: DemoSummaryProps) {
   const data = useQuery(api.demoSessions.aggregate, { demoId: demoId as Id<"demoSessions"> });
+  const [swapTarget, setSwapTarget] = useState<{
+    inviteId: string;
+    role: string;
+    userId: string;
+  } | null>(null);
 
   if (!data) {
     return (
@@ -39,6 +53,13 @@ export function DemoSummary({ demoId }: { demoId: string }) {
 
   return (
     <section className="space-y-5">
+      {demo.appliedDecision && (
+        <AppliedDecisionBanner
+          applied={demo.appliedDecision}
+          onOverride={onOverrideDecision ?? (() => {})}
+          onConfirmRedemo={onConfirmRedemo ?? (() => {})}
+        />
+      )}
       <Card surface="card" elevation={1} padding="md">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="min-w-0">
@@ -102,41 +123,72 @@ export function DemoSummary({ demoId }: { demoId: string }) {
           </Card>
         ) : (
           <div className="space-y-3">
-            {perEvaluator.map((p: any) => (
-              <Card key={p.invite._id} surface="card" elevation={1} padding="md">
-                <div className="flex items-start gap-3">
-                  <Avatar name={p.evaluatorName} size={32} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-body-s font-medium text-ink truncate">{p.evaluatorName}</p>
-                      <Badge variant="neutral">{p.evaluatorRole}</Badge>
-                      {p.evaluation.recommendation && (
-                        <Badge variant={recommendationVariant(p.evaluation.recommendation)}>
-                          {p.evaluation.recommendation}
-                        </Badge>
-                      )}
-                    </div>
-                    {p.evaluation.voiceInputs?.length ? (
-                      <div className="mt-3 space-y-2">
-                        {p.evaluation.voiceInputs.map((v: any) => (
-                          <div key={v.fieldKey}>
-                            <p className="text-caption text-ink-tertiary mb-1">{v.fieldKey}</p>
-                            <ul className="list-disc pl-5 text-body-s text-ink-secondary">
-                              {v.summaryPoints.map((b: string, i: number) => (
-                                <li key={i}>{b}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        ))}
+            {perEvaluator.map((p: any) => {
+              const canSwap = p.invite.status !== "submitted" && p.invite.status !== "cancelled";
+              return (
+                <Card key={p.invite._id} surface="card" elevation={1} padding="md">
+                  <div className="flex items-start gap-3">
+                    <Avatar name={p.evaluatorName} size={32} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-body-s font-medium text-ink truncate">{p.evaluatorName}</p>
+                        <Badge variant="neutral">{p.evaluatorRole}</Badge>
+                        {p.evaluation.recommendation && (
+                          <Badge variant={recommendationVariant(p.evaluation.recommendation)}>
+                            {p.evaluation.recommendation}
+                          </Badge>
+                        )}
                       </div>
-                    ) : null}
+                      {p.evaluation.voiceInputs?.length ? (
+                        <div className="mt-3 space-y-2">
+                          {p.evaluation.voiceInputs.map((v: any) => (
+                            <div key={v.fieldKey}>
+                              <p className="text-caption text-ink-tertiary mb-1">{v.fieldKey}</p>
+                              <ul className="list-disc pl-5 text-body-s text-ink-secondary">
+                                {v.summaryPoints.map((b: string, i: number) => (
+                                  <li key={i}>{b}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                    {canSwap && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        iconLeft="UserRoundCheck"
+                        onClick={() =>
+                          setSwapTarget({
+                            inviteId: p.invite._id,
+                            role: p.evaluatorRole,
+                            userId: p.invite.evaluatorUserId,
+                          })
+                        }
+                      >
+                        Swap
+                      </Button>
+                    )}
                   </div>
-                </div>
-              </Card>
-            ))}
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
+
+      {swapTarget && (
+        <SwapEvaluatorModal
+          open={!!swapTarget}
+          onClose={() => setSwapTarget(null)}
+          inviteId={swapTarget.inviteId}
+          schoolId={demo.schoolId}
+          evaluatorRole={swapTarget.role}
+          excludeUserId={swapTarget.userId}
+          onSwapped={() => setSwapTarget(null)}
+        />
+      )}
     </section>
   );
 }

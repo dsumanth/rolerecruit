@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import { Avatar, Badge, Button, Dialog, Input } from "@/components/ui";
+import { Avatar, Badge, Button, Dialog, Input, Select } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 type StaffRole = "principal" | "hod" | "hr_admin" | "teacher";
@@ -20,6 +20,7 @@ type ConfirmPayload = {
   videoUrl?: string;
   evaluators: { userId: string; role: StaffRole }[];
   parentDemoId?: string;
+  decisionRuleId?: string;
 };
 
 interface Props {
@@ -36,6 +37,8 @@ interface Props {
   initialScheduledAt?: number;
   /** Forwarded into `onConfirm` so the parent can record the lineage on the new demo. */
   parentDemoId?: string;
+  /** Active decision rules to offer on the review step. Empty / omitted hides the picker. */
+  activeRules?: { _id: string; name: string }[];
 }
 
 function splitTimestamp(ts: number): { date: string; time: string } {
@@ -103,6 +106,7 @@ export function ScheduleDemoWizard({
   initialEvaluators,
   initialScheduledAt,
   parentDemoId,
+  activeRules,
 }: Props) {
   const initial = initialScheduledAt ? splitTimestamp(initialScheduledAt) : { date: "", time: "" };
   const [step, setStep] = useState<0 | 1 | 2>(0);
@@ -116,6 +120,7 @@ export function ScheduleDemoWizard({
   const [picked, setPicked] = useState<Set<string>>(
     () => new Set(initialEvaluators?.map((e) => e.userId) ?? []),
   );
+  const [decisionRuleId, setDecisionRuleId] = useState<string>("");
 
   const dateId = useId();
   const timeId = useId();
@@ -154,6 +159,7 @@ export function ScheduleDemoWizard({
       videoUrl: videoUrl || undefined,
       evaluators,
       parentDemoId,
+      decisionRuleId: decisionRuleId || undefined,
     });
   };
 
@@ -366,6 +372,25 @@ export function ScheduleDemoWizard({
               )}
             </dd>
           </div>
+          {activeRules && activeRules.length > 0 && (
+            <div>
+              <dt className={SECTION_LABEL}>Decision rule (optional)</dt>
+              <dd className="mt-1">
+                <Select
+                  aria-label="Decision rule"
+                  value={decisionRuleId}
+                  onChange={(value) => setDecisionRuleId(value)}
+                  options={[
+                    { value: "", label: "None - manual decision" },
+                    ...activeRules.map((r) => ({ value: r._id, label: r.name })),
+                  ]}
+                />
+                <p className="text-caption text-ink-tertiary mt-1">
+                  If set, the matching action is auto-applied when all invites resolve. Otherwise HR decides manually.
+                </p>
+              </dd>
+            </div>
+          )}
         </dl>
       )}
     </Dialog>

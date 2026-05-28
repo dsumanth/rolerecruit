@@ -1,6 +1,8 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { generateToken } from "./lib/tokenGen";
+import { maybeApplyDecision } from "./decisions";
+import { internal } from "./_generated/api";
 
 export const listForDemo = query({
   args: { demoId: v.id("demoSessions") },
@@ -37,6 +39,7 @@ export const decline = mutation({
       declinedAt: Date.now(),
       declineReason: reason,
     });
+    await maybeApplyDecision(ctx, inv.demoSessionId);
   },
 });
 
@@ -111,11 +114,13 @@ export const listForUser = query({
  * expose to production traffic.
  */
 export const lastInviteForTest = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { index: v.optional(v.number()) },
+  handler: async (ctx, { index }) => {
     const rows = await ctx.db.query("evaluationInvites").collect();
     if (rows.length === 0) return null;
-    return rows.sort((a, b) => b.invitedAt - a.invitedAt)[0];
+    const sorted = rows.sort((a, b) => b.invitedAt - a.invitedAt);
+    const i = index ?? 0;
+    return sorted[i] ?? null;
   },
 });
 
@@ -145,6 +150,39 @@ export const swap = mutation({
       cancelledAt: now,
       replacedBy: newInviteId,
     });
+
+    // Fire-and-forget swap notifications. Both emails are best-effort: if the
+    // recipient's email is missing or Resend is not configured the action
+    // logs and returns without throwing.
+    const demo = await ctx.db.get(old.demoSessionId);
+    const application = demo ? await ctx.db.get(demo.applicationId) : null;
+    const candidate = application ? await ctx.db.get(application.candidateId) : null;
+    const newEvaluator = await ctx.db.get(newEvaluatorUserId);
+    const oldEvaluator = await ctx.db.get(old.evaluatorUserId);
+
+    if (demo && candidate && newEvaluator?.email) {
+      const newInvite = await ctx.db.get(newInviteId);
+      const tokenUrl = newInvite
+        ? `${process.env.PUBLIC_APP_URL ?? ""}/evaluations/from-token?token=${newInvite.token}`
+        : "";
+      await ctx.scheduler.runAfter(0, internal.notifications.sendSwapEmail, {
+        to: newEvaluator.email,
+        newEvaluatorName: newEvaluator.name ?? "",
+        candidateName: candidate.name,
+        scheduledAt: demo.scheduledAt,
+        tokenUrl,
+      });
+    }
+    if (demo && candidate && oldEvaluator?.email) {
+      await ctx.scheduler.runAfter(0, internal.notifications.sendSwapOutEmail, {
+        to: oldEvaluator.email,
+        oldEvaluatorName: oldEvaluator.name ?? "",
+        candidateName: candidate.name,
+        scheduledAt: demo.scheduledAt,
+      });
+    }
+
+    await maybeApplyDecision(ctx, old.demoSessionId);
     return newInviteId;
   },
 });

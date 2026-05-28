@@ -127,16 +127,18 @@ export function EvaluationForm({
   initialVoiceInputs,
   onDictate,
   onSubmit,
+  readOnly = false,
 }: {
   template: Template;
   initialResponses?: Record<string, number | string>;
   initialVoiceInputs?: VoiceInput[];
   onDictate?: (fieldKey: string) => Promise<VoiceInput | null>;
-  onSubmit: (data: {
+  onSubmit?: (data: {
     responses: Record<string, number | string>;
     recommendation: Recommendation | undefined;
     voiceInputs: VoiceInput[];
   }) => void;
+  readOnly?: boolean;
 }) {
   const [responses, setResponses] = useState<Record<string, number | string>>(initialResponses ?? {});
   const [voiceInputs, setVoiceInputs] = useState<VoiceInput[]>(initialVoiceInputs ?? []);
@@ -157,6 +159,7 @@ export function EvaluationForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (readOnly || !onSubmit) return;
     for (const f of template.fields) {
       if (f.required && (responses[f.key] === undefined || responses[f.key] === "")) {
         setError(`${f.label} is required`);
@@ -189,7 +192,7 @@ export function EvaluationForm({
               label={f.label}
               max={5}
               value={typeof responses[f.key] === "number" ? (responses[f.key] as number) : undefined}
-              onSelect={(n) => setValue(f.key, n)}
+              onSelect={(n) => !readOnly && setValue(f.key, n)}
             />
           )}
 
@@ -199,7 +202,7 @@ export function EvaluationForm({
               label={f.label}
               max={10}
               value={typeof responses[f.key] === "number" ? (responses[f.key] as number) : undefined}
-              onSelect={(n) => setValue(f.key, n)}
+              onSelect={(n) => !readOnly && setValue(f.key, n)}
             />
           )}
 
@@ -210,9 +213,10 @@ export function EvaluationForm({
                 value={(responses[f.key] as string) ?? ""}
                 onChange={(e) => setValue(f.key, e.target.value)}
                 rows={6}
-                className="w-full rounded-sm bg-surface border border-hairline-strong px-3 py-2 text-body-s text-ink placeholder:text-ink-tertiary outline-none transition-all duration-fast ease-apple-out focus:border-accent focus:ring-2 focus:ring-accent-soft resize-none"
+                disabled={readOnly}
+                className="w-full rounded-sm bg-surface border border-hairline-strong px-3 py-2 text-body-s text-ink placeholder:text-ink-tertiary outline-none transition-all duration-fast ease-apple-out focus:border-accent focus:ring-2 focus:ring-accent-soft resize-none disabled:opacity-60"
               />
-              {f.allowDictation && onDictate && (
+              {f.allowDictation && onDictate && !readOnly && (
                 <Button
                   type="button"
                   variant="ghost"
@@ -232,7 +236,7 @@ export function EvaluationForm({
               label={f.label}
               choices={f.choices}
               value={typeof responses[f.key] === "string" ? (responses[f.key] as string) : undefined}
-              onSelect={(c) => setValue(f.key, c)}
+              onSelect={(c) => !readOnly && setValue(f.key, c)}
             />
           )}
         </div>
@@ -252,8 +256,9 @@ export function EvaluationForm({
                 type="button"
                 variant={active ? "primary" : "outline"}
                 size="lg"
-                onClick={() => setRecommendation(r.value)}
+                onClick={() => !readOnly && setRecommendation(r.value)}
                 className="w-full"
+                disabled={readOnly}
               >
                 {r.label}
               </Button>
@@ -268,11 +273,13 @@ export function EvaluationForm({
         </p>
       )}
 
-      <div className="sticky bottom-0 -mx-4 px-4 py-3 bg-surface-floating backdrop-blur-20 border-t border-hairline">
-        <Button type="submit" variant="primary" size="lg" className="w-full">
-          Submit evaluation
-        </Button>
-      </div>
+      {!readOnly && (
+        <div className="sticky bottom-0 -mx-4 px-4 py-3 bg-surface-floating backdrop-blur-20 border-t border-hairline">
+          <Button type="submit" variant="primary" size="lg" className="w-full">
+            Submit evaluation
+          </Button>
+        </div>
+      )}
     </form>
   );
 }
