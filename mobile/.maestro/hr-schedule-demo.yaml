@@ -1,0 +1,27 @@
+appId: app.rolerecruit.mobile
+env:
+  SKIP_NOT_SEEDED: ${EXPO_SEED_EMAIL:-skip}
+---
+- runFlow:
+    when:
+      true: ${SKIP_NOT_SEEDED != "skip"}
+    commands:
+      - openLink: "rolerecruit://?token=${EXPO_SEED_SESSION_TOKEN}"
+      - assertVisible: "Candidates"
+      - tapOn: "Candidates"
+      - assertVisible:
+          id: "candidate-card"
+      - tapOn:
+          id: "candidate-card"
+          index: 0
+      - assertVisible: "Schedule new demo"
+      - tapOn: "Schedule new demo"
+      - assertVisible: "Step 1 of 3"
+      - tapOn: "Next"
+      - assertVisible: "Step 2 of 3"
+      - tapOn:
+          id: "staff-row"
+          index: 0
+      - tapOn: "Next"
+      - assertVisible: "Step 3 of 3"
+      - tapOn: "Confirm"

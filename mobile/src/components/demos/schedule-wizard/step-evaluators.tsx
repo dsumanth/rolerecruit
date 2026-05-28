@@ -98,6 +98,7 @@ export function StepEvaluators({
             <Pressable
               key={row._id}
               onPress={() => toggle(row)}
+              testID="staff-row"
               style={{
                 padding: space[3],
                 marginBottom: space[2],

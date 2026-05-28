@@ -14,6 +14,7 @@ export function CandidateCard({ name, email, subjects, onPress }: Props) {
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
+      testID="candidate-card"
       style={{ marginBottom: space[3] }}
     >
       <Card padding="md">

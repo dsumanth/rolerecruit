@@ -10,6 +10,13 @@ Run locally:
 ```bash
 maestro test mobile/.maestro/inbox-to-submit.yaml
 maestro test mobile/.maestro/dictation.yaml
+maestro test mobile/.maestro/hr-schedule-demo.yaml
 ```
+
+## Flows
+
+- `inbox-to-submit.yaml` - evaluator signs in, opens an invite, submits a score.
+- `dictation.yaml` - evaluator dictates a text response.
+- `hr-schedule-demo.yaml` - HR signs in, opens Candidates, picks a candidate, schedules a demo. Seeded environment required.
 
 Skip-condition for CI: if `maestro --version` fails, skip the entire stage.
