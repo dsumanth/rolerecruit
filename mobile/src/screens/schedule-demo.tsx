@@ -1,15 +1,19 @@
 import { useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 import { useRoute, useNavigation } from "@react-navigation/native";
+import { useMutation } from "convex/react";
+import { api } from "@convex/_generated/api";
 import type { EvaluatorRole } from "@convex/types";
 import {
   StepWhen,
   type StepWhenValue,
 } from "@/components/demos/schedule-wizard/step-when";
 import { StepEvaluators } from "@/components/demos/schedule-wizard/step-evaluators";
+import { StepReview } from "@/components/demos/schedule-wizard/step-review";
 import { PressableButton } from "@/components/ui/pressable-button";
 import { useRoleContext } from "@/hooks/use-role-context";
 import { useStaffDirectory } from "@/hooks/use-staff-directory";
+import { useActiveDecisionRules } from "@/hooks/use-active-decision-rules";
 import { colors, fonts, space } from "@/theme";
 
 export type Evaluator = { userId: string; role: EvaluatorRole };
@@ -39,11 +43,10 @@ export function ScheduleDemoScreen() {
     evaluators: [],
   });
 
-  void applicationId;
-  void parentDemoId;
-
   const role = useRoleContext();
   const { staff } = useStaffDirectory({ schoolId: role.schoolId });
+  const { rules } = useActiveDecisionRules({ schoolId: role.schoolId });
+  const createDemo = useMutation(api.demoSessions.create);
 
   const canAdvance =
     step === 1
@@ -51,6 +54,25 @@ export function ScheduleDemoScreen() {
       : step === 2
         ? draft.evaluators.length > 0
         : true;
+
+  const confirm = async () => {
+    if (!role.schoolId || !role.userProfileId) return;
+    await createDemo({
+      applicationId: applicationId as any,
+      schoolId: role.schoolId as any,
+      scheduledAt: mergeTimestamp(draft.date, draft.time),
+      durationMinutes: draft.durationMinutes,
+      mode: draft.mode,
+      format: draft.format,
+      location: draft.location,
+      videoUrl: draft.videoUrl,
+      evaluators: draft.evaluators as any,
+      createdBy: role.userProfileId as any,
+      parentDemoId: parentDemoId as any,
+      decisionRuleId: draft.decisionRuleId as any,
+    });
+    navigation.goBack();
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.surfaceCanvas }}>
@@ -88,7 +110,14 @@ export function ScheduleDemoScreen() {
           />
         )}
         {step === 3 && (
-          <Text style={{ color: colors.ink }}>Review (Task 12)</Text>
+          <StepReview
+            draft={draft}
+            rules={rules}
+            selectedRuleId={draft.decisionRuleId ?? null}
+            onSelectRule={(id) =>
+              setDraft({ ...draft, decisionRuleId: id ?? undefined })
+            }
+          />
         )}
       </ScrollView>
       <View
@@ -112,7 +141,7 @@ export function ScheduleDemoScreen() {
           <PressableButton
             variant="primary"
             disabled={!canAdvance}
-            onPress={() => (step < 3 ? setStep(step + 1) : navigation.goBack())}
+            onPress={() => (step < 3 ? setStep(step + 1) : confirm())}
           >
             {step < 3 ? "Next" : "Confirm"}
           </PressableButton>
