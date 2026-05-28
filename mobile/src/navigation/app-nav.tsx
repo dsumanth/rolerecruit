@@ -8,6 +8,11 @@ import { EvaluationFormScreen } from "@/screens/evaluation-form";
 import { CandidateDetailScreen } from "@/screens/candidate-detail";
 import { ScheduleDemoScreen } from "@/screens/schedule-demo";
 import { DemoSummaryScreen } from "@/screens/demo-summary";
+import { SettingsScreen } from "@/screens/settings";
+import { TemplatesIndexScreen } from "@/screens/templates";
+import { TemplateEditorScreen } from "@/screens/template-editor";
+import { DecisionRulesIndexScreen } from "@/screens/decision-rules";
+import { RuleEditorScreen } from "@/screens/rule-editor";
 import { DeclineModal } from "@/components/demos/decline-modal";
 import { useSession } from "@/hooks/use-session";
 import { useRoleContext } from "@/hooks/use-role-context";
@@ -23,6 +28,11 @@ export type RootStackParamList = {
   CandidateDetail: { candidateId: string };
   ScheduleDemo: { applicationId: string; parentDemoId?: string };
   DemoSummary: { demoId: string };
+  Settings: undefined;
+  Templates: undefined;
+  TemplateEditor: { role: "principal" | "hod" | "hr_admin" | "teacher" };
+  DecisionRules: undefined;
+  RuleEditor: { ruleId?: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -75,6 +85,31 @@ export function AppNav() {
               name="DemoSummary"
               component={DemoSummaryScreen}
               options={{ headerShown: true, title: "Summary" }}
+            />
+            <Stack.Screen
+              name="Settings"
+              component={SettingsScreen}
+              options={{ headerShown: true, title: "Settings" }}
+            />
+            <Stack.Screen
+              name="Templates"
+              component={TemplatesIndexScreen}
+              options={{ headerShown: true, title: "Templates" }}
+            />
+            <Stack.Screen
+              name="TemplateEditor"
+              component={TemplateEditorScreen}
+              options={{ headerShown: true, title: "Edit template" }}
+            />
+            <Stack.Screen
+              name="DecisionRules"
+              component={DecisionRulesIndexScreen}
+              options={{ headerShown: true, title: "Decision rules" }}
+            />
+            <Stack.Screen
+              name="RuleEditor"
+              component={RuleEditorScreen}
+              options={{ headerShown: true, title: "Edit rule" }}
             />
           </>
         ) : (

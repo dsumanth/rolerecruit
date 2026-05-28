@@ -1,14 +1,18 @@
 import { useEffect, useState } from "react";
 import { Linking, Text, View } from "react-native";
 import * as Notifications from "expo-notifications";
+import { useNavigation } from "@react-navigation/native";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PressableButton } from "@/components/ui/pressable-button";
 import { useSession } from "@/hooks/use-session";
+import { useRoleContext } from "@/hooks/use-role-context";
 import { colors, fonts, space } from "@/theme";
 
 export function ProfileScreen() {
   const { user, signOut } = useSession();
+  const role = useRoleContext();
+  const navigation = useNavigation<any>();
   const [permission, setPermission] = useState<"granted" | "denied" | "undetermined">("undetermined");
 
   useEffect(() => {
@@ -55,6 +59,17 @@ export function ProfileScreen() {
           </View>
         )}
       </Card>
+
+      {role.isHR && (
+        <View style={{ marginTop: space[4] }}>
+          <PressableButton
+            variant="secondary"
+            onPress={() => navigation.navigate("Settings")}
+          >
+            Settings
+          </PressableButton>
+        </View>
+      )}
 
       <View style={{ marginTop: space[6] }}>
         <PressableButton variant="secondary" onPress={signOut}>
