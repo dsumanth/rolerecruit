@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -17,6 +19,19 @@ export function EvaluateTab({ applicationId }: { applicationId: string }) {
       : "skip",
   );
 
+  // Re-demo prefill source. Two ways it can be set:
+  //   1. URL param (?fromDemo=<demoId>) — when the user navigates here from
+  //      the demo detail page after picking "Re-demo" in DecisionModal.
+  //   2. Future: an in-drawer DecisionModal could call setRedemoSourceId
+  //      directly (lift-state pattern), since the drawer has no URL routing.
+  const searchParams = useSearchParams();
+  const fromDemoParam = searchParams?.get("fromDemo") ?? null;
+  const [redemoSourceId, setRedemoSourceId] = useState<string | null>(fromDemoParam);
+
+  useEffect(() => {
+    if (fromDemoParam) setRedemoSourceId(fromDemoParam);
+  }, [fromDemoParam]);
+
   if (!application) {
     return <p className="text-body-s text-ink-secondary">Loading…</p>;
   }
@@ -26,6 +41,8 @@ export function EvaluateTab({ applicationId }: { applicationId: string }) {
       applicationId={applicationId}
       schoolId={application.schoolId}
       candidateName={candidate?.name ?? "Candidate"}
+      prefillFromDemoId={redemoSourceId ?? undefined}
+      onPrefillConsumed={() => setRedemoSourceId(null)}
     />
   );
 }

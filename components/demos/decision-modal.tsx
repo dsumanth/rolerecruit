@@ -14,17 +14,39 @@ interface DecisionModalProps {
   demoId: string;
   applicationId: string;
   onDecided: () => void;
+  /**
+   * Optional callback invoked when the user picks "Re-demo". When provided, the
+   * modal does NOT apply the decision itself — the parent is expected to open
+   * the schedule wizard prefilled with this demo's evaluators. When omitted,
+   * the modal falls back to `apply({ action: "redemo" })` so it remains usable
+   * in surfaces that don't host the wizard.
+   */
+  onRedemoRequested?: () => void;
 }
 
-export function DecisionModal({ open, onClose, demoId, applicationId, onDecided }: DecisionModalProps) {
+export function DecisionModal({
+  open,
+  onClose,
+  demoId,
+  applicationId,
+  onDecided,
+  onRedemoRequested,
+}: DecisionModalProps) {
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState<DecisionAction | null>(null);
   const apply = useMutation(api.demoSessions.applyDecision);
 
-  // applicationId is used by the caller / future re-demo prefill (Task 21).
+  // applicationId is reserved for future re-demo prefill use by callers.
   void applicationId;
 
   const decide = async (action: DecisionAction) => {
+    if (action === "redemo" && onRedemoRequested) {
+      // Parent takes over: open schedule wizard prefilled from this demo.
+      onRedemoRequested();
+      setNote("");
+      onClose();
+      return;
+    }
     setBusy(action);
     try {
       await apply({

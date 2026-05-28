@@ -19,6 +19,7 @@ type ConfirmPayload = {
   location?: string;
   videoUrl?: string;
   evaluators: { userId: string; role: StaffRole }[];
+  parentDemoId?: string;
 };
 
 interface Props {
@@ -29,6 +30,20 @@ interface Props {
   schoolId: string;
   candidateName: string;
   staffDirectory: StaffRow[];
+  /** Pre-select evaluators (e.g., when re-demoing — carry over the prior demo's panel). */
+  initialEvaluators?: { userId: string; role: StaffRole }[];
+  /** Pre-fill the date/time inputs from this timestamp. */
+  initialScheduledAt?: number;
+  /** Forwarded into `onConfirm` so the parent can record the lineage on the new demo. */
+  parentDemoId?: string;
+}
+
+function splitTimestamp(ts: number): { date: string; time: string } {
+  const d = new Date(ts);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return { date, time };
 }
 
 const MODE_OPTIONS: Mode[] = ["live", "post", "async"];
@@ -85,16 +100,22 @@ export function ScheduleDemoWizard({
   schoolId,
   candidateName,
   staffDirectory,
+  initialEvaluators,
+  initialScheduledAt,
+  parentDemoId,
 }: Props) {
+  const initial = initialScheduledAt ? splitTimestamp(initialScheduledAt) : { date: "", time: "" };
   const [step, setStep] = useState<0 | 1 | 2>(0);
-  const [date, setDate] = useState("");
-  const [time, setTime] = useState("");
+  const [date, setDate] = useState(initial.date);
+  const [time, setTime] = useState(initial.time);
   const [durationMinutes, setDurationMinutes] = useState(30);
   const [mode, setMode] = useState<Mode>("live");
   const [format, setFormat] = useState<Format>("classroom");
   const [location, setLocation] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
-  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [picked, setPicked] = useState<Set<string>>(
+    () => new Set(initialEvaluators?.map((e) => e.userId) ?? []),
+  );
 
   const dateId = useId();
   const timeId = useId();
@@ -132,6 +153,7 @@ export function ScheduleDemoWizard({
       location: location || undefined,
       videoUrl: videoUrl || undefined,
       evaluators,
+      parentDemoId,
     });
   };
 

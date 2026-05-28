@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -51,12 +51,24 @@ interface DemosPanelProps {
   applicationId: string;
   schoolId: string;
   candidateName: string;
+  /**
+   * When set, the panel opens the schedule wizard pre-populated with the
+   * evaluator list and timing inferred from this demo (the prior demo we're
+   * re-running). Call `onPrefillConsumed` once the wizard is open so the
+   * parent can clear its source-of-truth.
+   */
+  prefillFromDemoId?: string;
+  onPrefillConsumed?: () => void;
 }
+
+const REDEMO_DEFAULT_LEAD_MS = 3 * 86400000; // +3 days
 
 export function DemosPanel({
   applicationId,
   schoolId,
   candidateName,
+  prefillFromDemoId,
+  onPrefillConsumed,
 }: DemosPanelProps) {
   // Mirror useCurrentUser pattern from app/evaluations/page.tsx + settings/team/page.tsx
   const { data: session } = authClient.useSession();
@@ -72,11 +84,26 @@ export function DemosPanel({
   const staff = useQuery(api.users.listSchoolStaff, {
     schoolId: schoolId as Id<"schools">,
   });
+  const prefillSource = useQuery(
+    api.demoSessions.aggregate,
+    prefillFromDemoId
+      ? { demoId: prefillFromDemoId as Id<"demoSessions"> }
+      : "skip",
+  );
 
   const create = useMutation(api.demoSessions.create);
   const cancel = useMutation(api.demoSessions.cancel);
 
   const [wizardOpen, setWizardOpen] = useState(false);
+
+  // When a prefill demo arrives, open the wizard and notify parent so it can
+  // clear the prefill source (avoids re-opening on subsequent renders).
+  useEffect(() => {
+    if (prefillFromDemoId && prefillSource && !wizardOpen) {
+      setWizardOpen(true);
+      onPrefillConsumed?.();
+    }
+  }, [prefillFromDemoId, prefillSource, wizardOpen, onPrefillConsumed]);
 
   if (!demos || !me) {
     return (
@@ -176,6 +203,17 @@ export function DemosPanel({
           schoolId={schoolId}
           candidateName={candidateName}
           staffDirectory={staffDirectory}
+          initialEvaluators={
+            prefillSource?.perEvaluator
+              .map((p: { invite: { evaluatorUserId: string; evaluatorRole: StaffRole } }) => ({
+                userId: p.invite.evaluatorUserId,
+                role: p.invite.evaluatorRole,
+              }))
+          }
+          initialScheduledAt={
+            prefillSource ? Date.now() + REDEMO_DEFAULT_LEAD_MS : undefined
+          }
+          parentDemoId={prefillSource ? (prefillSource.demo._id as string) : undefined}
           onConfirm={async (data) => {
             await create({
               applicationId: data.applicationId as Id<"applications">,
@@ -191,6 +229,9 @@ export function DemosPanel({
                 role: e.role,
               })),
               createdBy: me._id as Id<"userProfiles">,
+              parentDemoId: data.parentDemoId
+                ? (data.parentDemoId as Id<"demoSessions">)
+                : undefined,
             });
             setWizardOpen(false);
           }}
