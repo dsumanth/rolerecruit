@@ -36,11 +36,31 @@ describe("applications.removeManyApplications", () => {
     const appId = await t.mutation("applications:create", {
       candidateId, schoolId, skipTriage: true,
     });
-    await t.run(async (ctx: any) => {
-      await ctx.db.insert("evaluations", {
-        applicationId: appId, evaluatorUserId: "u", evaluatorRole: "principal",
-        token: "t", submitted: false,
+    // Seed a demo + invite + evaluation through the new chain so the cascade
+    // has something to walk.
+    const { demoId, inviteId, evalId } = await t.run(async (ctx: any) => {
+      const tplId = await ctx.db.insert("formTemplates", {
+        schoolId, role: "principal", name: "P", fields: [],
+        isActive: true, createdAt: Date.now(), updatedAt: Date.now(),
       });
+      const userId = await ctx.db.insert("userProfiles", {
+        userId: "u-cascade", name: "P", email: "p@x.com", schoolId, role: "principal",
+      });
+      const demoId = await ctx.db.insert("demoSessions", {
+        applicationId: appId, schoolId,
+        scheduledAt: Date.now() + 86400000, durationMinutes: 30,
+        mode: "live", format: "classroom", status: "scheduled",
+        createdBy: userId, createdAt: Date.now(),
+      });
+      const inviteId = await ctx.db.insert("evaluationInvites", {
+        demoSessionId: demoId, evaluatorUserId: userId, evaluatorRole: "principal",
+        formTemplateId: tplId, status: "invited", token: "t-cascade", invitedAt: Date.now(),
+      });
+      const evalId = await ctx.db.insert("evaluations", {
+        inviteId, formTemplateId: tplId, responses: {},
+        submittedAt: Date.now(), submittedFromPlatform: "web",
+      });
+      return { demoId, inviteId, evalId };
     });
 
     const { batchId, count } = await t.mutation("applications:removeManyApplications", { ids: [appId] });
@@ -51,10 +71,13 @@ describe("applications.removeManyApplications", () => {
 
     const appAfter = await t.run(async (ctx: any) => ctx.db.get(appId));
     expect(appAfter).toBeNull();
-    const evals = await t.run(async (ctx: any) =>
-      ctx.db.query("evaluations").withIndex("by_applicationId", (q: any) => q.eq("applicationId", appId)).collect()
-    );
-    expect(evals.length).toBe(0);
+    // Cascade walks demos -> invites -> evaluations.
+    const demoAfter = await t.run(async (ctx: any) => ctx.db.get(demoId));
+    const inviteAfter = await t.run(async (ctx: any) => ctx.db.get(inviteId));
+    const evalAfter = await t.run(async (ctx: any) => ctx.db.get(evalId));
+    expect(demoAfter).toBeNull();
+    expect(inviteAfter).toBeNull();
+    expect(evalAfter).toBeNull();
     const candAfter = await t.run(async (ctx: any) => ctx.db.get(candidateId));
     expect(candAfter).not.toBeNull();
     vi.useRealTimers();

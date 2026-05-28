@@ -220,12 +220,9 @@ export const getPipelineForJob = query({
       let priorRejectCount = 0;
       for (const other of otherApps) {
         if (other.stage === "rejected") { priorRejectCount++; continue; }
-        const evals = await ctx.db
-          .query("evaluations")
-          .withIndex("by_applicationId", (q) => q.eq("applicationId", other._id))
-          .filter((q) => q.eq(q.field("recommendation"), "reject"))
-          .collect();
-        if (evals.length > 0) priorRejectCount++;
+        const rows = await evaluationsForApplication(ctx, other._id);
+        const hasReject = rows.some((r) => r.evaluation.recommendation === "reject");
+        if (hasReject) priorRejectCount++;
       }
       enriched.push({
         applicationId: app._id,
@@ -437,9 +434,57 @@ export const undoBatchDelete = mutation({
   },
 });
 
+// Walk demos -> invites -> evaluations for one application. Used by cascade
+// delete and any consumer that needs all evaluation rows for an application
+// after the invite-rooted refactor.
+export async function evaluationsForApplication(ctx: any, applicationId: any) {
+  const demos = await ctx.db
+    .query("demoSessions")
+    .withIndex("by_applicationId", (q: any) => q.eq("applicationId", applicationId))
+    .collect();
+  const out: Array<{ evaluation: any; invite: any; demo: any }> = [];
+  for (const demo of demos) {
+    const invites = await ctx.db
+      .query("evaluationInvites")
+      .withIndex("by_demoSessionId", (q: any) => q.eq("demoSessionId", demo._id))
+      .collect();
+    for (const invite of invites) {
+      const evals = await ctx.db
+        .query("evaluations")
+        .withIndex("by_inviteId", (q: any) => q.eq("inviteId", invite._id))
+        .collect();
+      for (const evaluation of evals) {
+        out.push({ evaluation, invite, demo });
+      }
+    }
+  }
+  return out;
+}
+
 // Shared cascade helper (also used by candidates.finalizeBatchDelete).
 export async function deleteApplicationChildren(ctx: any, applicationId: any) {
-  for (const table of ["evaluations", "outreachMessages", "calendarEvents", "triageDecisions", "bookingTokens"] as const) {
+  // Cascade through the new demo -> invite -> evaluation chain.
+  const demos = await ctx.db
+    .query("demoSessions")
+    .withIndex("by_applicationId", (q: any) => q.eq("applicationId", applicationId))
+    .collect();
+  for (const demo of demos) {
+    const invites = await ctx.db
+      .query("evaluationInvites")
+      .withIndex("by_demoSessionId", (q: any) => q.eq("demoSessionId", demo._id))
+      .collect();
+    for (const invite of invites) {
+      const evals = await ctx.db
+        .query("evaluations")
+        .withIndex("by_inviteId", (q: any) => q.eq("inviteId", invite._id))
+        .collect();
+      for (const ev of evals) await ctx.db.delete(ev._id);
+      await ctx.db.delete(invite._id);
+    }
+    await ctx.db.delete(demo._id);
+  }
+  // Other application-rooted children.
+  for (const table of ["outreachMessages", "calendarEvents", "triageDecisions", "bookingTokens"] as const) {
     const rows = await ctx.db
       .query(table)
       .withIndex("by_applicationId", (q: any) => q.eq("applicationId", applicationId))
