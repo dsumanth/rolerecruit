@@ -12,11 +12,16 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@better-auth/expo": "^1.6.11",
+    "@convex-dev/better-auth": "^0.12.2",
+    "better-auth": "^1.6.11",
+    "convex": "^1.17.0",
     "expo": "~51.0.0",
+    "expo-constants": "^56.0.16",
+    "expo-secure-store": "^56.0.4",
     "expo-status-bar": "~1.12.1",
     "react": "18.2.0",
-    "react-native": "0.74.5",
-    "convex": "^1.17.0"
+    "react-native": "0.74.5"
   },
   "devDependencies": {
     "@babel/core": "^7.24.0",
