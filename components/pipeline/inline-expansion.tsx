@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { MessageComposer } from "@/components/outreach/message-composer";
 import { DemoScheduler } from "@/components/outreach/demo-scheduler";
+import { DemosPanel } from "@/components/demos/demos-panel";
 import { InboxThread } from "@/components/dashboard/inbox-thread";
 import { useState } from "react";
 
@@ -102,7 +103,7 @@ export function InlineExpansion({ app }: InlineExpansionProps) {
             candidatePhone={candidatePhone}
           />
         )}
-        {tab === "evaluate" && <EvaluateTabContent applicationId={app._id} />}
+        {tab === "evaluate" && <EvaluateTabContent applicationId={app._id} candidateName={candidateName} />}
       </div>
     </div>
   );
@@ -235,73 +236,16 @@ function InfoTabContent({
   );
 }
 
-function EvaluateTabContent({ applicationId }: { applicationId: string }) {
-  const createEval = useMutation(api.evaluations.create);
-  const [evaluatorRole, setEvaluatorRole] = useState<string>("principal");
-  const [sending, setSending] = useState(false);
-  const [result, setResult] = useState<"success" | "error" | null>(null);
-  const [token, setToken] = useState("");
-
-  const handleRequest = async () => {
-    setSending(true);
-    setResult(null);
-    try {
-      const evalResult = await createEval({
-        applicationId: applicationId as any,
-        evaluatorRole: evaluatorRole as "principal" | "hod" | "hr_admin",
-      });
-      setToken((evalResult as any).token ?? "");
-      setResult("success");
-    } catch {
-      setResult("error");
-    } finally {
-      setSending(false);
-    }
-  };
-
-  const feedbackUrl = token ? `/feedback/${token}` : "";
-
+function EvaluateTabContent({ applicationId, candidateName }: { applicationId: string; candidateName: string }) {
+  const app = useQuery(api.applications.get, { applicationId: applicationId as any });
+  if (!app?.schoolId) {
+    return <p className="text-sm text-ink-secondary">Loading...</p>;
+  }
   return (
-    <div className="space-y-4 max-w-md">
-      <p className="text-sm text-ink-secondary">
-        Request a demo lesson evaluation from a team member.
-      </p>
-
-      <div>
-        <label className="block text-xs text-ink-secondary mb-1">Evaluator Role</label>
-        <Select
-          value={evaluatorRole}
-          onChange={setEvaluatorRole}
-          options={[
-            { value: "principal", label: "Principal" },
-            { value: "hod", label: "HOD" },
-            { value: "hr_admin", label: "HR Admin" },
-          ]}
-        />
-      </div>
-
-      {result === "success" && (
-        <div className="px-3 py-2 rounded-md bg-green-50 text-sm text-success">
-          Evaluation request created. Share this link:
-          <br />
-          <code className="text-xs text-ink break-all">{feedbackUrl}</code>
-        </div>
-      )}
-      {result === "error" && (
-        <div className="px-3 py-2 rounded-md bg-red-50 text-sm text-danger">
-          Failed to create evaluation request.
-        </div>
-      )}
-
-      <Button
-        variant="primary"
-        size="md"
-        loading={sending}
-        onClick={handleRequest}
-        className="w-full"
-      >
-        Request Evaluation
-      </Button>
-    </div>
+    <DemosPanel
+      applicationId={applicationId}
+      schoolId={app.schoolId as any}
+      candidateName={candidateName}
+    />
   );
 }

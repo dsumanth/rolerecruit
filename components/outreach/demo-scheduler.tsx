@@ -21,7 +21,6 @@ export function DemoScheduler({
 }: Props) {
   const scheduleMessage = useAction(api.whatsapp.sendWhatsAppTemplate);
   const moveStage = useMutation(api.applications.moveStage);
-  const createEval = useMutation(api.evaluations.create);
   const app = useQuery(api.applications.get, { applicationId: applicationId as any });
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
@@ -67,10 +66,10 @@ export function DemoScheduler({
         phone: candidatePhone,
       });
 
-      await createEval({
-        applicationId: applicationId as any,
-        evaluatorRole: "principal",
-      });
+      // Note: evaluations are now created through the new schedule-demo wizard
+      // (components/demos/schedule-demo-wizard.tsx + DemosPanel). This outreach
+      // path only sends the WhatsApp template and advances the application
+      // stage; evaluators are invited separately when HR opens the wizard.
 
       setResult("success");
     } catch (err: any) {
