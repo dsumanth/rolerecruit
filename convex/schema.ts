@@ -92,6 +92,46 @@ export default defineSchema({
     .index("by_userId", ["userId"])
     .index("by_schoolId", ["schoolId"]),
 
+  whatsappIntegrations: defineTable({
+    schoolId: v.id("schools"),
+    status: v.union(
+      v.literal("not_connected"),
+      v.literal("pending"),
+      v.literal("active"),
+      v.literal("disconnected"),
+      v.literal("error"),
+    ),
+    wabaId: v.optional(v.string()),
+    phoneNumberId: v.optional(v.string()),
+    displayPhoneNumber: v.optional(v.string()),
+    businessName: v.optional(v.string()),
+    verifiedName: v.optional(v.string()),
+    accessTokenCipher: v.optional(v.string()),
+    accessTokenIv: v.optional(v.string()),
+    connectedAt: v.optional(v.number()),
+    disconnectedAt: v.optional(v.number()),
+    lastErrorAt: v.optional(v.number()),
+    lastErrorMessage: v.optional(v.string()),
+    markupPct: v.number(),
+  })
+    .index("by_schoolId", ["schoolId"])
+    .index("by_phoneNumberId", ["phoneNumberId"])
+    .index("by_wabaId", ["wabaId"]),
+
+  whatsappUsage: defineTable({
+    schoolId: v.id("schools"),
+    periodStart: v.number(),
+    messageCount: v.number(),
+    utilityCount: v.number(),
+    marketingCount: v.number(),
+    authenticationCount: v.number(),
+    serviceCount: v.number(),
+    metaCostUsdTotal: v.number(),
+    billableUsdTotal: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_schoolId_periodStart", ["schoolId", "periodStart"]),
+
   invitations: defineTable({
     token: v.string(),
     email: v.string(),
@@ -570,11 +610,26 @@ export default defineSchema({
     escalationReason: v.optional(v.string()),
     resolvedAt: v.optional(v.number()),
     processedAt: v.optional(v.number()),
+    metaMessageId: v.optional(v.string()),
+    metaConversationId: v.optional(v.string()),
+    metaCategory: v.optional(v.union(
+      v.literal("utility"),
+      v.literal("marketing"),
+      v.literal("authentication"),
+      v.literal("service"),
+    )),
+    metaPricingModel: v.optional(v.string()),
+    metaCostUsd: v.optional(v.number()),
+    markupPct: v.optional(v.number()),
+    billableUsd: v.optional(v.number()),
+    costCurrency: v.optional(v.string()),
   })
     .index("by_applicationId", ["applicationId"])
     .index("by_status_scheduledSendAt", ["status", "scheduledSendAt"])
     .index("by_replyToken", ["replyToken"])
-    .index("by_schoolId_escalated", ["schoolId", "escalated"]),
+    .index("by_schoolId_escalated", ["schoolId", "escalated"])
+    .index("by_metaMessageId", ["metaMessageId"])
+    .index("by_schoolId_sentAt", ["schoolId", "sentAt"]),
 
   sourcingRuns: defineTable({
     jobPostingId: v.id("jobPostings"),
