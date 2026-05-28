@@ -98,6 +98,16 @@ export const updateBriefSettings = mutation({
   },
 });
 
+export const updateFaqContent = mutation({
+  args: {
+    schoolId: v.id("schools"),
+    faqContent: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.schoolId, { faqContent: args.faqContent });
+  },
+});
+
 export const get = query({
   args: { schoolId: v.id("schools") },
   handler: async (ctx, args) => {

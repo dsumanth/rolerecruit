@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { MessageComposer } from "@/components/outreach/message-composer";
 import { DemoScheduler } from "@/components/outreach/demo-scheduler";
+import { InboxThread } from "@/components/dashboard/inbox-thread";
 import { useState } from "react";
 
 const STAGE_LABELS: Record<string, string> = {
@@ -55,8 +56,23 @@ export function InlineExpansion({ app }: InlineExpansionProps) {
   const candidateName = candidate?.name ?? app.candidate?.name ?? "Candidate";
   const candidatePhone = candidate?.phone ?? app.candidate?.phone ?? "";
 
+  const thread = useQuery(api.inbox.getThread, { applicationId: app._id as any });
+  const hasEscalated = thread?.some(
+    (m: any) => m.escalated === true && m.resolvedAt == null,
+  );
+
   return (
     <div className="border-t border-hairline bg-surface-canvas px-6 py-4">
+      {hasEscalated && (
+        <div className="mb-4">
+          <div className="text-micro text-warning mb-2">Conversation needs your attention</div>
+          <InboxThread
+            applicationId={app._id as any}
+            candidateId={app.candidateId as any}
+          />
+        </div>
+      )}
+
       <Tabs
         items={[
           { value: "info", label: "Info" },
