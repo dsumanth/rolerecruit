@@ -20,6 +20,7 @@ const ITEMS: NavItem[] = [
   { href: "/dashboard/settings/notifications", label: "Notifications", icon: "Bell", permission: "settings:manage" },
   { href: "/dashboard/settings/pipeline", label: "Pipeline stages", icon: "Kanban" },
   { href: "/dashboard/settings/triage", label: "Triage", icon: "ClipboardList" },
+  { href: "/dashboard/settings/conversation", label: "Conversation agent", icon: "Bot" },
   { href: "/dashboard/settings/facets", label: "Facets", icon: "Tags" },
   { href: "/dashboard/settings/roles", label: "Roles", icon: "Shield", permission: "settings:manage" },
   { href: "/dashboard/settings/team", label: "Team", icon: "Users", permission: "team" },

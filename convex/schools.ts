@@ -108,6 +108,16 @@ export const updateFaqContent = mutation({
   },
 });
 
+export const updateConversationAgentEnabled = mutation({
+  args: {
+    schoolId: v.id("schools"),
+    enabled: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.schoolId, { conversationAgentEnabled: args.enabled });
+  },
+});
+
 export const get = query({
   args: { schoolId: v.id("schools") },
   handler: async (ctx, args) => {
