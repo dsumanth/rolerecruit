@@ -39,7 +39,7 @@ function jobStatusBadge(status: string) {
 export function RoleCards({ schoolId }: Props) {
   const { results: jobs, status: jobsStatus } = usePaginatedQuery(
     api.jobs.listBySchool,
-    { schoolId: schoolId as any },
+    { schoolId: schoolId as any, filter: { status: "active" } },
     { initialNumItems: 50 },
   );
   const pipeline = useQuery(api.dashboard.getPipelineBreakdown, { schoolId: schoolId as any });

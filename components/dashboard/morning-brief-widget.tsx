@@ -15,9 +15,15 @@ export function MorningBriefWidget({ schoolId }: Props) {
 
   if (!stats || !school) {
     return (
-      <Card padding="lg">
-        <div className="text-body-s text-ink-secondary">Loading today&apos;s brief...</div>
-      </Card>
+      <section>
+        <div className="flex items-baseline justify-between mb-3">
+          <h2 className="text-micro text-ink-secondary">Today&apos;s hiring brief</h2>
+          <span className="text-caption text-ink-tertiary">Sent daily at 8am IST</span>
+        </div>
+        <Card padding="md" elevation={1}>
+          <div className="text-body-s text-ink-secondary">Loading...</div>
+        </Card>
+      </section>
     );
   }
 
@@ -27,15 +33,13 @@ export function MorningBriefWidget({ schoolId }: Props) {
   const showDisabledWarning = !showRecipientWarning && !enabled;
 
   return (
-    <Card padding="lg" elevation={1}>
-      <div className="space-y-4">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-title-l text-ink">Today&apos;s hiring brief</h2>
-          <span className="text-caption text-ink-tertiary uppercase tracking-wider">
-            Sent daily at 8am IST
-          </span>
-        </div>
-
+    <section>
+      <div className="flex items-baseline justify-between mb-3">
+        <h2 className="text-micro text-ink-secondary">Today&apos;s hiring brief</h2>
+        <span className="text-caption text-ink-tertiary">Sent daily at 8am IST</span>
+      </div>
+      <Card padding="md" elevation={1}>
+        <div className="space-y-4">
         {showRecipientWarning && (
           <div className="rounded-sm bg-[color-mix(in_srgb,var(--warning)_12%,transparent)] border border-[color-mix(in_srgb,var(--warning)_45%,transparent)] px-3 py-2 text-body-s text-ink">
             Morning brief recipients not configured.{" "}
@@ -124,7 +128,8 @@ export function MorningBriefWidget({ schoolId }: Props) {
             </ul>
           </div>
         )}
-      </div>
-    </Card>
+        </div>
+      </Card>
+    </section>
   );
 }
