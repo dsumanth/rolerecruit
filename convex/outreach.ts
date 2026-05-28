@@ -3,6 +3,8 @@ import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
 import { OUTREACH_DRAFT_SYSTEM } from "./prompts/outreachDraft";
 import { getLlmClient, LLM_MODEL } from "./lib/llmClient";
+import { generateReplyToken } from "./lib/replyToken";
+import { cloudSend } from "./whatsapp";
 
 export const sendMessage = mutation({
   args: {
@@ -126,15 +128,6 @@ export const saveFailedMessage = internalMutation({
   },
 });
 
-function generateReplyToken(): string {
-  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-  let token = "";
-  for (let i = 0; i < 32; i++) {
-    token += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return token;
-}
-
 export const createDraft = internalMutation({
   args: {
     applicationId: v.id("applications"),
@@ -215,13 +208,21 @@ export const markSent = internalMutation({
   args: {
     messageId: v.id("outreachMessages"),
     externalId: v.optional(v.string()),
+    metaMessageId: v.optional(v.string()),
+    markupPct: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.messageId, {
+    const patch: Record<string, unknown> = {
       status: "sent" as any,
       sentAt: Date.now(),
       externalId: args.externalId,
-    });
+    };
+    if (args.metaMessageId !== undefined) patch.metaMessageId = args.metaMessageId;
+    if (args.markupPct !== undefined) {
+      patch.markupPct = args.markupPct;
+      patch.costCurrency = "USD";
+    }
+    await ctx.db.patch(args.messageId, patch);
   },
 });
 
@@ -250,6 +251,8 @@ export const dispatchScheduledOutreach = internalAction({
         }
 
         let externalId: string | undefined;
+        let metaMessageId: string | undefined;
+        let markupPct: number | undefined;
 
         if (msg.channel === "whatsapp") {
           if (!candidate.phone) {
@@ -257,28 +260,15 @@ export const dispatchScheduledOutreach = internalAction({
             failed++;
             continue;
           }
-
-          // Call the raw Gupshup API directly so we can update the existing row
-          // rather than letting sendWhatsAppMessage insert a new row.
-          const apiKey = process.env.GUPSHUP_API_KEY;
-          const appName = process.env.GUPSHUP_APP_NAME;
-          const sourceNumber = process.env.GUPSHUP_SOURCE_NUMBER;
-          if (!apiKey || !appName || !sourceNumber) {
-            throw new Error("WhatsApp API not configured");
-          }
-          const GUPSHUP_API = "https://api.gupshup.io/wa/api/v1/msg";
-          const response = await fetch(
-            `${GUPSHUP_API}?apikey=${apiKey}&source=${sourceNumber}&destination=${candidate.phone}&message=${encodeURIComponent(msg.body)}&app_name=${appName}`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            }
-          );
-          if (!response.ok) {
-            throw new Error(`Gupshup error: ${response.status}`);
-          }
-          const json: { messageId?: string } = await response.json();
-          externalId = json.messageId;
+          const result = await cloudSend(ctx, {
+            applicationId: msg.applicationId,
+            to: candidate.phone,
+            kind: "text",
+            body: msg.body,
+          });
+          externalId = result.metaMessageId;
+          metaMessageId = result.metaMessageId;
+          markupPct = result.markupPct;
 
         } else if (msg.channel === "email") {
           if (!candidate.email) {
@@ -295,11 +285,16 @@ export const dispatchScheduledOutreach = internalAction({
           const { subject, rest } = extractSubject(msg.body);
           const { Resend } = await import("resend");
           const resend = new Resend(resendApiKey);
+          const replyDomain = process.env.REPLY_INBOUND_DOMAIN ?? "reply.rolerecruit.com";
+          const replyTo = msg.replyToken
+            ? `reply+${msg.replyToken}@${replyDomain}`
+            : undefined;
           const result = await resend.emails.send({
             from: "RoleRecruit <noreply@rolerecruit.com>",
             to: candidate.email,
             subject,
             text: rest,
+            replyTo,
           });
           externalId = result.data?.id ?? undefined;
         }
@@ -307,6 +302,8 @@ export const dispatchScheduledOutreach = internalAction({
         await ctx.runMutation(internal.outreach.markSent, {
           messageId: msg._id,
           externalId,
+          metaMessageId,
+          markupPct,
         });
         sent++;
       } catch (_err) {
