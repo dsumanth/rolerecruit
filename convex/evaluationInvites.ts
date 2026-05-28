@@ -104,6 +104,21 @@ export const listForUser = query({
   },
 });
 
+/**
+ * Dev/E2E only: returns the most recently invited row in the table.
+ * The dev-only API route `/api/test/last-invite-url` reads this to hand the
+ * Playwright spec a fresh token URL without polling the email outbox. Do not
+ * expose to production traffic.
+ */
+export const lastInviteForTest = query({
+  args: {},
+  handler: async (ctx) => {
+    const rows = await ctx.db.query("evaluationInvites").collect();
+    if (rows.length === 0) return null;
+    return rows.sort((a, b) => b.invitedAt - a.invitedAt)[0];
+  },
+});
+
 export const swap = mutation({
   args: {
     inviteId: v.id("evaluationInvites"),
