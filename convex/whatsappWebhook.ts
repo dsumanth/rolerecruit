@@ -1,9 +1,10 @@
-import { internalMutation } from "./_generated/server";
+import { internalMutation, internalAction } from "./_generated/server";
 import { v } from "convex/values";
 import { normalizeToE164, countryFromPhone } from "./lib/phone";
 import { internal } from "./_generated/api";
 import { lookupMetaCostUsd, computeBillableUsd, type MessageCategory } from "./lib/metaPricing";
 import { bumpUsage } from "./whatsappUsage";
+import { verifyMetaSignature, parseMetaWebhook } from "./lib/metaWebhook";
 
 function mapStatus(metaStatus: string): "sent" | "delivered" | "failed" | undefined {
   if (metaStatus === "sent") return "sent";
@@ -123,5 +124,42 @@ export const recordInbound = internalMutation({
     });
     await ctx.scheduler.runAfter(0, internal.conversation.handleInbound, { messageId: inboundId });
     return { matched: true };
+  },
+});
+
+export const processWebhook = internalAction({
+  args: { rawBody: v.string(), signature: v.optional(v.union(v.string(), v.null())) },
+  handler: async (ctx, args): Promise<{ verified: boolean; inbound: number; statuses: number }> => {
+    const verified = await verifyMetaSignature(args.rawBody, args.signature ?? null);
+    if (!verified) return { verified: false, inbound: 0, statuses: 0 };
+
+    let payload: any;
+    try {
+      payload = JSON.parse(args.rawBody);
+    } catch {
+      return { verified: true, inbound: 0, statuses: 0 };
+    }
+    const { inbound, statuses } = parseMetaWebhook(payload);
+
+    for (const s of statuses) {
+      await ctx.runMutation(internal.whatsappWebhook.recordStatus, {
+        phoneNumberId: s.phoneNumberId,
+        metaMessageId: s.metaMessageId,
+        status: s.status,
+        recipientPhone: s.recipientPhone,
+        category: s.category,
+        pricingModel: s.pricingModel,
+        conversationId: s.conversationId,
+      });
+    }
+    for (const m of inbound) {
+      await ctx.runMutation(internal.whatsappWebhook.recordInbound, {
+        phoneNumberId: m.phoneNumberId,
+        fromPhone: m.fromPhone,
+        text: m.text,
+        metaMessageId: m.metaMessageId,
+      });
+    }
+    return { verified: true, inbound: inbound.length, statuses: statuses.length };
   },
 });
