@@ -2,6 +2,7 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { generateToken } from "./lib/tokenGen";
 import { EVALUATOR_ROLE_UNION } from "./types";
+import { maybeApplyDecision } from "./decisions";
 
 export const create = mutation({
   args: {
@@ -103,6 +104,7 @@ export const cancel = mutation({
       if (inv.status === "submitted" || inv.status === "declined" || inv.status === "cancelled") continue;
       await ctx.db.patch(inv._id, { status: "cancelled", cancelledAt: now });
     }
+    await maybeApplyDecision(ctx, demoId);
   },
 });
 

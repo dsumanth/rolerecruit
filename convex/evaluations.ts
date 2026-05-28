@@ -1,5 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { maybeApplyDecision } from "./decisions";
 
 const VOICE_INPUT_VALIDATOR = v.array(v.object({
   fieldKey: v.string(),
@@ -47,6 +48,7 @@ async function persistSubmission(
     submittedFromPlatform: platform,
   });
   await ctx.db.patch(inviteId, { status: "submitted", submittedAt: now });
+  await maybeApplyDecision(ctx, inv.demoSessionId);
 }
 
 export const submit = mutation({

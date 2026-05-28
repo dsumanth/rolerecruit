@@ -1,6 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { generateToken } from "./lib/tokenGen";
+import { maybeApplyDecision } from "./decisions";
 
 export const listForDemo = query({
   args: { demoId: v.id("demoSessions") },
@@ -37,6 +38,7 @@ export const decline = mutation({
       declinedAt: Date.now(),
       declineReason: reason,
     });
+    await maybeApplyDecision(ctx, inv.demoSessionId);
   },
 });
 
@@ -145,6 +147,7 @@ export const swap = mutation({
       cancelledAt: now,
       replacedBy: newInviteId,
     });
+    await maybeApplyDecision(ctx, old.demoSessionId);
     return newInviteId;
   },
 });
