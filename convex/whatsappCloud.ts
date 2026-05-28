@@ -84,6 +84,50 @@ export const insertCloudSentMessage = internalMutation({
   },
 });
 
+// Maps internal outreach template keys -> approved Meta templates (created in Meta Business Manager).
+// `params` is the ordered list of templateParams keys that fill the template body variables {{1}}, {{2}}, ...
+const TEMPLATE_REGISTRY: Record<string, { metaName: string; languageCode: string; params: string[] }> = {
+  shortlist_notification: { metaName: "shortlist_notification", languageCode: "en", params: ["name", "position", "school"] },
+  demo_schedule: { metaName: "demo_schedule", languageCode: "en", params: ["name", "date", "time", "topic", "classLevel", "address", "school"] },
+  feedback_request: { metaName: "feedback_request", languageCode: "en", params: ["name", "feedbackUrl"] },
+  offer_notification: { metaName: "offer_notification", languageCode: "en", params: ["name", "position", "school", "deadline"] },
+  rejection_notification: { metaName: "rejection_notification", languageCode: "en", params: ["name", "position", "school"] },
+};
+
+export const sendWhatsAppTemplate = action({
+  args: {
+    applicationId: v.id("applications"),
+    candidateId: v.id("candidates"),
+    templateName: v.string(),
+    templateParams: v.any(),
+    phone: v.string(),
+  },
+  handler: async (ctx, args): Promise<{ success: boolean; messageId?: string; error?: string }> => {
+    const spec = TEMPLATE_REGISTRY[args.templateName];
+    if (!spec) throw new Error(`Unknown template: ${args.templateName}`);
+    const p = (args.templateParams ?? {}) as Record<string, string>;
+    const bodyParams = spec.params.map((k) => p[k] ?? "");
+    try {
+      const { metaMessageId, markupPct, schoolId } = await cloudSend(ctx, {
+        applicationId: args.applicationId, to: args.phone,
+        kind: "template", templateName: spec.metaName, languageCode: spec.languageCode, bodyParams,
+      });
+      await ctx.runMutation(internal.whatsappCloud.insertCloudSentMessage, {
+        applicationId: args.applicationId, candidateId: args.candidateId, schoolId,
+        type: args.templateName.replace("_notification", ""), body: bodyParams.join(" | "),
+        metaMessageId, markupPct,
+      });
+      return { success: true, messageId: metaMessageId };
+    } catch (err: any) {
+      await ctx.runMutation(internal.outreach.saveFailedMessage as any, {
+        applicationId: args.applicationId, candidateId: args.candidateId,
+        type: args.templateName, channel: "whatsapp", body: bodyParams.join(" | "), error: err?.message ?? "Unknown error",
+      });
+      return { success: false, error: err?.message };
+    }
+  },
+});
+
 export const sendWhatsAppMessage = action({
   args: {
     applicationId: v.id("applications"),

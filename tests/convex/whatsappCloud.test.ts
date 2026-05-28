@@ -77,3 +77,40 @@ describe("sendWhatsAppMessage (Cloud API)", () => {
     expect(rows[0].status).toBe("failed");
   });
 });
+
+describe("sendWhatsAppTemplate (Cloud API)", () => {
+  it("sends a template with ordered body params", async () => {
+    const f = vi.spyOn(global, "fetch").mockResolvedValueOnce({
+      ok: true, status: 200, json: async () => ({ messages: [{ id: "wamid.TPL" }] }),
+    } as any);
+    const t = convexTest(schema, modules);
+    const { applicationId, candidateId } = await seedConnected(t);
+
+    const res = await t.action(apiModule.api.whatsappCloud.sendWhatsAppTemplate, {
+      applicationId, candidateId, templateName: "shortlist_notification",
+      templateParams: { name: "Asha", position: "TGT Math", school: "Greenfield" },
+      phone: "+919876543210",
+    });
+    expect(res.success).toBe(true);
+    const sent = JSON.parse((f.mock.calls[0][1] as any).body);
+    expect(sent.type).toBe("template");
+    expect(sent.template.name).toBe("shortlist_notification");
+    expect(sent.template.components[0].parameters.map((p: any) => p.text)).toEqual(["Asha", "TGT Math", "Greenfield"]);
+
+    const rows = await t.run(async (ctx) =>
+      ctx.db.query("outreachMessages").withIndex("by_applicationId", (q) => q.eq("applicationId", applicationId)).collect(),
+    );
+    expect(rows[0].type).toBe("shortlist");
+    expect(rows[0].metaMessageId).toBe("wamid.TPL");
+  });
+
+  it("throws on an unknown template", async () => {
+    const t = convexTest(schema, modules);
+    const { applicationId, candidateId } = await seedConnected(t);
+    await expect(
+      t.action(apiModule.api.whatsappCloud.sendWhatsAppTemplate, {
+        applicationId, candidateId, templateName: "nope", templateParams: {}, phone: "+919876543210",
+      }),
+    ).rejects.toThrow("Unknown template");
+  });
+});
