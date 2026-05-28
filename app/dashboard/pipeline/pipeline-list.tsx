@@ -17,6 +17,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { UndoToast } from "@/components/ui/undo-toast";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Button } from "@/components/ui/button";
 import type { SortMode } from "@/components/pipeline/pipeline-controls";
 import type { JobStatus } from "@/components/pipeline/status-tabs";
 import type { Application } from "@/components/pipeline/application-table";
@@ -36,7 +37,7 @@ const FALLBACK_STAGES = [
 function StagePicker({ value, onChange }: { value: string; onChange: (s: string) => void }) {
   return (
     <select
-      className="w-full p-2 border border-hairline rounded"
+      className="w-full px-3 py-2 rounded-sm bg-surface border border-hairline-strong text-ink text-body-s outline-none transition-all duration-fast ease-apple-out focus:border-accent focus:ring-2 focus:ring-accent-soft"
       value={value}
       onChange={(e) => onChange(e.target.value)}
     >
@@ -288,21 +289,17 @@ export function PipelineList({ schoolId }: { schoolId: any }) {
             ) : undefined
           }
         >
-          <button
-            className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded text-body-s"
-            onClick={() => setConfirmRemove(true)}
-          >
+          <Button variant="danger" size="sm" iconLeft="Trash2" onClick={() => setConfirmRemove(true)}>
             Remove from pipeline
-          </button>
-          <button
-            className="bg-accent text-white px-3 py-1.5 rounded text-body-s"
-            onClick={() => setStageOpen(true)}
-          >
+          </Button>
+          <Button variant="primary" size="sm" iconLeft="MoveRight" onClick={() => setStageOpen(true)}>
             Move to stage
-          </button>
+          </Button>
           {sel.mode.kind === "ids" && (
-            <button
-              className="bg-surface text-ink px-3 py-1.5 rounded text-body-s border border-hairline"
+            <Button
+              variant="secondary"
+              size="sm"
+              iconLeft="Download"
               onClick={() => {
                 const selectedRows = sel.mode.kind === "ids"
                   ? pipelineResults.filter((r: any) => sel.isSelected(r.applicationId))
@@ -322,7 +319,7 @@ export function PipelineList({ schoolId }: { schoolId: any }) {
               }}
             >
               Export CSV
-            </button>
+            </Button>
           )}
         </BulkActionBar>
       )}
@@ -355,25 +352,23 @@ export function PipelineList({ schoolId }: { schoolId: any }) {
       {/* Stage picker modal */}
       {stageOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center"
+          className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center"
           onClick={() => setStageOpen(false)}
         >
           <div
-            className="bg-surface rounded-lg p-6 max-w-sm w-full"
+            className="bg-surface border border-hairline rounded-lg shadow-elev-3 p-6 max-w-sm w-full"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-body font-semibold mb-3">Move {countN} to stage</h3>
+            <h3 className="text-body font-semibold text-ink mb-3">Move {countN} to stage</h3>
             <StagePicker value={pickedStage} onChange={setPickedStage} />
             <div className="flex justify-end gap-2 mt-4">
-              <button
-                onClick={() => setStageOpen(false)}
-                className="text-body-s text-ink-secondary"
-              >
+              <Button variant="ghost" size="md" onClick={() => setStageOpen(false)}>
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="primary"
+                size="md"
                 disabled={!pickedStage}
-                className="bg-accent text-white px-3 py-1.5 rounded text-body-s disabled:opacity-50"
                 onClick={async () => {
                   const args: any =
                     sel.mode.kind === "ids"
@@ -400,7 +395,7 @@ export function PipelineList({ schoolId }: { schoolId: any }) {
                 }}
               >
                 Move
-              </button>
+              </Button>
             </div>
           </div>
         </div>

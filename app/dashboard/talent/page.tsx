@@ -227,9 +227,14 @@ export default function TalentBankPage() {
 
       <NlSearchBar onResults={(c, intent) => { setNlResults(c); setNlIntent(intent); }} />
       {nlResults && (
-        <div className="mb-4 text-sm text-gray-600">
+        <div className="mb-4 text-body-s text-ink-secondary">
           {nlIntent ? `Showing results for: ${nlIntent}` : null} ({nlResults.length} candidates)
-          <button className="ml-2 text-blue-600 underline" onClick={() => setNlResults(null)}>Clear</button>
+          <button
+            className="ml-2 text-accent hover:underline transition-colors duration-fast ease-apple-out"
+            onClick={() => setNlResults(null)}
+          >
+            Clear
+          </button>
         </div>
       )}
 
@@ -327,15 +332,14 @@ export default function TalentBankPage() {
             ) : undefined
           }
         >
-          <button
-            className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded text-body-s"
-            onClick={() => setConfirmDelete(true)}
-          >
+          <Button variant="danger" size="sm" iconLeft="Trash2" onClick={() => setConfirmDelete(true)}>
             Delete
-          </button>
+          </Button>
           {sel.mode.kind === "ids" && (
-            <button
-              className="bg-surface text-ink px-3 py-1.5 rounded text-body-s border border-hairline"
+            <Button
+              variant="secondary"
+              size="sm"
+              iconLeft="Download"
               onClick={() => {
                 const selectedRows = sel.mode.kind === "ids"
                   ? results.filter((r: any) => sel.isSelected(r.applicationId))
@@ -354,7 +358,7 @@ export default function TalentBankPage() {
               }}
             >
               Export CSV
-            </button>
+            </Button>
           )}
         </BulkActionBar>
       )}

@@ -113,25 +113,26 @@ export default function JobsPage() {
             ) : undefined
           }
         >
-          <button
+          <Button
+            variant="danger"
+            size="sm"
+            iconLeft="Trash2"
             disabled={!allDrafts}
             title={!allDrafts ? "Only draft jobs can be deleted in bulk" : undefined}
-            className="bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-3 py-1.5 rounded text-body-s"
             onClick={() => setConfirmDelete(true)}
           >
             Delete drafts
-          </button>
+          </Button>
 
-          <button
-            className="bg-accent text-white px-3 py-1.5 rounded text-body-s"
-            onClick={() => setStatusOpen(true)}
-          >
+          <Button variant="primary" size="sm" iconLeft="RefreshCw" onClick={() => setStatusOpen(true)}>
             Change status
-          </button>
+          </Button>
 
           {sel.mode.kind === "ids" && (
-            <button
-              className="bg-surface text-ink px-3 py-1.5 rounded text-body-s border border-hairline"
+            <Button
+              variant="secondary"
+              size="sm"
+              iconLeft="Download"
               onClick={() => {
                 const selectedRows = sel.mode.kind === "ids"
                   ? results.filter((j: any) => sel.isSelected(j._id))
@@ -151,7 +152,7 @@ export default function JobsPage() {
               }}
             >
               Export CSV
-            </button>
+            </Button>
           )}
         </BulkActionBar>
       )}
@@ -186,18 +187,18 @@ export default function JobsPage() {
       {/* Change status modal */}
       {statusOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center"
+          className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center"
           onClick={() => setStatusOpen(false)}
         >
           <div
-            className="bg-surface rounded-lg p-6 max-w-sm w-full"
+            className="bg-surface border border-hairline rounded-lg shadow-elev-3 p-6 max-w-sm w-full"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-body font-semibold mb-3">
+            <h3 className="text-body font-semibold text-ink mb-3">
               Change status for {countN} {countN === 1 ? "job" : "jobs"}
             </h3>
             <select
-              className="w-full p-2 border border-hairline rounded"
+              className="w-full px-3 py-2 rounded-sm bg-surface border border-hairline-strong text-ink text-body-s outline-none transition-all duration-fast ease-apple-out focus:border-accent focus:ring-2 focus:ring-accent-soft"
               value={pickedStatus}
               onChange={(e) => setPickedStatus(e.target.value)}
             >
@@ -208,15 +209,13 @@ export default function JobsPage() {
               <option value="closed">Closed</option>
             </select>
             <div className="flex justify-end gap-2 mt-4">
-              <button
-                onClick={() => setStatusOpen(false)}
-                className="text-body-s text-ink-secondary"
-              >
+              <Button variant="ghost" size="md" onClick={() => setStatusOpen(false)}>
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="primary"
+                size="md"
                 disabled={!pickedStatus}
-                className="bg-accent text-white px-3 py-1.5 rounded text-body-s disabled:opacity-50"
                 onClick={async () => {
                   const args: any =
                     sel.mode.kind === "ids"
@@ -243,7 +242,7 @@ export default function JobsPage() {
                 }}
               >
                 Apply
-              </button>
+              </Button>
             </div>
           </div>
         </div>

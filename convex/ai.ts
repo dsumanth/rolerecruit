@@ -7,6 +7,7 @@ import { EMPTY_RELATIONSHIPS } from "./types";
 import { getLlmClient, LLM_MODEL } from "./lib/llmClient";
 import { repairJsonControlChars } from "./lib/jsonRepair";
 import { normalizeFacetArray, normalizeStringArray, normalizeOptionalString } from "./facetNormalize";
+import { sanitizeRawChunks } from "./rawChunks";
 
 const TYPED_FACET_KEYS = [
   "specializations", "gradeLevels", "pedagogicalApproach", "leadershipRoles",
@@ -195,13 +196,27 @@ export const parseProfileFromText = action({
 
     const systemPrompt = buildFacetExtractionPrompt(promotedKeys);
 
+    // The output schema is verbose — every facet value carries an evidence
+    // block (quote + ~80 chars of context), plus a full rawChunks transcript of
+    // the input. A real resume can blow past 8k tokens easily; 8192 cut off
+    // mid-JSON in production. 32768 leaves ~4x headroom under Gemini 2.5
+    // Flash-Lite's 65k output ceiling. max_tokens is a ceiling, not a quota —
+    // the model still stops when it's done.
+    //
+    // INPUT_CHAR_CAP: safety net only. Real resumes top out around 20k chars
+    // and Flash-Lite accepts ~1M input tokens, so 50k is well within bounds.
+    // Log if hit so we know to raise it.
+    const INPUT_CHAR_CAP = 50_000;
+    if (args.text.length > INPUT_CHAR_CAP) {
+      console.log("[parseProfile] input-truncated", args.text.length);
+    }
     const response = await client.chat.completions.create({
       model: LLM_MODEL,
-      max_tokens: 8192,
+      max_tokens: 32768,
       temperature: 0,
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: args.text.substring(0, 12000) },
+        { role: "user", content: args.text.substring(0, INPUT_CHAR_CAP) },
       ],
     });
 
@@ -317,7 +332,7 @@ export const parseProfileFromText = action({
         subjects: normalizeStringArray(parsed.subjects),
         yearsExperience: typeof yrs === "number" && Number.isFinite(yrs) ? yrs : null,
         parsedFacets: parsedFacets as any,
-        rawChunks: Array.isArray(parsed.rawChunks) ? parsed.rawChunks : [],
+        rawChunks: sanitizeRawChunks(parsed.rawChunks),
         candidateSummary: typeof parsed.candidateSummary === "string" ? parsed.candidateSummary : "",
         relationships,
       };

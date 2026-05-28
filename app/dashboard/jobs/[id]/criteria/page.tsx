@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { PageHeader, Badge, Card } from "@/components/ui";
+import { PageHeader, Badge, Card, Button } from "@/components/ui";
 import { ScoringRuleEditor } from "@/components/criteria/ScoringRuleEditor";
 import { CriteriaNaturalLanguageEditor } from "@/components/criteria/CriteriaNaturalLanguageEditor";
 
@@ -59,13 +59,15 @@ export default function CriteriaPage() {
         subtitle={[job.subject, job.level, job.board].filter(Boolean).join(" · ")}
         status={jobBadge(job.status)}
         actions={
-          <button
+          <Button
+            variant="secondary"
+            size="md"
+            iconLeft="Sparkles"
             onClick={handleGenerateSuggestions}
-            disabled={loadingSuggestions}
-            className="bg-accent text-white px-4 py-2 rounded text-body-s disabled:opacity-50"
+            loading={loadingSuggestions}
           >
             {loadingSuggestions ? "Generating…" : "Generate with AI"}
-          </button>
+          </Button>
         }
       />
 
