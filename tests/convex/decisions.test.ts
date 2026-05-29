@@ -55,8 +55,8 @@ async function setup(t: ReturnType<typeof convexTest>) {
   const ruleId = await t.mutation("decisionRules:create" as any, {
     schoolId,
     name: "auto-advance on 2 hires",
-    branches: [{ condition: { minHire: 2 }, action: "advance" }],
-    fallback: "manual",
+    steps: [{ match: "all", conditions: [{ type: "recCount", rec: "hire", op: "atLeast", value: 2 }], action: "advance" }],
+    otherwise: "manual",
   } as any);
   const demoId = await t.mutation("demoSessions:create" as any, {
     applicationId: appId,
