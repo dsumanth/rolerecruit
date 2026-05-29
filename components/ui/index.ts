@@ -3,6 +3,7 @@ export { BrandMark } from "./brand-mark";
 export { Badge } from "./badge";
 export { Button } from "./button";
 export { Card } from "./card";
+export { DatePicker } from "./date-picker";
 export { Dialog } from "./dialog";
 export { Dropdown, DropdownItem, DropdownDivider, DropdownLabel } from "./dropdown";
 export { EmptyState } from "./empty-state";
