@@ -1,5 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { explainRule } from "./lib/decisionRuleEngine";
+import { buildRuleInputForDemo } from "./decisions";
 
 const REC = v.union(v.literal("hire"), v.literal("maybe"), v.literal("reject"));
 const ROLE = v.union(v.literal("principal"), v.literal("hod"), v.literal("hr_admin"), v.literal("teacher"));
@@ -27,6 +29,8 @@ const STEP_VALIDATOR = v.array(v.object({
   conditions: v.array(CONDITION_VALIDATOR),
   action: ACTION_VALIDATOR,
 }));
+
+const PREVIEW_RULE_VALIDATOR = v.object({ steps: STEP_VALIDATOR, otherwise: ACTION_VALIDATOR });
 
 export const list = query({
   args: { schoolId: v.id("schools") },
@@ -109,5 +113,44 @@ export const remove = mutation({
     const r = await ctx.db.get(ruleId);
     if (!r) throw new Error("Rule not found");
     await ctx.db.delete(ruleId);
+  },
+});
+
+export const recentDecidedDemos = query({
+  args: { schoolId: v.id("schools") },
+  handler: async (ctx, { schoolId }) => {
+    const demos = await ctx.db
+      .query("demoSessions")
+      .withIndex("by_schoolId_scheduledAt", (q) => q.eq("schoolId", schoolId))
+      .collect();
+    const completed = demos
+      .filter((d) => d.status === "completed")
+      .sort((a, b) => b.scheduledAt - a.scheduledAt)
+      .slice(0, 10);
+    const out = [];
+    for (const d of completed) {
+      const app = await ctx.db.get(d.applicationId);
+      const candidate = app ? await ctx.db.get(app.candidateId) : null;
+      out.push({
+        demoId: d._id,
+        label: `${candidate?.name ?? "Candidate"} - ${new Date(d.scheduledAt).toLocaleDateString("en-IN")}`,
+      });
+    }
+    return out;
+  },
+});
+
+export const previewRuleOnDemo = query({
+  args: { demoId: v.id("demoSessions"), rule: PREVIEW_RULE_VALIDATOR },
+  handler: async (ctx, { demoId, rule }) => {
+    const demo = await ctx.db.get(demoId);
+    if (!demo) throw new Error("Demo not found");
+    const allInvites = await ctx.db
+      .query("evaluationInvites")
+      .withIndex("by_demoSessionId", (q) => q.eq("demoSessionId", demoId))
+      .collect();
+    const nonCancelled = allInvites.filter((i) => i.status !== "cancelled");
+    const input = await buildRuleInputForDemo({ db: ctx.db }, rule, nonCancelled);
+    return explainRule(input);
   },
 });
