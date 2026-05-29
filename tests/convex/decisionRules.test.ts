@@ -20,55 +20,71 @@ async function setupSchool(t: ReturnType<typeof convexTest>) {
   } as any);
 }
 
+const advanceOn2Hires = {
+  match: "all" as const,
+  conditions: [{ type: "recCount" as const, rec: "hire" as const, op: "atLeast" as const, value: 2 }],
+  action: "advance" as const,
+};
+
 describe("decisionRules", () => {
-  it("creates a rule and lists it for the school", async () => {
+  it("creates a rule with steps/otherwise and lists it", async () => {
     const t = convexTest(schema, modules);
     const schoolId = await setupSchool(t);
     const ruleId = await t.mutation("decisionRules:create" as any, {
-      schoolId,
-      name: "Standard hire path",
-      branches: [
-        { condition: { minHire: 2, maxReject: 0 }, action: "advance" },
-      ],
-      fallback: "manual",
+      schoolId, name: "Standard hire path", steps: [advanceOn2Hires], otherwise: "manual",
     } as any);
     expect(ruleId).toBeDefined();
-
     const list = await t.query("decisionRules:list" as any, { schoolId } as any);
     expect(list).toHaveLength(1);
     expect(list[0].name).toBe("Standard hire path");
     expect(list[0].isActive).toBe(true);
   });
 
-  it("update replaces branches and fallback", async () => {
+  it("update replaces steps and otherwise", async () => {
     const t = convexTest(schema, modules);
     const schoolId = await setupSchool(t);
     const ruleId = await t.mutation("decisionRules:create" as any, {
-      schoolId, name: "r1",
-      branches: [{ condition: { minHire: 1 }, action: "advance" }],
-      fallback: "manual",
+      schoolId, name: "r1", steps: [advanceOn2Hires], otherwise: "manual",
     } as any);
-
     await t.mutation("decisionRules:update" as any, {
-      ruleId,
-      name: "r1 renamed",
-      branches: [{ condition: { minHire: 3 }, action: "reject" }],
-      fallback: "redemo",
+      ruleId, name: "r1 renamed",
+      steps: [{ match: "all", conditions: [{ type: "recCount", rec: "hire", op: "atLeast", value: 3 }], action: "reject" }],
+      otherwise: "redemo",
     } as any);
-
     const got = await t.query("decisionRules:get" as any, { ruleId } as any);
     expect(got.name).toBe("r1 renamed");
-    expect(got.branches[0].condition.minHire).toBe(3);
-    expect(got.fallback).toBe("redemo");
+    expect(got.steps[0].conditions[0].value).toBe(3);
+    expect(got.otherwise).toBe("redemo");
+  });
+
+  it("accepts every condition type", async () => {
+    const t = convexTest(schema, modules);
+    const schoolId = await setupSchool(t);
+    const id = await t.mutation("decisionRules:create" as any, {
+      schoolId, name: "all types",
+      steps: [{
+        match: "any",
+        conditions: [
+          { type: "recCount", rec: "hire", op: "exactly", value: 1 },
+          { type: "recPercent", rec: "reject", op: "atMost", value: 25 },
+          { type: "scoreAvg", fieldKey: "subjectKnowledge", op: "atLeast", value: 4 },
+          { type: "overallScore", op: "atLeast", value: 7 },
+          { type: "roleSubmitted", mode: "allOf", roles: ["principal", "hod"] },
+          { type: "roleVerdict", role: "principal", rec: "hire" },
+        ],
+        action: "advance",
+      }],
+      otherwise: "manual",
+    } as any);
+    expect(id).toBeDefined();
   });
 
   it("setActive toggles isActive", async () => {
     const t = convexTest(schema, modules);
     const schoolId = await setupSchool(t);
     const ruleId = await t.mutation("decisionRules:create" as any, {
-      schoolId, name: "r", branches: [], fallback: "manual",
+      schoolId, name: "r", steps: [], otherwise: "manual",
     } as any);
-
     await t.mutation("decisionRules:setActive" as any, { ruleId, active: false } as any);
     const got = await t.query("decisionRules:get" as any, { ruleId } as any);
     expect(got.isActive).toBe(false);
@@ -78,25 +94,18 @@ describe("decisionRules", () => {
     const t = convexTest(schema, modules);
     const schoolId = await setupSchool(t);
     const ruleId = await t.mutation("decisionRules:create" as any, {
-      schoolId, name: "r", branches: [], fallback: "manual",
+      schoolId, name: "r", steps: [], otherwise: "manual",
     } as any);
-
     await t.mutation("decisionRules:remove" as any, { ruleId } as any);
-    const list = await t.query("decisionRules:list" as any, { schoolId } as any);
-    expect(list).toHaveLength(0);
+    expect(await t.query("decisionRules:list" as any, { schoolId } as any)).toHaveLength(0);
   });
 
   it("listActive returns only active rules", async () => {
     const t = convexTest(schema, modules);
     const schoolId = await setupSchool(t);
-    const a = await t.mutation("decisionRules:create" as any, {
-      schoolId, name: "a", branches: [], fallback: "manual",
-    } as any);
-    const b = await t.mutation("decisionRules:create" as any, {
-      schoolId, name: "b", branches: [], fallback: "manual",
-    } as any);
+    const a = await t.mutation("decisionRules:create" as any, { schoolId, name: "a", steps: [], otherwise: "manual" } as any);
+    const b = await t.mutation("decisionRules:create" as any, { schoolId, name: "b", steps: [], otherwise: "manual" } as any);
     await t.mutation("decisionRules:setActive" as any, { ruleId: b, active: false } as any);
-
     const active = await t.query("decisionRules:listActive" as any, { schoolId } as any);
     expect(active.map((r: any) => r._id)).toEqual([a]);
   });
@@ -105,7 +114,7 @@ describe("decisionRules", () => {
     const t = convexTest(schema, modules);
     const schoolId = await setupSchool(t);
     await expect(t.mutation("decisionRules:create" as any, {
-      schoolId, name: "  ", branches: [], fallback: "manual",
+      schoolId, name: "  ", steps: [], otherwise: "manual",
     } as any)).rejects.toThrow(/name/i);
   });
 });
