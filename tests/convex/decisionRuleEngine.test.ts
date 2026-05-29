@@ -101,3 +101,55 @@ describe("evaluateRule - recCount", () => {
     expect(evaluateRule(buildInput({ rule, recs: [undefined] }))).toBe("manual");
   });
 });
+
+describe("evaluateRule - scores", () => {
+  it("scoreAvg passes when weighted average meets threshold", () => {
+    const rule: Rule = {
+      steps: [{ match: "all", conditions: [{ type: "scoreAvg", fieldKey: "score", op: "atLeast", value: 3.5 }], action: "advance" }],
+      otherwise: "manual",
+    };
+    const input = buildInput({ rule, recs: ["hire", "hire"], scoreField: { key: "score", values: [5, 3], weight: 2 } });
+    expect(evaluateRule(input)).toBe("advance"); // (5+3)/2 = 4
+  });
+
+  it("scoreAvg fails when average below threshold", () => {
+    const rule: Rule = {
+      steps: [{ match: "all", conditions: [{ type: "scoreAvg", fieldKey: "score", op: "atLeast", value: 4 }], action: "advance" }],
+      otherwise: "redemo",
+    };
+    const input = buildInput({ rule, recs: ["hire", "hire"], scoreField: { key: "score", values: [3, 3] } });
+    expect(evaluateRule(input)).toBe("redemo");
+  });
+
+  it("scoreAvg is unmet when no evaluation contains the field", () => {
+    const rule: Rule = {
+      steps: [{ match: "all", conditions: [{ type: "scoreAvg", fieldKey: "missing", op: "atLeast", value: 1 }], action: "advance" }],
+      otherwise: "manual",
+    };
+    const input = buildInput({ rule, recs: ["hire"], scoreField: { key: "score", values: [5] } });
+    expect(evaluateRule(input)).toBe("manual");
+  });
+
+  it("scoreAvg restricted to a formTemplateId only averages that template", () => {
+    const rule: Rule = {
+      steps: [{ match: "all", conditions: [{ type: "scoreAvg", formTemplateId: "tpl1", fieldKey: "score", op: "atLeast", value: 4 }], action: "advance" }],
+      otherwise: "manual",
+    };
+    const input = buildInput({ rule, recs: ["hire"], scoreField: { key: "score", values: [5] } });
+    expect(evaluateRule(input)).toBe("advance");
+    const miss: Rule = {
+      steps: [{ match: "all", conditions: [{ type: "scoreAvg", formTemplateId: "tplX", fieldKey: "score", op: "atLeast", value: 1 }], action: "advance" }],
+      otherwise: "manual",
+    };
+    expect(evaluateRule(buildInput({ rule: miss, recs: ["hire"], scoreField: { key: "score", values: [5] } }))).toBe("manual");
+  });
+
+  it("overallScore averages every score field across evaluations", () => {
+    const rule: Rule = {
+      steps: [{ match: "all", conditions: [{ type: "overallScore", op: "atLeast", value: 4 }], action: "advance" }],
+      otherwise: "manual",
+    };
+    const input = buildInput({ rule, recs: ["hire", "hire"], scoreField: { key: "score", values: [5, 3] } });
+    expect(evaluateRule(input)).toBe("advance"); // mean 4
+  });
+});
