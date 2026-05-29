@@ -73,3 +73,20 @@ describe("summarizeRule", () => {
     );
   });
 });
+
+import { STARTER_TEMPLATES, defaultCondition } from "../../components/settings/decision-rules/starter-templates";
+
+describe("starter templates", () => {
+  it("every starter summarizes to a non-empty sentence", () => {
+    for (const s of STARTER_TEMPLATES) {
+      const text = summarizeRule(s.rule);
+      expect(text.startsWith("Once everyone finishes:")).toBe(true);
+      expect(text.length).toBeGreaterThan(30);
+    }
+  });
+
+  it("defaultCondition produces a valid condition for each type", () => {
+    expect(defaultCondition("recCount")).toMatchObject({ type: "recCount", rec: "hire", op: "atLeast" });
+    expect(defaultCondition("roleVerdict")).toMatchObject({ type: "roleVerdict", role: "principal", rec: "hire" });
+  });
+});
