@@ -124,6 +124,22 @@ export const lastInviteForTest = query({
   },
 });
 
+export const listForDemoWithProfiles = query({
+  args: { demoId: v.id("demoSessions") },
+  handler: async (ctx, { demoId }) => {
+    const invites = await ctx.db
+      .query("evaluationInvites")
+      .withIndex("by_demoSessionId", (q) => q.eq("demoSessionId", demoId))
+      .collect();
+    const out = [];
+    for (const i of invites) {
+      const profile = await ctx.db.get(i.evaluatorUserId);
+      out.push({ ...i, profile });
+    }
+    return out;
+  },
+});
+
 export const swap = mutation({
   args: {
     inviteId: v.id("evaluationInvites"),
@@ -182,7 +198,27 @@ export const swap = mutation({
       });
     }
 
+    await ctx.scheduler.runAfter(0, internal.notifications.sendDemoEvent, {
+      event: "evaluator_swap_in",
+      demoId: old.demoSessionId,
+      targetUserIds: [newEvaluatorUserId],
+    });
+    await ctx.scheduler.runAfter(0, internal.notifications.sendDemoEvent, {
+      event: "evaluator_swap_out",
+      demoId: old.demoSessionId,
+      targetUserIds: [old.evaluatorUserId],
+    });
+
     await maybeApplyDecision(ctx, old.demoSessionId);
     return newInviteId;
+  },
+});
+
+export const get = query({
+  args: { inviteId: v.id("evaluationInvites") },
+  handler: async (ctx, { inviteId }) => {
+    const inv = await ctx.db.get(inviteId);
+    if (!inv) throw new Error("Invite not found");
+    return inv;
   },
 });

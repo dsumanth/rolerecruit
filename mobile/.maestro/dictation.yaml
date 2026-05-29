@@ -1,0 +1,16 @@
+appId: app.rolerecruit.mobile
+---
+- launchApp
+- openLink: "rolerecruit://?token=${EXPO_SEED_SESSION_TOKEN}"
+- tapOn:
+    text: "Priya"
+    index: 0
+- tapOn: "Start evaluation"
+- tapOn:
+    id: "dictate"
+- assertVisible:
+    text: "Detected language: en-IN"
+    timeout: 5000
+- tapOn:
+    id: "cancel-dictation"
+- assertNotVisible: "Detected language: en-IN"

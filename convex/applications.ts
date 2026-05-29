@@ -83,6 +83,25 @@ export const get = query({
   },
 });
 
+export const getWithCandidateAndJob = query({
+  args: { applicationId: v.id("applications") },
+  handler: async (ctx, args) => {
+    const application = await ctx.db.get(args.applicationId);
+    if (!application) return null;
+    const candidate = await ctx.db.get(application.candidateId);
+    const jobPosting = application.jobPostingId
+      ? await ctx.db.get(application.jobPostingId)
+      : null;
+    return {
+      ...application,
+      name: candidate?.name ?? "",
+      subject: jobPosting?.subject ?? "",
+      candidate,
+      jobPosting,
+    };
+  },
+});
+
 export const moveStage = mutation({
   args: {
     applicationId: v.id("applications"),
@@ -546,5 +565,16 @@ export const bulkSetStage = mutation({
       await ctx.db.patch(id as any, { stage: a.stage });
     }
     return { batchId, previousStages };
+  },
+});
+
+export const listForCandidate = query({
+  args: { candidateId: v.id("candidates") },
+  handler: async (ctx, { candidateId }) => {
+    return await ctx.db
+      .query("applications")
+      .withIndex("by_candidateId", (q) => q.eq("candidateId", candidateId))
+      .filter((q) => q.eq(q.field("pendingDeleteAt"), undefined))
+      .collect();
   },
 });

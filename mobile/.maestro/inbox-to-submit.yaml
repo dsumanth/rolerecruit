@@ -1,0 +1,30 @@
+appId: app.rolerecruit.mobile
+---
+- launchApp
+- assertVisible: "Send sign-in link"
+- tapOn:
+    id: "you@example.com"
+- inputText: ${EXPO_SEED_EMAIL}
+- tapOn: "Send sign-in link"
+- assertVisible:
+    text: "Check your inbox"
+    timeout: 5000
+# At this point the user follows the magic link from the dev mailbox. In CI,
+# the seed script can stamp the session token directly via deep-link.
+- openLink: "rolerecruit://?token=${EXPO_SEED_SESSION_TOKEN}"
+- assertVisible:
+    text: "Open now"
+    timeout: 10000
+- tapOn:
+    text: "Priya"
+    index: 0
+- assertVisible: "Start evaluation"
+- tapOn: "Start evaluation"
+- tapOn:
+    id: "score-4"
+- tapOn:
+    text: "Hire"
+- tapOn: "Submit evaluation"
+- assertVisible:
+    text: "Open now"
+    timeout: 5000

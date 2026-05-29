@@ -1,5 +1,6 @@
 import { mutation, query, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
+import type { EvaluatorRole } from "./types";
 
 export const getProfile = query({
   args: { userId: v.string() },
@@ -127,5 +128,80 @@ export const getPermissions = query({
     };
 
     return legacyPermissions[profile.role] ?? [];
+  },
+});
+
+export const getById = query({
+  args: { userId: v.id("userProfiles") },
+  handler: async (ctx, { userId }) => {
+    const u = await ctx.db.get(userId);
+    if (!u) throw new Error("User profile not found");
+    return u;
+  },
+});
+
+export const getMobileRoleContext = query({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }) => {
+    const profile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .first();
+    if (!profile) return null;
+
+    const role = await ctx.db
+      .query("roles")
+      .withIndex("by_schoolId", (q) => q.eq("schoolId", profile.schoolId))
+      .filter((q) => q.eq(q.field("name"), profile.role))
+      .first();
+
+    const permissions = role?.permissions ?? [];
+    const isHR = profile.role === "hr_admin" || profile.role === "principal";
+
+    return {
+      userProfileId: profile._id,
+      schoolId: profile.schoolId,
+      role: profile.role as EvaluatorRole,
+      permissions,
+      isHR,
+    };
+  },
+});
+
+export const getByIdInternal = internalQuery({
+  args: { userId: v.id("userProfiles") },
+  handler: async (ctx, { userId }) => await ctx.db.get(userId),
+});
+
+export const listSchoolStaffInternal = internalQuery({
+  args: { schoolId: v.id("schools") },
+  handler: async (ctx, { schoolId }) =>
+    await ctx.db
+      .query("userProfiles")
+      .withIndex("by_schoolId", (q) => q.eq("schoolId", schoolId))
+      .collect(),
+});
+
+export const registerExpoToken = mutation({
+  args: { userId: v.id("userProfiles"), token: v.string() },
+  handler: async (ctx, { userId, token }) => {
+    if (!token.trim()) throw new Error("Token cannot be empty");
+    const u = await ctx.db.get(userId);
+    if (!u) throw new Error("User profile not found");
+    const existing = u.expoPushTokens ?? [];
+    if (existing.includes(token)) return;
+    await ctx.db.patch(userId, { expoPushTokens: [...existing, token] });
+  },
+});
+
+export const unregisterExpoToken = mutation({
+  args: { userId: v.id("userProfiles"), token: v.string() },
+  handler: async (ctx, { userId, token }) => {
+    const u = await ctx.db.get(userId);
+    if (!u) throw new Error("User profile not found");
+    const existing = u.expoPushTokens ?? [];
+    const next = existing.filter((t) => t !== token);
+    if (next.length === existing.length) return;
+    await ctx.db.patch(userId, { expoPushTokens: next });
   },
 });

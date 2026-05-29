@@ -88,6 +88,7 @@ export default defineSchema({
     email: v.string(),
     schoolId: v.id("schools"),
     role: v.string(),
+    expoPushTokens: v.optional(v.array(v.string())),
   })
     .index("by_userId", ["userId"])
     .index("by_schoolId", ["schoolId"]),
