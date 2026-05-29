@@ -4,6 +4,7 @@ import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
 import { PARSED_FACETS_VERSION, EMBEDDING_VERSION } from "./versions";
 import { deleteApplicationChildren, evaluationsForApplication } from "./applications";
+import { normalizeToE164 } from "./lib/phone";
 
 export const getRejectionHistory = query({
   args: {
@@ -76,7 +77,7 @@ export const create = mutation({
   handler: async (ctx, args) => {
     return await ctx.db.insert("candidates", {
       name: args.name,
-      phone: args.phone,
+      phone: normalizeToE164(args.phone),
       email: args.email,
       location: args.location,
       qualifications: args.qualifications,
@@ -96,6 +97,26 @@ export const get = query({
   args: { candidateId: v.id("candidates") },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.candidateId);
+  },
+});
+
+export const backfillNormalizePhones = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const all = await ctx.db.query("candidates").collect();
+    let normalized = 0;
+    let unchanged = 0;
+    let invalid = 0;
+    let skipped = 0;
+    for (const c of all) {
+      if (!c.phone) { skipped++; continue; }
+      const next = normalizeToE164(c.phone);
+      if (!next) { invalid++; continue; }
+      if (next === c.phone) { unchanged++; continue; }
+      await ctx.db.patch(c._id, { phone: next });
+      normalized++;
+    }
+    return { normalized, unchanged, invalid, skipped };
   },
 });
 
@@ -339,7 +360,10 @@ export const writeCompiledData = internalMutation({
     }
 
     if (args.email && !existing?.email) patch.email = args.email;
-    if (args.phone) patch.phone = args.phone;
+    if (args.phone) {
+      const normalized = normalizeToE164(args.phone);
+      if (normalized) patch.phone = normalized;
+    }
     if (args.location) patch.location = args.location;
     if (args.currentSchool) patch.currentSchool = args.currentSchool;
     if (args.qualifications && args.qualifications.length > 0) patch.qualifications = args.qualifications;

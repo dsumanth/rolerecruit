@@ -83,6 +83,8 @@ describe("handleInbound", () => {
     expect(agentReply).toBeDefined();
     expect(agentReply?.body).toContain("4-6 LPA");
     expect(agentReply?.status).toBe("scheduled");
+    expect(typeof agentReply?.replyToken).toBe("string");
+    expect(agentReply?.replyToken?.length).toBe(32);
 
     const inbound = messages.find((m: any) => m._id === inboundId);
     expect(inbound?.escalated).not.toBe(true);

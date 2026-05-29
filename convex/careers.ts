@@ -1,6 +1,7 @@
 import { query, mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
+import { normalizeToE164 } from "./lib/phone";
 
 export const getSchoolBySlug = query({
   args: { slug: v.string() },
@@ -86,13 +87,14 @@ export const submitApplication = mutation({
     if (!args.phone && !args.email) {
       throw new Error("Either phone or email is required");
     }
-    if (args.phone && !/^\d{10,12}$/.test(args.phone)) {
+    const normalizedPhone = normalizeToE164(args.phone);
+    if (args.phone && !normalizedPhone) {
       throw new Error("Invalid phone number");
     }
 
     const candidateId = await ctx.db.insert("candidates", {
       name: args.name,
-      phone: args.phone,
+      phone: normalizedPhone,
       email: args.email,
       qualifications: args.qualifications,
       certifications: args.certifications ?? [],
@@ -192,7 +194,7 @@ export const submitApplicationForIngestion = internalMutation({
   handler: async (ctx, args) => {
     const candidateId = await ctx.db.insert("candidates", {
       name: args.name,
-      phone: args.phone,
+      phone: normalizeToE164(args.phone),
       email: args.email,
       qualifications: args.qualifications,
       certifications: args.certifications ?? [],

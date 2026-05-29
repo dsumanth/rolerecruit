@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useMutation, useAction, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 
 interface Props {
@@ -90,11 +91,7 @@ export function DemoScheduler({
 
       <div>
         <label className="block text-caption text-ink-secondary mb-1">Date</label>
-        <Input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-        />
+        <DatePicker value={date} onChange={setDate} />
       </div>
 
       <div>

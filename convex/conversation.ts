@@ -4,6 +4,7 @@ import { internal, api } from "./_generated/api";
 import { classifyReply } from "./conversation_classify";
 import { draftFaqReply } from "./conversation_faq";
 import { buildRescheduleReply } from "./conversation_reschedule";
+import { generateReplyToken } from "./lib/replyToken";
 
 const CONFIDENCE_THRESHOLD = 0.75;
 
@@ -78,6 +79,7 @@ export const insertAgentReply = internalMutation({
       direction: "outbound",
       draftedBy: "conversation_agent",
       inReplyToMessageId: args.inReplyToMessageId,
+      replyToken: args.channel === "email" ? generateReplyToken() : undefined,
     });
   },
 });

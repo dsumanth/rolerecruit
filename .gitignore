@@ -5,6 +5,9 @@ node_modules
 convex/_generated
 .superpowers
 .claude
+.claire/
+.last30days/
+.commandcode/taste/taste.md
 tsconfig.tsbuildinfo
 # Playwright E2E — generated auth state and seed fixtures
 tests/e2e/.auth/

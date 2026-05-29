@@ -4,6 +4,8 @@
 
 @layer base {
   :root {
+    color-scheme: light;
+
     /* Ink */
     --ink-1: #0f0f12;
     --ink-2: #6e6e76;
@@ -45,6 +47,8 @@
   }
 
   [data-theme="dark"] {
+    color-scheme: dark;
+
     --ink-1: #f5f5f7;
     --ink-2: #98989f;
     --ink-3: #6e6e76;

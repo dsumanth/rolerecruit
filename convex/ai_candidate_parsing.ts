@@ -6,6 +6,7 @@ import type { ParsedProfile, RelationshipsHint, PreviousSchoolHint, Qualificatio
 import { EMPTY_RELATIONSHIPS } from "./types";
 import { getLlmClient, LLM_MODEL } from "./lib/llmClient";
 import { repairJsonControlChars } from "./lib/jsonRepair";
+import { normalizeResumeWhitespace } from "./lib/inputNormalize";
 import { normalizeFacetArray, normalizeStringArray, normalizeOptionalString } from "./facetNormalize";
 import { sanitizeRawChunks } from "./rawChunks";
 
@@ -57,9 +58,14 @@ export const parseProfileFromText = action({
     // INPUT_CHAR_CAP: safety net only. Real resumes top out around 20k chars
     // and Flash-Lite accepts ~1M input tokens, so 50k is well within bounds.
     // Log if hit so we know to raise it.
+    //
+    // Whitespace normalization runs BEFORE the cap: OCR'd PDFs and Word tables
+    // dump runs of tabs/spaces that (a) waste cap budget and (b) trigger a
+    // greedy-decoding tab cascade in the model that exhausts max_tokens.
+    const normalizedText = normalizeResumeWhitespace(args.text);
     const INPUT_CHAR_CAP = 50_000;
-    if (args.text.length > INPUT_CHAR_CAP) {
-      console.log("[parseProfile] input-truncated", args.text.length);
+    if (normalizedText.length > INPUT_CHAR_CAP) {
+      console.log("[parseProfile] input-truncated", normalizedText.length);
     }
     const response = await client.chat.completions.create({
       model: LLM_MODEL,
@@ -67,7 +73,7 @@ export const parseProfileFromText = action({
       temperature: 0,
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: args.text.substring(0, INPUT_CHAR_CAP) },
+        { role: "user", content: normalizedText.substring(0, INPUT_CHAR_CAP) },
       ],
     });
 
@@ -82,6 +88,16 @@ export const parseProfileFromText = action({
       `resp=${text.length}ch`,
       `finish=${finishReason ?? "?"}`,
     );
+    // finish_reason "length" means max_tokens was hit. The trailing JSON is
+    // guaranteed truncated, and observed failures show the model spent its
+    // budget in a runaway whitespace loop. Parsing the partial response either
+    // throws on malformed structure or silently yields a fragmentary profile
+    // (e.g. name parsed, qualifications missing) that downstream pipelines
+    // can't distinguish from a real-but-sparse candidate. Fail closed instead.
+    if (finishReason === "length") {
+      console.log("[parseProfile] truncated by max_tokens; returning empty profile");
+      return emptyProfile();
+    }
     try {
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {

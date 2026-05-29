@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import { Avatar, Badge, Button, Dialog, Input, Select } from "@/components/ui";
+import { Avatar, Badge, Button, DatePicker, Dialog, Input, Select } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 type StaffRole = "principal" | "hod" | "hr_admin" | "teacher";
@@ -208,11 +208,10 @@ export function ScheduleDemoWizard({
               <label htmlFor={dateId} className="block text-body-s font-semibold text-ink">
                 Date
               </label>
-              <Input
+              <DatePicker
                 id={dateId}
-                type="date"
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
+                onChange={setDate}
               />
             </div>
             <div className="space-y-1.5">
