@@ -153,3 +153,78 @@ describe("evaluateRule - scores", () => {
     expect(evaluateRule(input)).toBe("advance"); // mean 4
   });
 });
+
+describe("evaluateRule - roles and match modes", () => {
+  it("roleSubmitted allOf requires every listed role to have submitted", () => {
+    const rule: Rule = {
+      steps: [{ match: "all", conditions: [{ type: "roleSubmitted", mode: "allOf", roles: ["principal", "hod"] }], action: "advance" }],
+      otherwise: "manual",
+    };
+    expect(evaluateRule(buildInput({ rule, recs: ["hire", "hire"], roles: ["principal", "hod"] }))).toBe("advance");
+    expect(evaluateRule(buildInput({ rule, recs: ["hire", "hire"], roles: ["principal", "hr_admin"] }))).toBe("manual");
+  });
+
+  it("roleSubmitted anyOf needs at least one listed role", () => {
+    const rule: Rule = {
+      steps: [{ match: "all", conditions: [{ type: "roleSubmitted", mode: "anyOf", roles: ["principal", "hod"] }], action: "advance" }],
+      otherwise: "manual",
+    };
+    expect(evaluateRule(buildInput({ rule, recs: ["hire"], roles: ["hod"] }))).toBe("advance");
+  });
+
+  it("roleVerdict matches a specific role's recommendation (veto)", () => {
+    const rule: Rule = {
+      steps: [{ match: "all", conditions: [{ type: "roleVerdict", role: "principal", rec: "hire" }], action: "advance" }],
+      otherwise: "manual",
+    };
+    expect(evaluateRule(buildInput({ rule, recs: ["hire", "reject"], roles: ["principal", "teacher"] }))).toBe("advance");
+    expect(evaluateRule(buildInput({ rule, recs: ["reject", "hire"], roles: ["principal", "teacher"] }))).toBe("manual");
+  });
+
+  it("match all requires every condition; match any requires one", () => {
+    const allRule: Rule = {
+      steps: [{
+        match: "all",
+        conditions: [
+          { type: "recCount", rec: "hire", op: "atLeast", value: 2 },
+          { type: "recCount", rec: "reject", op: "atMost", value: 0 },
+        ],
+        action: "advance",
+      }],
+      otherwise: "manual",
+    };
+    expect(evaluateRule(buildInput({ rule: allRule, recs: ["hire", "hire", "reject"] }))).toBe("manual");
+
+    const anyRule: Rule = { ...allRule, steps: [{ ...allRule.steps[0], match: "any" }] };
+    expect(evaluateRule(buildInput({ rule: anyRule, recs: ["hire", "hire", "reject"] }))).toBe("advance");
+  });
+
+  it("first matching step wins", () => {
+    const rule: Rule = {
+      steps: [
+        { match: "all", conditions: [{ type: "recCount", rec: "reject", op: "atMost", value: 5 }], action: "manual" },
+        { match: "all", conditions: [{ type: "recCount", rec: "hire", op: "atLeast", value: 1 }], action: "advance" },
+      ],
+      otherwise: "reject",
+    };
+    expect(evaluateRule(buildInput({ rule, recs: ["hire"] }))).toBe("manual");
+  });
+
+  it("explainRule reports matched step index and per-condition results", () => {
+    const rule: Rule = {
+      steps: [{
+        match: "all",
+        conditions: [
+          { type: "recCount", rec: "hire", op: "atLeast", value: 2 },
+          { type: "recCount", rec: "reject", op: "atMost", value: 0 },
+        ],
+        action: "advance",
+      }],
+      otherwise: "manual",
+    };
+    const ex = explainRule(buildInput({ rule, recs: ["hire", "reject"] }));
+    expect(ex.action).toBe("manual");
+    expect(ex.matchedStepIndex).toBeNull();
+    expect(ex.steps[0].conditions.map((c) => c.passed)).toEqual([false, false]);
+  });
+});
