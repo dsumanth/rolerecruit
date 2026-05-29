@@ -12,7 +12,6 @@ import { SettingsScreen } from "@/screens/settings";
 import { TemplatesIndexScreen } from "@/screens/templates";
 import { TemplateEditorScreen } from "@/screens/template-editor";
 import { DecisionRulesIndexScreen } from "@/screens/decision-rules";
-import { RuleEditorScreen } from "@/screens/rule-editor";
 import { DeclineModal } from "@/components/demos/decline-modal";
 import { useSession } from "@/hooks/use-session";
 import { useRoleContext } from "@/hooks/use-role-context";
@@ -32,7 +31,6 @@ export type RootStackParamList = {
   Templates: undefined;
   TemplateEditor: { role: "principal" | "hod" | "hr_admin" | "teacher" };
   DecisionRules: undefined;
-  RuleEditor: { ruleId?: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -105,11 +103,6 @@ export function AppNav() {
               name="DecisionRules"
               component={DecisionRulesIndexScreen}
               options={{ headerShown: true, title: "Decision rules" }}
-            />
-            <Stack.Screen
-              name="RuleEditor"
-              component={RuleEditorScreen}
-              options={{ headerShown: true, title: "Edit rule" }}
             />
           </>
         ) : (
