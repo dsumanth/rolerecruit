@@ -1,179 +1,230 @@
 import { describe, it, expect } from "vitest";
-import { evaluateRule, type RuleInput } from "../../convex/lib/decisionRuleEngine";
+import {
+  evaluateRule,
+  explainRule,
+  type Rule,
+  type RuleInput,
+  type Recommendation,
+} from "../../convex/lib/decisionRuleEngine";
 
-type Rec = "hire" | "maybe" | "reject" | undefined;
+type Rec = Recommendation | undefined;
 
+// Builds a RuleInput from a flat description. Each entry in `recs` is one
+// invite/evaluation; `undefined` means the invite was declined (no evaluation).
 function buildInput(opts: {
-  branches?: any[];
-  fallback?: "advance" | "reject" | "redemo" | "manual";
+  rule: Rule;
   recs?: Rec[];
-  rolesSubmitted?: string[];
-  scoreField?: { key: string; values: number[]; weight?: number };
+  roles?: string[];
+  scoreField?: { key: string; values: number[]; weight?: number; type?: string };
 }): RuleInput {
-  const invites = (opts.recs ?? []).map((rec, i) => ({
-    _id: `inv${i}` as any,
-    evaluatorRole: opts.rolesSubmitted?.[i] ?? "principal",
-    status: rec === undefined ? "declined" : "submitted",
-    formTemplateId: "tpl1" as any,
-  }));
   const fieldKey = opts.scoreField?.key ?? "score";
-  const evaluations = (opts.recs ?? []).flatMap((rec, i) => {
-    if (rec === undefined) return [];
-    return [{
-      _id: `eval${i}` as any,
-      inviteId: invites[i]._id,
-      formTemplateId: "tpl1" as any,
-      responses: opts.scoreField ? { [fieldKey]: opts.scoreField.values[i] ?? 0 } : {},
-      recommendation: rec,
-    }];
-  });
+  const invites = (opts.recs ?? []).map((rec, i) => ({
+    _id: `inv${i}`,
+    evaluatorRole: opts.roles?.[i] ?? "principal",
+    status: rec === undefined ? "declined" : "submitted",
+    formTemplateId: "tpl1",
+  }));
+  const evaluations = (opts.recs ?? []).flatMap((rec, i) =>
+    rec === undefined
+      ? []
+      : [{
+          _id: `eval${i}`,
+          inviteId: `inv${i}`,
+          formTemplateId: "tpl1",
+          responses: opts.scoreField ? { [fieldKey]: opts.scoreField.values[i] ?? 0 } : {},
+          recommendation: rec,
+        }],
+  );
   const template = {
-    _id: "tpl1" as any,
+    _id: "tpl1",
     fields: opts.scoreField
-      ? [{ key: fieldKey, label: "X", type: "score_1_5", weight: opts.scoreField.weight }]
+      ? [{ key: fieldKey, type: opts.scoreField.type ?? "score_1_5", weight: opts.scoreField.weight }]
       : [],
   };
-  return {
-    rule: {
-      branches: opts.branches ?? [],
-      fallback: opts.fallback ?? "manual",
-    },
-    invites,
-    evaluations,
-    templates: [template],
-  };
+  return { rule: opts.rule, invites, evaluations, templates: [template] };
 }
 
-describe("evaluateRule", () => {
-  it("returns fallback when there are no branches", () => {
-    expect(evaluateRule(buildInput({ fallback: "manual", recs: ["hire", "hire"] }))).toBe("manual");
+describe("evaluateRule - recCount", () => {
+  it("returns otherwise when there are no steps", () => {
+    const rule: Rule = { steps: [], otherwise: "manual" };
+    expect(evaluateRule(buildInput({ rule, recs: ["hire", "hire"] }))).toBe("manual");
   });
 
-  it("matches minHire branch and ignores later branches", () => {
-    const input = buildInput({
-      branches: [
-        { condition: { minHire: 2 }, action: "advance" },
-        { condition: { maxReject: 0 }, action: "redemo" },
+  it("matches recCount atLeast and ignores later steps", () => {
+    const rule: Rule = {
+      steps: [
+        { match: "all", conditions: [{ type: "recCount", rec: "hire", op: "atLeast", value: 2 }], action: "advance" },
+        { match: "all", conditions: [{ type: "recCount", rec: "reject", op: "atMost", value: 0 }], action: "redemo" },
       ],
-      fallback: "manual",
-      recs: ["hire", "hire", "maybe"],
-    });
-    expect(evaluateRule(input)).toBe("advance");
+      otherwise: "manual",
+    };
+    expect(evaluateRule(buildInput({ rule, recs: ["hire", "hire", "maybe"] }))).toBe("advance");
   });
 
-  it("does not match minHire when threshold not met", () => {
-    const input = buildInput({
-      branches: [{ condition: { minHire: 3 }, action: "advance" }],
-      fallback: "manual",
-      recs: ["hire", "hire", "maybe"],
-    });
-    expect(evaluateRule(input)).toBe("manual");
+  it("fails recCount atLeast when threshold not met", () => {
+    const rule: Rule = {
+      steps: [{ match: "all", conditions: [{ type: "recCount", rec: "hire", op: "atLeast", value: 3 }], action: "advance" }],
+      otherwise: "manual",
+    };
+    expect(evaluateRule(buildInput({ rule, recs: ["hire", "hire", "maybe"] }))).toBe("manual");
   });
 
-  it("matches maxReject when reject count <= threshold", () => {
-    const input = buildInput({
-      branches: [{ condition: { maxReject: 1 }, action: "advance" }],
-      fallback: "reject",
-      recs: ["hire", "reject"],
-    });
-    expect(evaluateRule(input)).toBe("advance");
+  it("supports recCount atMost and exactly", () => {
+    const atMost: Rule = {
+      steps: [{ match: "all", conditions: [{ type: "recCount", rec: "reject", op: "atMost", value: 1 }], action: "advance" }],
+      otherwise: "reject",
+    };
+    expect(evaluateRule(buildInput({ rule: atMost, recs: ["hire", "reject"] }))).toBe("advance");
+
+    const exactly: Rule = {
+      steps: [{ match: "all", conditions: [{ type: "recCount", rec: "hire", op: "exactly", value: 2 }], action: "advance" }],
+      otherwise: "manual",
+    };
+    expect(evaluateRule(buildInput({ rule: exactly, recs: ["hire", "hire"] }))).toBe("advance");
+    expect(evaluateRule(buildInput({ rule: exactly, recs: ["hire"] }))).toBe("manual");
   });
 
-  it("fails maxReject when reject count exceeds threshold", () => {
-    const input = buildInput({
-      branches: [{ condition: { maxReject: 0 }, action: "advance" }],
-      fallback: "reject",
-      recs: ["reject", "hire"],
-    });
-    expect(evaluateRule(input)).toBe("reject");
+  it("recPercent computes share of submitted evaluations", () => {
+    const rule: Rule = {
+      steps: [{ match: "all", conditions: [{ type: "recPercent", rec: "hire", op: "atLeast", value: 51 }], action: "advance" }],
+      otherwise: "manual",
+    };
+    expect(evaluateRule(buildInput({ rule, recs: ["hire", "hire", "reject"] }))).toBe("advance"); // 66%
+    expect(evaluateRule(buildInput({ rule, recs: ["hire", "reject"] }))).toBe("manual"); // 50%
   });
 
-  it("computes weighted average and passes minAverage threshold", () => {
-    const input = buildInput({
-      branches: [{
-        condition: { minAverage: { fieldKey: "score", minValue: 3.5 } },
-        action: "advance",
-      }],
-      fallback: "manual",
-      recs: ["hire", "hire"],
-      scoreField: { key: "score", values: [5, 3], weight: 2 },
-    });
-    expect(evaluateRule(input)).toBe("advance");
+  it("recPercent with zero submissions is treated as 0 percent", () => {
+    const rule: Rule = {
+      steps: [{ match: "all", conditions: [{ type: "recPercent", rec: "hire", op: "atLeast", value: 1 }], action: "advance" }],
+      otherwise: "manual",
+    };
+    expect(evaluateRule(buildInput({ rule, recs: [undefined] }))).toBe("manual");
+  });
+});
+
+describe("evaluateRule - scores", () => {
+  it("scoreAvg passes when weighted average meets threshold", () => {
+    const rule: Rule = {
+      steps: [{ match: "all", conditions: [{ type: "scoreAvg", fieldKey: "score", op: "atLeast", value: 3.5 }], action: "advance" }],
+      otherwise: "manual",
+    };
+    const input = buildInput({ rule, recs: ["hire", "hire"], scoreField: { key: "score", values: [5, 3], weight: 2 } });
+    expect(evaluateRule(input)).toBe("advance"); // (5+3)/2 = 4
   });
 
-  it("fails minAverage when average below threshold", () => {
-    const input = buildInput({
-      branches: [{
-        condition: { minAverage: { fieldKey: "score", minValue: 4 } },
-        action: "advance",
-      }],
-      fallback: "redemo",
-      recs: ["hire", "hire"],
-      scoreField: { key: "score", values: [3, 3] },
-    });
+  it("scoreAvg fails when average below threshold", () => {
+    const rule: Rule = {
+      steps: [{ match: "all", conditions: [{ type: "scoreAvg", fieldKey: "score", op: "atLeast", value: 4 }], action: "advance" }],
+      otherwise: "redemo",
+    };
+    const input = buildInput({ rule, recs: ["hire", "hire"], scoreField: { key: "score", values: [3, 3] } });
     expect(evaluateRule(input)).toBe("redemo");
   });
 
-  it("treats minAverage clause as unmet when no submitted evaluation contains the field", () => {
-    const input = buildInput({
-      branches: [{
-        condition: { minAverage: { fieldKey: "missing", minValue: 1 } },
-        action: "advance",
-      }],
-      fallback: "manual",
-      recs: ["hire"],
-      scoreField: { key: "score", values: [5] },
-    });
+  it("scoreAvg is unmet when no evaluation contains the field", () => {
+    const rule: Rule = {
+      steps: [{ match: "all", conditions: [{ type: "scoreAvg", fieldKey: "missing", op: "atLeast", value: 1 }], action: "advance" }],
+      otherwise: "manual",
+    };
+    const input = buildInput({ rule, recs: ["hire"], scoreField: { key: "score", values: [5] } });
     expect(evaluateRule(input)).toBe("manual");
   });
 
-  it("requiredRoles must all have at least one submitted evaluation", () => {
-    const input = buildInput({
-      branches: [{
-        condition: { requiredRoles: ["principal", "hod"] },
-        action: "advance",
-      }],
-      fallback: "manual",
-      recs: ["hire", "hire"],
-      rolesSubmitted: ["principal", "hr_admin"],
-    });
-    expect(evaluateRule(input)).toBe("manual");
-  });
-
-  it("requiredRoles matches when all roles have a submission", () => {
-    const input = buildInput({
-      branches: [{
-        condition: { requiredRoles: ["principal", "hod"] },
-        action: "advance",
-      }],
-      fallback: "manual",
-      recs: ["hire", "hire"],
-      rolesSubmitted: ["principal", "hod"],
-    });
+  it("scoreAvg restricted to a formTemplateId only averages that template", () => {
+    const rule: Rule = {
+      steps: [{ match: "all", conditions: [{ type: "scoreAvg", formTemplateId: "tpl1", fieldKey: "score", op: "atLeast", value: 4 }], action: "advance" }],
+      otherwise: "manual",
+    };
+    const input = buildInput({ rule, recs: ["hire"], scoreField: { key: "score", values: [5] } });
     expect(evaluateRule(input)).toBe("advance");
+    const miss: Rule = {
+      steps: [{ match: "all", conditions: [{ type: "scoreAvg", formTemplateId: "tplX", fieldKey: "score", op: "atLeast", value: 1 }], action: "advance" }],
+      otherwise: "manual",
+    };
+    expect(evaluateRule(buildInput({ rule: miss, recs: ["hire"], scoreField: { key: "score", values: [5] } }))).toBe("manual");
   });
 
-  it("AND-conjoins multiple clauses within one condition", () => {
-    const input = buildInput({
-      branches: [{
-        condition: { minHire: 2, maxReject: 0 },
+  it("overallScore averages every score field across evaluations", () => {
+    const rule: Rule = {
+      steps: [{ match: "all", conditions: [{ type: "overallScore", op: "atLeast", value: 4 }], action: "advance" }],
+      otherwise: "manual",
+    };
+    const input = buildInput({ rule, recs: ["hire", "hire"], scoreField: { key: "score", values: [5, 3] } });
+    expect(evaluateRule(input)).toBe("advance"); // mean 4
+  });
+});
+
+describe("evaluateRule - roles and match modes", () => {
+  it("roleSubmitted allOf requires every listed role to have submitted", () => {
+    const rule: Rule = {
+      steps: [{ match: "all", conditions: [{ type: "roleSubmitted", mode: "allOf", roles: ["principal", "hod"] }], action: "advance" }],
+      otherwise: "manual",
+    };
+    expect(evaluateRule(buildInput({ rule, recs: ["hire", "hire"], roles: ["principal", "hod"] }))).toBe("advance");
+    expect(evaluateRule(buildInput({ rule, recs: ["hire", "hire"], roles: ["principal", "hr_admin"] }))).toBe("manual");
+  });
+
+  it("roleSubmitted anyOf needs at least one listed role", () => {
+    const rule: Rule = {
+      steps: [{ match: "all", conditions: [{ type: "roleSubmitted", mode: "anyOf", roles: ["principal", "hod"] }], action: "advance" }],
+      otherwise: "manual",
+    };
+    expect(evaluateRule(buildInput({ rule, recs: ["hire"], roles: ["hod"] }))).toBe("advance");
+  });
+
+  it("roleVerdict matches a specific role's recommendation (veto)", () => {
+    const rule: Rule = {
+      steps: [{ match: "all", conditions: [{ type: "roleVerdict", role: "principal", rec: "hire" }], action: "advance" }],
+      otherwise: "manual",
+    };
+    expect(evaluateRule(buildInput({ rule, recs: ["hire", "reject"], roles: ["principal", "teacher"] }))).toBe("advance");
+    expect(evaluateRule(buildInput({ rule, recs: ["reject", "hire"], roles: ["principal", "teacher"] }))).toBe("manual");
+  });
+
+  it("match all requires every condition; match any requires one", () => {
+    const allRule: Rule = {
+      steps: [{
+        match: "all",
+        conditions: [
+          { type: "recCount", rec: "hire", op: "atLeast", value: 2 },
+          { type: "recCount", rec: "reject", op: "atMost", value: 0 },
+        ],
         action: "advance",
       }],
-      fallback: "manual",
-      recs: ["hire", "hire", "reject"],
-    });
-    expect(evaluateRule(input)).toBe("manual");
+      otherwise: "manual",
+    };
+    expect(evaluateRule(buildInput({ rule: allRule, recs: ["hire", "hire", "reject"] }))).toBe("manual");
+
+    const anyRule: Rule = { ...allRule, steps: [{ ...allRule.steps[0], match: "any" }] };
+    expect(evaluateRule(buildInput({ rule: anyRule, recs: ["hire", "hire", "reject"] }))).toBe("advance");
   });
 
-  it("first-match-wins: earlier branch fires even if later would match", () => {
-    const input = buildInput({
-      branches: [
-        { condition: { maxReject: 5 }, action: "manual" },
-        { condition: { minHire: 1 }, action: "advance" },
+  it("first matching step wins", () => {
+    const rule: Rule = {
+      steps: [
+        { match: "all", conditions: [{ type: "recCount", rec: "reject", op: "atMost", value: 5 }], action: "manual" },
+        { match: "all", conditions: [{ type: "recCount", rec: "hire", op: "atLeast", value: 1 }], action: "advance" },
       ],
-      fallback: "reject",
-      recs: ["hire"],
-    });
-    expect(evaluateRule(input)).toBe("manual");
+      otherwise: "reject",
+    };
+    expect(evaluateRule(buildInput({ rule, recs: ["hire"] }))).toBe("manual");
+  });
+
+  it("explainRule reports matched step index and per-condition results", () => {
+    const rule: Rule = {
+      steps: [{
+        match: "all",
+        conditions: [
+          { type: "recCount", rec: "hire", op: "atLeast", value: 2 },
+          { type: "recCount", rec: "reject", op: "atMost", value: 0 },
+        ],
+        action: "advance",
+      }],
+      otherwise: "manual",
+    };
+    const ex = explainRule(buildInput({ rule, recs: ["hire", "reject"] }));
+    expect(ex.action).toBe("manual");
+    expect(ex.matchedStepIndex).toBeNull();
+    expect(ex.steps[0].conditions.map((c) => c.passed)).toEqual([false, false]);
   });
 });

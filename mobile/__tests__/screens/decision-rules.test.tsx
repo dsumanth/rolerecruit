@@ -12,8 +12,10 @@ jest.mock("convex/react", () => ({
       _id: "r1",
       name: "Strict",
       isActive: true,
-      branches: [{ condition: { minHire: 2 }, action: "advance" }],
-      fallback: "manual",
+      steps: [
+        { match: "all", conditions: [{ type: "recCount", rec: "hire", op: "atLeast", value: 2 }], action: "advance" },
+      ],
+      otherwise: "manual",
     },
   ],
 }));
@@ -24,9 +26,21 @@ jest.mock("@convex/_generated/api", () => ({
 import { DecisionRulesIndexScreen } from "@/screens/decision-rules";
 
 describe("DecisionRulesIndexScreen", () => {
-  it("renders the rule with active badge", () => {
+  it("renders the rule name and active badge", () => {
     render(<DecisionRulesIndexScreen />);
     expect(screen.getByText("Strict")).toBeTruthy();
     expect(screen.getByText("Active")).toBeTruthy();
+  });
+
+  it("renders a plain-English summary", () => {
+    render(<DecisionRulesIndexScreen />);
+    expect(
+      screen.getByText(/Once everyone finishes: if at least 2 recommended Hire, Move forward/),
+    ).toBeTruthy();
+  });
+
+  it("does not render a 'New rule' editing control", () => {
+    render(<DecisionRulesIndexScreen />);
+    expect(screen.queryByText("New rule")).toBeNull();
   });
 });

@@ -15,6 +15,32 @@ const facetValueValidator = v.object({
 
 const facetArrayValidator = v.array(facetValueValidator);
 
+const decisionActionValidator = v.union(
+  v.literal("advance"),
+  v.literal("reject"),
+  v.literal("redemo"),
+  v.literal("manual"),
+);
+
+const decisionRecValidator = v.union(v.literal("hire"), v.literal("maybe"), v.literal("reject"));
+const decisionRoleValidator = v.union(
+  v.literal("principal"),
+  v.literal("hod"),
+  v.literal("hr_admin"),
+  v.literal("teacher"),
+);
+const decisionRangeOp = v.union(v.literal("atLeast"), v.literal("atMost"));
+const decisionCountOp = v.union(v.literal("atLeast"), v.literal("atMost"), v.literal("exactly"));
+
+const decisionConditionValidator = v.union(
+  v.object({ type: v.literal("recCount"), rec: decisionRecValidator, op: decisionCountOp, value: v.number() }),
+  v.object({ type: v.literal("recPercent"), rec: decisionRecValidator, op: decisionRangeOp, value: v.number() }),
+  v.object({ type: v.literal("scoreAvg"), formTemplateId: v.optional(v.string()), fieldKey: v.string(), op: decisionRangeOp, value: v.number() }),
+  v.object({ type: v.literal("overallScore"), op: decisionRangeOp, value: v.number() }),
+  v.object({ type: v.literal("roleSubmitted"), mode: v.union(v.literal("allOf"), v.literal("anyOf")), roles: v.array(decisionRoleValidator) }),
+  v.object({ type: v.literal("roleVerdict"), role: decisionRoleValidator, rec: decisionRecValidator }),
+);
+
 export default defineSchema({
   schools: defineTable({
     name: v.string(),
@@ -510,29 +536,12 @@ export default defineSchema({
   decisionRules: defineTable({
     schoolId: v.id("schools"),
     name: v.string(),
-    branches: v.array(v.object({
-      condition: v.object({
-        minHire: v.optional(v.number()),
-        maxReject: v.optional(v.number()),
-        minAverage: v.optional(v.object({
-          fieldKey: v.string(),
-          minValue: v.number(),
-        })),
-        requiredRoles: v.optional(v.array(v.string())),
-      }),
-      action: v.union(
-        v.literal("advance"),
-        v.literal("reject"),
-        v.literal("redemo"),
-        v.literal("manual"),
-      ),
+    steps: v.array(v.object({
+      match: v.union(v.literal("all"), v.literal("any")),
+      conditions: v.array(decisionConditionValidator),
+      action: decisionActionValidator,
     })),
-    fallback: v.union(
-      v.literal("advance"),
-      v.literal("reject"),
-      v.literal("redemo"),
-      v.literal("manual"),
-    ),
+    otherwise: decisionActionValidator,
     isActive: v.boolean(),
     createdAt: v.number(),
   })

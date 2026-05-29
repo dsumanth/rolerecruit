@@ -5,69 +5,67 @@ import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import type { OutcomeStep, Rule, RuleAction } from "@/convex/lib/decisionRuleEngine";
 import { Badge, Button, Card, Icon, Input, Select, useToast } from "@/components/ui";
-import { BranchRow, type DraftBranch } from "./branch-row";
+import { OutcomeStepEditor } from "./outcome-step";
+import { RuleSummary } from "./rule-summary";
+import { RuleTester } from "./rule-tester";
+import { useFieldLabelLookup } from "./field-picker";
+import { STARTER_TEMPLATES } from "./starter-templates";
 
-const FALLBACK_OPTIONS = [
-  { value: "advance", label: "Advance application" },
-  { value: "reject", label: "Reject application" },
-  { value: "redemo", label: "Schedule re-demo" },
-  { value: "manual", label: "Send to manual review" },
+const ACTION_OPTS = [
+  { value: "advance", label: "Move forward" },
+  { value: "reject", label: "Reject" },
+  { value: "redemo", label: "Schedule another demo" },
+  { value: "manual", label: "Let me decide manually" },
 ];
 
-interface RuleEditorProps {
-  schoolId: string;
-  ruleId?: string;
-}
+const emptyStep = (): OutcomeStep => ({ match: "all", conditions: [], action: "advance" });
 
-export function RuleEditor({ schoolId, ruleId }: RuleEditorProps) {
-  const existing = useQuery(
-    api.decisionRules.get,
-    ruleId ? { ruleId: ruleId as Id<"decisionRules"> } : "skip",
-  );
+export function RuleEditor({ schoolId, ruleId }: { schoolId: string; ruleId?: string }) {
+  const existing = useQuery(api.decisionRules.get, ruleId ? { ruleId: ruleId as Id<"decisionRules"> } : "skip");
   const create = useMutation(api.decisionRules.create);
   const update = useMutation(api.decisionRules.update);
   const router = useRouter();
   const { toast } = useToast();
+  const getLabel = useFieldLabelLookup(schoolId);
 
   const [name, setName] = useState<string | null>(null);
-  const [branches, setBranches] = useState<DraftBranch[] | null>(null);
-  const [fallback, setFallback] = useState<DraftBranch["action"] | null>(null);
+  const [steps, setSteps] = useState<OutcomeStep[] | null>(null);
+  const [otherwise, setOtherwise] = useState<RuleAction | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (ruleId && existing && name === null) {
     setName(existing.name);
-    setBranches(existing.branches as DraftBranch[]);
-    setFallback(existing.fallback);
+    setSteps(existing.steps as OutcomeStep[]);
+    setOtherwise(existing.otherwise as RuleAction);
   }
   if (!ruleId && name === null) {
     setName("");
-    setBranches([]);
-    setFallback("manual");
+    setSteps([]);
+    setOtherwise("manual");
   }
-
-  if (name === null || branches === null || fallback === null) {
+  if (name === null || steps === null || otherwise === null) {
     return <p className="text-body-s text-ink-secondary">Loading...</p>;
   }
 
-  const addBranch = () =>
-    setBranches([...branches, { condition: { minHire: 1 }, action: "advance" }]);
+  const rule: Rule = { steps, otherwise };
 
-  const updateBranch = (i: number, next: DraftBranch) => {
-    const copy = branches.slice();
-    copy[i] = next;
-    setBranches(copy);
+  const applyStarter = (id: string) => {
+    const s = STARTER_TEMPLATES.find((x) => x.id === id);
+    if (!s) return;
+    setSteps(s.rule.steps.map((st) => ({ ...st, conditions: [...st.conditions] })));
+    setOtherwise(s.rule.otherwise);
+    if (!name.trim()) setName(s.name);
   };
 
-  const removeBranch = (i: number) => setBranches(branches.filter((_, idx) => idx !== i));
-
-  const moveBranch = (from: number, to: number) => {
-    if (to < 0 || to >= branches.length) return;
-    const copy = branches.slice();
-    const [moved] = copy.splice(from, 1);
-    copy.splice(to, 0, moved);
-    setBranches(copy);
+  const moveStep = (from: number, to: number) => {
+    if (to < 0 || to >= steps.length) return;
+    const copy = steps.slice();
+    const [m] = copy.splice(from, 1);
+    copy.splice(to, 0, m);
+    setSteps(copy);
   };
 
   const submit = async () => {
@@ -75,16 +73,10 @@ export function RuleEditor({ schoolId, ruleId }: RuleEditorProps) {
     setSaving(true);
     try {
       if (ruleId) {
-        await update({
-          ruleId: ruleId as Id<"decisionRules">,
-          name, branches, fallback,
-        });
+        await update({ ruleId: ruleId as Id<"decisionRules">, name, steps, otherwise });
         toast({ message: "Rule saved", variant: "success" });
       } else {
-        const newId = await create({
-          schoolId: schoolId as Id<"schools">,
-          name, branches, fallback,
-        });
+        const newId = await create({ schoolId: schoolId as Id<"schools">, name, steps, otherwise });
         toast({ message: "Rule created", variant: "success" });
         router.replace(`/dashboard/settings/decision-rules/${newId}`);
       }
@@ -102,32 +94,46 @@ export function RuleEditor({ schoolId, ruleId }: RuleEditorProps) {
         <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Standard hire path" />
       </Card>
 
+      <RuleSummary rule={rule} getLabel={getLabel} />
+
+      {!ruleId && steps.length === 0 && (
+        <Card padding="md" elevation={1}>
+          <p className="text-body-s font-medium text-ink mb-2">Start from an example</p>
+          <div className="grid gap-2">
+            {STARTER_TEMPLATES.map((s) => (
+              <button key={s.id} type="button" onClick={() => applyStarter(s.id)} className="text-left rounded-apple border border-hairline-strong p-3 hover:bg-accent-soft transition-colors duration-fast">
+                <p className="text-body-s font-medium text-ink">{s.name}</p>
+                <p className="text-caption text-ink-secondary">{s.description}</p>
+              </button>
+            ))}
+          </div>
+        </Card>
+      )}
+
       <Card padding="md" elevation={1}>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <Badge variant="info">Branches</Badge>
-            <span className="text-caption text-ink-secondary">First match wins</span>
+            <Badge variant="info">Steps</Badge>
+            <span className="text-caption text-ink-secondary">Checked top to bottom, first match wins</span>
           </div>
-          <Button variant="secondary" size="sm" iconLeft="Plus" onClick={addBranch}>Add branch</Button>
+          <Button variant="secondary" size="sm" iconLeft="Plus" onClick={() => setSteps([...steps, emptyStep()])}>Add step</Button>
         </div>
-
-        {branches.length === 0 ? (
-          <p className="text-body-s text-ink-tertiary">
-            No branches yet. Without branches, every demo falls through to the fallback action.
-          </p>
+        {steps.length === 0 ? (
+          <p className="text-body-s text-ink-tertiary">No steps yet. Every demo will use the &quot;Otherwise&quot; outcome below.</p>
         ) : (
           <div className="space-y-3">
-            {branches.map((b, i) => (
-              <BranchRow
+            {steps.map((s, i) => (
+              <OutcomeStepEditor
                 key={i}
-                branch={b}
+                step={s}
                 index={i}
-                onChange={(next) => updateBranch(i, next)}
-                onRemove={() => removeBranch(i)}
-                onMoveUp={() => moveBranch(i, i - 1)}
-                onMoveDown={() => moveBranch(i, i + 1)}
+                schoolId={schoolId}
+                onChange={(next) => setSteps(steps.map((x, j) => (j === i ? next : x)))}
+                onRemove={() => setSteps(steps.filter((_, j) => j !== i))}
+                onMoveUp={() => moveStep(i, i - 1)}
+                onMoveDown={() => moveStep(i, i + 1)}
                 isFirst={i === 0}
-                isLast={i === branches.length - 1}
+                isLast={i === steps.length - 1}
               />
             ))}
           </div>
@@ -137,19 +143,15 @@ export function RuleEditor({ schoolId, ruleId }: RuleEditorProps) {
       <Card padding="md" elevation={1}>
         <div className="flex items-center gap-2 mb-2">
           <Icon name="GitBranch" size={14} />
-          <p className="text-body-s font-medium text-ink">If no branch matches</p>
+          <p className="text-body-s font-medium text-ink">Otherwise</p>
         </div>
-        <Select
-          value={fallback}
-          onChange={(value) => setFallback(value as DraftBranch["action"])}
-          options={FALLBACK_OPTIONS}
-        />
+        <Select value={otherwise} onChange={(v) => setOtherwise(v as RuleAction)} options={ACTION_OPTS} />
       </Card>
 
+      <RuleTester schoolId={schoolId} rule={rule} getLabel={getLabel} />
+
       {error && (
-        <div className="rounded-apple bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] border border-[color-mix(in_srgb,var(--danger)_25%,transparent)] px-3 py-2 text-body-s text-danger">
-          {error}
-        </div>
+        <div className="rounded-apple bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] border border-[color-mix(in_srgb,var(--danger)_25%,transparent)] px-3 py-2 text-body-s text-danger">{error}</div>
       )}
 
       <div className="flex justify-end">

@@ -23,7 +23,7 @@ export default function DecisionRuleEditorPage({ params }: { params: Promise<{ r
     <div className="space-y-6">
       <PageHeader
         title={isNew ? "New decision rule" : "Edit decision rule"}
-        subtitle="Auto-applied when every non-cancelled invite reaches a terminal state. First matching branch wins."
+        subtitle="Auto-applied once everyone has finished their evaluation. Steps are checked top to bottom, first match wins."
         back={{ href: "/dashboard/settings/decision-rules", label: "Decision rules" }}
       />
       <RuleEditor schoolId={profile.schoolId} ruleId={isNew ? undefined : ruleId} />

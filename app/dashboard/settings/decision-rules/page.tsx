@@ -6,6 +6,8 @@ import { api } from "@/convex/_generated/api";
 import { authClient } from "@/lib/auth-client";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Badge, Button, Card, PageHeader, useToast } from "@/components/ui";
+import { summarizeRule } from "@/convex/lib/decisionRuleSummary";
+import type { Rule } from "@/convex/lib/decisionRuleEngine";
 
 export default function DecisionRulesIndexPage() {
   const { data: session } = authClient.useSession();
@@ -53,8 +55,8 @@ export default function DecisionRulesIndexPage() {
                       {r.isActive ? "Active" : "Disabled"}
                     </Badge>
                   </div>
-                  <p className="text-caption text-ink-secondary mt-0.5">
-                    {r.branches.length} branch{r.branches.length === 1 ? "" : "es"} · fallback: {r.fallback}
+                  <p className="text-caption text-ink-secondary mt-0.5 line-clamp-2">
+                    {summarizeRule({ steps: r.steps, otherwise: r.otherwise } as Rule)}
                   </p>
                 </div>
                 <div className="flex gap-2">
