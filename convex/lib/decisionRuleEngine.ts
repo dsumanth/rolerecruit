@@ -117,8 +117,8 @@ function conditionPasses(cond: Condition, ctx: EvalContext): boolean {
     case "recCount":
       return compareCount(recCount(ctx.evaluations, cond.rec), cond.op, cond.value);
     case "recPercent": {
-      const total = ctx.evaluations.length;
-      const pct = total === 0 ? 0 : (recCount(ctx.evaluations, cond.rec) / total) * 100;
+      const submittedCount = ctx.evaluations.length;
+      const pct = submittedCount === 0 ? 0 : (recCount(ctx.evaluations, cond.rec) / submittedCount) * 100;
       return compareRange(pct, cond.op, cond.value);
     }
     case "scoreAvg": {
