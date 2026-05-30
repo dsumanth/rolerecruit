@@ -1,4 +1,4 @@
-import { mutation, query, internalMutation } from "./_generated/server";
+import { mutation, query, action, internalQuery, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 
@@ -57,11 +57,40 @@ export const getBookingByToken = query({
   },
 });
 
-export const confirmBooking = mutation({
+export const getConfirmContext = internalQuery({
+  args: { token: v.string() },
+  handler: async (ctx, args) => {
+    const bookingToken = await ctx.db
+      .query("bookingTokens")
+      .withIndex("by_token", (q) => q.eq("token", args.token))
+      .first();
+
+    if (!bookingToken || bookingToken.used || Date.now() > bookingToken.expiresAt) {
+      return null;
+    }
+
+    const app = await ctx.db.get(bookingToken.applicationId);
+    if (!app) return null;
+
+    const candidate = await ctx.db.get(app.candidateId);
+    const school = await ctx.db.get(bookingToken.schoolId);
+
+    return {
+      applicationId: bookingToken.applicationId,
+      schoolId: bookingToken.schoolId,
+      candidateEmail: candidate?.email,
+      schoolName: school?.name ?? "School",
+    };
+  },
+});
+
+export const finalizeBooking = internalMutation({
   args: {
     token: v.string(),
     startMs: v.number(),
     endMs: v.number(),
+    googleEventId: v.optional(v.string()),
+    meetLink: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const bookingToken = await ctx.db
@@ -73,24 +102,22 @@ export const confirmBooking = mutation({
       throw new Error("Invalid or expired booking token");
     }
 
-    await ctx.db.patch(bookingToken._id, { used: true });
-
     const app = await ctx.db.get(bookingToken.applicationId);
     if (!app) throw new Error("Application not found");
 
-    // Create calendar event record
-    const eventId = `rr_${bookingToken._id}`;
+    await ctx.db.patch(bookingToken._id, { used: true });
+
     await ctx.db.insert("calendarEvents", {
       applicationId: bookingToken.applicationId,
       schoolId: bookingToken.schoolId,
-      googleEventId: eventId,
-      summary: `Demo Lesson`,
+      googleEventId: args.googleEventId ?? `rr_${bookingToken._id}`,
+      summary: "Demo Lesson",
       start: args.startMs,
       end: args.endMs,
       attendees: [],
+      meetLink: args.meetLink,
     });
 
-    // Move application to next stage if config exists
     const config = await ctx.db
       .query("pipelineConfigs")
       .withIndex("by_schoolId", (q) => q.eq("schoolId", bookingToken.schoolId))
@@ -102,6 +129,36 @@ export const confirmBooking = mutation({
         await ctx.db.patch(app._id, { stage: nextTransition.toStageId });
       }
     }
+  },
+});
+
+export const confirmBooking = action({
+  args: {
+    token: v.string(),
+    startMs: v.number(),
+    endMs: v.number(),
+  },
+  handler: async (ctx, args): Promise<{ success: true }> => {
+    const context = await ctx.runQuery(internal.booking.getConfirmContext, {
+      token: args.token,
+    });
+    if (!context) throw new Error("Invalid or expired booking token");
+
+    const event = await ctx.runAction(internal.calendar.createGoogleEvent, {
+      schoolId: context.schoolId,
+      summary: `Demo Lesson - ${context.schoolName}`,
+      startMs: args.startMs,
+      endMs: args.endMs,
+      candidateEmail: context.candidateEmail,
+    });
+
+    await ctx.runMutation(internal.booking.finalizeBooking, {
+      token: args.token,
+      startMs: args.startMs,
+      endMs: args.endMs,
+      googleEventId: event.googleEventId ?? undefined,
+      meetLink: event.meetLink ?? undefined,
+    });
 
     return { success: true };
   },

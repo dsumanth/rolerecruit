@@ -10,6 +10,7 @@ import * as pipeline_config from "../../convex/pipeline_config";
 import * as pipeline_defaults from "../../convex/pipeline_defaults";
 import * as outreach from "../../convex/outreach";
 import * as booking from "../../convex/booking";
+import * as calendar from "../../convex/calendar";
 import * as authConfig from "../../convex/auth.config";
 import * as server from "../../convex/_generated/server";
 import * as apiModule from "../../convex/_generated/api";
@@ -24,6 +25,7 @@ const modules = {
   "pipeline_defaults.ts": async () => pipeline_defaults,
   "outreach.ts": async () => outreach,
   "booking.ts": async () => booking,
+  "calendar.ts": async () => calendar,
   "auth.config.ts": async () => authConfig,
   "_generated/server.js": async () => server,
   "_generated/api.js": async () => apiModule,
@@ -195,7 +197,7 @@ describe("Candidate Full Pipeline User Journey", () => {
     const startMs = Date.now() + 2 * 24 * 60 * 60 * 1000; // 2 days from now
     const endMs = startMs + 45 * 60 * 1000; // 45 min slot
 
-    const confirmResult = await t.mutation("booking:confirmBooking", {
+    const confirmResult = await t.action("booking:confirmBooking", {
       token: bookingToken,
       startMs,
       endMs,
@@ -615,7 +617,7 @@ describe("Candidate Full Pipeline User Journey", () => {
     expect(data.valid).toBe(true);
 
     // Simulate expiry by re-confirming it (marks used)
-    await t.mutation("booking:confirmBooking", {
+    await t.action("booking:confirmBooking", {
       token,
       startMs: Date.now() + 3 * 86400000,
       endMs: Date.now() + 3 * 86400000 + 2700000,

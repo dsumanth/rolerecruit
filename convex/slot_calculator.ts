@@ -122,9 +122,18 @@ export const getAvailableSlotsForDate = action({
 
     for (const cal of interviewerCalendars) {
       try {
+        const accessToken: string = await ctx.runAction(
+          internal.calendar.ensureFreshToken,
+          {
+            calendarId: cal._id,
+            accessToken: cal.googleTokens.access_token,
+            refreshToken: cal.googleTokens.refresh_token,
+            expiry: cal.googleTokens.expiry,
+          }
+        );
         const response = await fetch(
           `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(cal.calendarId)}/events?timeMin=${new Date(dateStart).toISOString()}&timeMax=${new Date(dateEnd).toISOString()}&singleEvents=true&orderBy=startTime`,
-          { headers: { Authorization: `Bearer ${cal.googleTokens.access_token}` } }
+          { headers: { Authorization: `Bearer ${accessToken}` } }
         );
 
         if (response.ok) {

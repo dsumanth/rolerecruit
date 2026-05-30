@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useAction, useMutation } from "convex/react";
+import { useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Card, Button } from "@/components/ui";
@@ -24,7 +24,7 @@ interface Props {
 
 export function BookingView({ token, schoolId, jobTitle, schoolName }: Props) {
   const getSlots = useAction(api.slot_calculator.getAvailableSlotsForDate);
-  const confirmBooking = useMutation(api.booking.confirmBooking);
+  const confirmBooking = useAction(api.booking.confirmBooking);
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [slots, setSlots] = useState<Slot[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
