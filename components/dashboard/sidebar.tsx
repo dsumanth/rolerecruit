@@ -26,7 +26,6 @@ const PRIMARY_NAV: NavLinkItem[] = [
   { href: "/dashboard/inbox",      label: "Inbox",       icon: "Inbox" },
   { href: "/dashboard/triage",     label: "Triage",      icon: "ClipboardList" },
   { href: "/dashboard/talent",     label: "Talent Bank", icon: "Users" },
-  { href: "/dashboard/sourcing",   label: "Sourcing",    icon: "Network" },
 ];
 
 interface SidebarProps {

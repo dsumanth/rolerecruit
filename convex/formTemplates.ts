@@ -45,8 +45,7 @@ export const getForRole = query({
       .withIndex("by_schoolId_role", (q) => q.eq("schoolId", schoolId).eq("role", role))
       .filter((q) => q.eq(q.field("isActive"), true))
       .first();
-    if (!tpl) throw new Error(`No active template for role ${role} in school ${schoolId}`);
-    return tpl;
+    return tpl ?? null;
   },
 });
 

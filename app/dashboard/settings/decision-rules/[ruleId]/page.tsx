@@ -1,14 +1,13 @@
 "use client";
 
-import { use } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { authClient } from "@/lib/auth-client";
 import { PageHeader } from "@/components/ui";
 import { RuleEditor } from "@/components/settings/decision-rules/rule-editor";
 
-export default function DecisionRuleEditorPage({ params }: { params: Promise<{ ruleId: string }> }) {
-  const { ruleId } = use(params);
+export default function DecisionRuleEditorPage({ params }: { params: { ruleId: string } }) {
+  const { ruleId } = params;
   const isNew = ruleId === "new";
 
   const { data: session } = authClient.useSession();

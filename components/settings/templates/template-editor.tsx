@@ -39,11 +39,13 @@ export function TemplateEditor({ schoolId, role }: TemplateEditorProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (active && name === null && fields === null) {
-    setName(active.name);
-    setFields(active.fields as DraftField[]);
+  if (active === undefined || defaultDraft === undefined) {
+    return <p className="text-body-s text-ink-secondary">Loading...</p>;
   }
-  if (!active || name === null || fields === null) {
+  if (name === null || fields === null) {
+    const source = active ?? defaultDraft;
+    setName(source.name);
+    setFields(source.fields as DraftField[]);
     return <p className="text-body-s text-ink-secondary">Loading...</p>;
   }
 

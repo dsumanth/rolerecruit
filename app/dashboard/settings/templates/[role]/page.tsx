@@ -1,6 +1,5 @@
 "use client";
 
-import { use } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { authClient } from "@/lib/auth-client";
@@ -17,8 +16,8 @@ const ROLE_LABELS: Record<Role, string> = {
   teacher: "Teacher",
 };
 
-export default function TemplateRolePage({ params }: { params: Promise<{ role: string }> }) {
-  const { role: roleParam } = use(params);
+export default function TemplateRolePage({ params }: { params: { role: string } }) {
+  const { role: roleParam } = params;
   const role = (ROLES.includes(roleParam as Role) ? roleParam : null) as Role | null;
 
   const { data: session } = authClient.useSession();
