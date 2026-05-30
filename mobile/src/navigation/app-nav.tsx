@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { SignInScreen } from "@/screens/sign-in";
@@ -43,7 +44,16 @@ export function AppNav() {
   const { signedIn, loading: sessionLoading } = useSession();
   const role = useRoleContext();
   useRegisterPushToken();
-  if (sessionLoading || (signedIn && role.loading)) return null;
+
+  // Latch once the session is known. Foreground refetches re-toggle sessionLoading,
+  // and unmounting the tree on every refetch would reset in-progress screens (e.g. OTP entry).
+  const [sessionResolvedOnce, setSessionResolvedOnce] = useState(false);
+  useEffect(() => {
+    if (!sessionLoading) setSessionResolvedOnce(true);
+  }, [sessionLoading]);
+
+  if (!sessionResolvedOnce) return null;
+  if (signedIn && role.loading) return null;
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
